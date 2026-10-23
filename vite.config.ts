@@ -24,7 +24,7 @@ export default defineConfig({
       "@tauri-apps/plugin-autostart", "@tauri-apps/plugin-notification", "@tauri-apps/plugin-process", "@tauri-apps/plugin-updater",
     ],
   },
-  server: { port: 5420, strictPort: false, host: "localhost" },
+  server: { port: 5420, strictPort: false, host: "0.0.0.0" },
   preview: { port: 5421, host: "localhost" },
   build: { chunkSizeWarningLimit: 1500 },
 });
