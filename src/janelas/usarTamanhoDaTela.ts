@@ -27,5 +27,6 @@ export function usarTamanhoDaTela(): TamanhoDaTela {
 // Menor escala entre a escolhida e a que faz o conteúdo caber, com um piso para continuar legível.
 export function escalaQueCabe(escolhida: number, conteudo: TamanhoDaTela, espaco: TamanhoDaTela, piso = 0.6): number {
   const cabe = Math.min(espaco.largura / Math.max(1, conteudo.largura), espaco.altura / Math.max(1, conteudo.altura));
-  return Math.max(Math.min(piso, escolhida), Math.min(escolhida, cabe));
+  const pisoMobile = espaco.largura <= 768 ? Math.min(0.4, cabe) : piso;
+  return Math.max(Math.min(pisoMobile, escolhida), Math.min(escolhida, cabe));
 }

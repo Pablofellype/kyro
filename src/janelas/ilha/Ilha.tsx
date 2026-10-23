@@ -420,7 +420,9 @@ export function Ilha() {
           ? { w: LARGURA_DO_QUADRO, h: ALTURA_DO_QUADRO, r: 30 }
           : { w: LARGURA_ABA[abaAtual] ?? LARGURA_EXPANDIDA, h: alturaDaVisao(abaAtual, secaoHoje, alturaConexoes), r: 30 };
   // Em tela pequena ou com zoom alto do sistema, a aba aberta encolhe para caber em vez de sair da tela.
-  const escala = escalaQueCabe(ESCALA[cfg.tamanho], { largura: alvo.w, altura: alvo.h }, { largura: tela.largura - MARGEM_DA_TELA * 2, altura: tela.altura - ALTURA_DA_FAIXA - MARGEM_DA_TELA });
+  const ehMobile = tela.largura <= 768;
+  const margemTela = ehMobile ? 8 : MARGEM_DA_TELA;
+  const escala = escalaQueCabe(ESCALA[cfg.tamanho], { largura: alvo.w, altura: alvo.h }, { largura: tela.largura - margemTela * 2, altura: tela.altura - (ehMobile ? 0 : ALTURA_DA_FAIXA) - margemTela });
   const crescendo = alvo.w * alvo.h >= anterior.current.w * anterior.current.h;
   anterior.current = { w: alvo.w, h: alvo.h };
   const transicao = crescendo ? MOLA : FECHAR;
@@ -430,7 +432,7 @@ export function Ilha() {
   const agenteCompacto = ["agente", "pomodoro", "relogio", "nada"].includes(compacta.tipo) ? agenteDaVez : compacta.tipo === "trabalho" ? trabalhando[0] : compacta.tipo === "revelacao" && !revelacao?.marca ? revelacao?.agente : undefined;
   const agenteContinuo = estadoEfetivo === "expandida" ? agenteLateral : agenteCompacto ?? agenteDaVez;
   const restantePomodoro = restanteAtual(pomodoro, agora);
-  const barraVisivel = mostrarLateraisDaIlha({ ativadas: cfg.laterais, estado: estadoEfetivo, saudando, telaCheia: frente.telaCheia, areaEmFoco: lateraisLivres });
+  const barraVisivel = !ehMobile && mostrarLateraisDaIlha({ ativadas: cfg.laterais, estado: estadoEfetivo, saudando, telaCheia: frente.telaCheia, areaEmFoco: lateraisLivres });
 
   const abaDaCompacta = (): VisaoIlha | undefined =>
     compacta.tipo === "revelacao" ? revelacao?.aba : compacta.tipo === "pomodoro" ? "foco" : compacta.tipo === "midia" ? "midia" : compacta.tipo === "trabalho" ? "chat" : compacta.tipo === "claude" || compacta.tipo === "claudePedido" ? "claude" : undefined;

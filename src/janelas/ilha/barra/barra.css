@@ -1328,3 +1328,11 @@ button.ilha-rapido-icone:hover:not(:disabled),
 .ilha-material-pilula:hover .ilha-material-icone-copia {
   opacity: 0.9;
 }
+
+
+@media (max-width: 768px) {
+  .ilha-barra,
+  .ilha-pop {
+    display: none !important;
+  }
+}

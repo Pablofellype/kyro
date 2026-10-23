@@ -1133,3 +1133,11 @@ html.janela-sobreposta #raiz {
   background: var(--fundo);
   color: var(--texto);
 }
+
+
+@media (max-width: 768px) {
+  .barra-tarefas,
+  .assistive-touch {
+    display: none !important;
+  }
+}

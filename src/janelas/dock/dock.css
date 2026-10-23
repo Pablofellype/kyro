@@ -513,3 +513,15 @@
   color: var(--busca-destaque);
   font-weight: 500;
 }
+
+
+@media (max-width: 768px) {
+  .dock,
+  .dock-gatilho,
+  .dock-previa,
+  .dock-menu-contexto,
+  .dock-busca-caixa,
+  .assistive-touch {
+    display: none !important;
+  }
+}
