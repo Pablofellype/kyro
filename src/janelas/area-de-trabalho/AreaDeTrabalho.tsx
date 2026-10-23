@@ -12,27 +12,32 @@ import { useConfig } from "../../estado/configuracoes";
 import { usarTema } from "./usarTema";
 import { usarAtalhos } from "./usarAtalhos";
 import { useServicos } from "../../servicos/servicos";
+import { usarTamanhoDaTela } from "../usarTamanhoDaTela";
 
 export function AreaDeTrabalho() {
   usarTema();
   usarAtalhos();
   useServicos();
+  const tela = usarTamanhoDaTela();
+  const ehMobile = tela.largura <= 768;
   const aberto = useInterface((s) => s.sistemaAberto);
   const minimizado = useInterface((s) => s.sistemaMinimizado);
   const janelas = useInterface((s) => s.janelasConexao);
   const primeira = useConfig((s) => s.primeiraExecucaoFeita);
 
+  const sistemaVisivel = ehMobile || (aberto && !minimizado);
+
   return (
-    <div className="area-trabalho">
-      <AnimatePresence>{aberto && !minimizado && <JanelaSistema key="sistema" />}</AnimatePresence>
+    <div className="area-trabalho" data-mobile={ehMobile ? "sim" : "nao"}>
+      <AnimatePresence>{sistemaVisivel && <JanelaSistema key="sistema" />}</AnimatePresence>
       <AnimatePresence>
-        {janelas.filter((j) => !j.minimizada).map((j) => (
+        {!ehMobile && janelas.filter((j) => !j.minimizada).map((j) => (
           <JanelaConexao key={j.id} janela={j} />
         ))}
       </AnimatePresence>
       <Ilha />
-      <Dock />
-      <AssistiveTouch />
+      {!ehMobile && <Dock />}
+      {!ehMobile && <AssistiveTouch />}
       <BuscaGlobal />
       <CapturaRapida />
       {!primeira && <PrimeiraExecucao />}
