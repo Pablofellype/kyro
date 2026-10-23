@@ -416,8 +416,8 @@ export function PainelRapido({ topo, aoFechar }: { topo: number; aoFechar: () =>
         <button
           type="button"
           className="ilha-rapido-redondo"
-          aria-label={B.configuracoesNiko}
-          title={B.configuracoesNiko}
+          aria-label={B.configuracoesKyro}
+          title={B.configuracoesKyro}
           onClick={() => {
             void tocarSom("open");
             aoFechar();

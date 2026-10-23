@@ -189,7 +189,7 @@ function Configurar({ servico, aoFechar }: { servico: ServicoId | null; aoFechar
         </div>
         {servico === "google" && loginDisponivel && (
           <button type="button" className="botao botao-fantasma botao-pequeno" disabled={testando} onClick={() => { setClienteProprio(!clienteProprio); setErro(""); }}>
-            {clienteProprio ? T.conexoes.usarLoginDoNiko : T.conexoes.usarClienteProprio}
+            {clienteProprio ? T.conexoes.usarLoginDoKyro : T.conexoes.usarClienteProprio}
           </button>
         )}
         <LinhaAlternador

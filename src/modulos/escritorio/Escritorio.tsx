@@ -160,7 +160,7 @@ export default function Escritorio({ tipoInicial = "niko", demonstracaoInicial =
   const sessoes = useClaudeCode((s) => s.ordem.length);
   const alternador = (
     <div className="escritorio-troca" role="tablist" aria-label={T.escritorio.tipo}>
-      {([["niko", Building2, T.escritorio.niko, T.escritorio.trocaNiko], ["ias", SquareTerminal, T.escritorio.ias.curto, T.escritorio.trocaIas(sessoes)]] as const).map(([id, Icone, titulo, dica]) => (
+      {([["niko", Building2, T.escritorio.niko, T.escritorio.trocaKyro], ["ias", SquareTerminal, T.escritorio.ias.curto, T.escritorio.trocaIas(sessoes)]] as const).map(([id, Icone, titulo, dica]) => (
         <button key={id} type="button" role="tab" aria-selected={tipo === id} className="escritorio-troca-botao" onClick={() => setTipo(id)}>
           <span className="escritorio-troca-icone"><Icone size={18} /></span>
           <span className="escritorio-troca-texto"><b>{titulo}</b><small>{dica}</small></span>

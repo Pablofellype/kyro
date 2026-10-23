@@ -115,8 +115,8 @@ export function Personalizacao({ topo, aoFechar }: { topo: number; aoFechar: () 
       transition={{ type: "spring", visualDuration: 0.28, bounce: 0.15 }}
     >
       <Grupo icone={SunMoon} titulo={P.grupos.aparencia}>
-        <Linha rotulo={P.temaDoNiko}>
-          <Escolha<Tema> rotulo={P.temaDoNiko} valor={cfg.tema} aoMudar={mudarTema} opcoes={(["claro", "escuro", "sistema"] as Tema[]).map((t) => ({ valor: t, rotulo: P.temas[t] }))} />
+        <Linha rotulo={P.temaDoKyro}>
+          <Escolha<Tema> rotulo={P.temaDoKyro} valor={cfg.tema} aoMudar={mudarTema} opcoes={(["claro", "escuro", "sistema"] as Tema[]).map((t) => ({ valor: t, rotulo: P.temas[t] }))} />
         </Linha>
         <Linha rotulo={P.destaque}>
           <div className="ilha-amostras">
