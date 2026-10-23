@@ -2372,13 +2372,21 @@
 
 @media (max-width: 768px) {
   .ilha-raiz {
-    top: max(8px, env(safe-area-inset-top, 8px)) !important;
+    left: auto !important;
+    right: 8px !important;
+    top: calc(max(6px, env(safe-area-inset-top, 6px)) + 7px) !important;
   }
   .ilha::before,
   .ilha::after {
     display: none !important;
   }
   .ilha {
-    border-radius: 24px !important;
+    border-radius: 999px !important;
+  }
+  .ilha-gatilho {
+    left: auto !important;
+    right: 8px !important;
+    transform: none !important;
+    top: calc(max(6px, env(safe-area-inset-top, 6px)) + 7px) !important;
   }
 }

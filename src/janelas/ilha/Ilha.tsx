@@ -584,9 +584,9 @@ export function Ilha() {
         transition={movimentoDeVisibilidade.transition}
         style={{
           ...variaveisDaBorda(aparencia),
-          x: "-50%",
+          x: ehMobile ? 0 : "-50%",
           scale: escala,
-          transformOrigin: "top center",
+          transformOrigin: ehMobile ? "top right" : "top center",
           pointerEvents: oculta ? "none" : "auto",
           ["--topo-orelhas" as string]: `${barraVisivel ? ALTURA_DA_FAIXA : 0}px`,
           ["--raio-orelha" as string]: barraVisivel ? "10px" : "14px",

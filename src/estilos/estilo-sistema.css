@@ -1570,9 +1570,26 @@
 
 @media (max-width: 768px) {
   .estilo-sistema .janela-controles,
-  .estilo-sistema .janela-controle,
+  .estilo-sistema .janela-controles .janela-controle,
   .estilo-sistema .janela-fechar,
   .estilo-sistema .janela-alca {
     display: none !important;
+  }
+
+  .estilo-sistema .janela-barra {
+    padding-right: 210px !important;
+    box-sizing: border-box !important;
+  }
+
+  .estilo-sistema .migalha {
+    max-width: 100% !important;
+    overflow: hidden !important;
+    white-space: nowrap !important;
+  }
+
+  .estilo-sistema .migalha-atual {
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
   }
 }
