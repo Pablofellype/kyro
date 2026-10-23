@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Kyro</title>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <style>
+      .carregando-kyro { position: fixed; inset: 0; display: grid; place-items: center; background: #0e0e10; }
+      .carregando-kyro img { width: 76px; height: 76px; border-radius: 18px; animation: respirar-kyro 1.6s ease-in-out infinite; }
+      @keyframes respirar-kyro { 0%, 100% { transform: scale(0.94); opacity: 0.75; } 50% { transform: scale(1); opacity: 1; } }
+      html.janela-sobreposta .carregando-kyro { display: none; }
+    </style>
+  </head>
+  <body>
+    <div id="raiz"><div class="carregando-kyro" aria-busy="true"><img src="/apple-touch-icon.png" alt="Kyro" /></div></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
