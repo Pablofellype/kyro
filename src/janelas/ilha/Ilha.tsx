@@ -411,33 +411,25 @@ export function Ilha() {
   // Em tela pequena ou com zoom alto do sistema, a aba aberta encolhe para caber em vez de sair da tela.
   const ehMobile = verificarSeEhMobile(tela);
   const rotaAtual = useInterface((s) => s.rota);
-  const [larguraTitulo, setLarguraTitulo] = useState(160);
 
-  useEffect(() => {
-    const medir = () => {
-      const el = document.querySelector<HTMLElement>(".migalha");
-      if (el) {
-        const w = Math.ceil(el.getBoundingClientRect().width);
-        if (w > 0) setLarguraTitulo(w);
-      }
-    };
-    medir();
-    const id = requestAnimationFrame(medir);
-    window.addEventListener("resize", medir);
-    return () => {
-      cancelAnimationFrame(id);
-      window.removeEventListener("resize", medir);
-    };
-  }, [rotaAtual, tela.largura]);
+  const LARGURA_TITULO: Record<string, number> = {
+    inicio: 155,
+    hoje: 150,
+    foco: 150,
+    metas: 175,
+    journal: 185,
+    estudos: 185,
+    financas: 190,
+    calendario: 215,
+    conexoes: 195,
+    configuracoes: 245,
+  };
 
-  const espacoParaIlha = Math.max(76, tela.largura - larguraTitulo - 32);
-  const maxLarguraIlha = Math.max(220, Math.min(300, tela.largura - 120));
+  const larguraTexto = LARGURA_TITULO[rotaAtual] ?? 175;
+  const espacoDisponivel = tela.largura - larguraTexto - 24;
   const larguraCompacta = ehMobile
-    ? Math.max(76, Math.min(maxLarguraIlha, espacoParaIlha))
+    ? Math.max(120, Math.min(230, espacoDisponivel))
     : compacta.largura;
-
-  const larguraReferencia = 210;
-  const fatorCompressao = ehMobile ? Math.min(1, Math.max(0.52, larguraCompacta / larguraReferencia)) : 1;
   const alturaConexoes = alturaDasConexoes(conexaoSelecionada, conexaoLigada);
   const quadroDeTarefasAberto = cfg.tarefasEmQuadro && abaAtual === "hoje" && secaoHoje === "tarefas";
   const alvo = saudando
@@ -666,23 +658,8 @@ export function Ilha() {
                   tabIndex={0}
                   aria-label={T.ilha.expandir}
                   initial={{ opacity: 0, filter: "blur(8px)", scale: 0.97 }}
-                  animate={{
-                    opacity: 1,
-                    filter: "blur(0px)",
-                    scale: ehMobile ? fatorCompressao : 1,
-                    transition: { duration: 0.28, ease: [0.3, 0.9, 0.3, 1] },
-                  }}
+                  animate={{ opacity: 1, filter: "blur(0px)", scale: 1, transition: { delay: 0.16, duration: 0.3 } }}
                   exit={{ opacity: 0, filter: "blur(8px)", scale: 0.97, transition: { duration: 0.16 } }}
-                  style={{
-                    transformOrigin: "center center",
-                    ...(ehMobile
-                      ? {
-                          width: `${Math.round(larguraCompacta / fatorCompressao)}px`,
-                          left: "50%",
-                          marginLeft: `${Math.round(-(larguraCompacta / fatorCompressao) / 2)}px`,
-                        }
-                      : {}),
-                  }}
                   onClick={acionarCompacta}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === " ") {

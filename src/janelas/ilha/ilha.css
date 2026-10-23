@@ -2408,8 +2408,7 @@ html[data-mobile="sim"] .ilha-gatilho {
 
 @media (max-width: 768px), (orientation: landscape) and (max-height: 540px), (pointer: coarse) and (max-width: 1024px) {
   .ilha-compacta {
-    padding: 0 8px !important;
-    gap: 6px !important;
-    justify-content: center !important;
+    padding: 0 12px !important;
+    gap: 8px !important;
   }
 }
