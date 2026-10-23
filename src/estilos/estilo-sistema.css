@@ -1568,7 +1568,7 @@
 }
 
 
-@media (max-width: 768px) {
+@media (max-width: 768px), (orientation: landscape) and (max-height: 540px), (pointer: coarse) and (max-width: 1024px) {
   .estilo-sistema .janela-controles,
   .estilo-sistema .janela-controles .janela-controle,
   .estilo-sistema .janela-fechar,
@@ -1592,4 +1592,28 @@
     text-overflow: ellipsis !important;
     white-space: nowrap !important;
   }
+}
+
+html[data-mobile="sim"] .estilo-sistema .janela-controles,
+html[data-mobile="sim"] .estilo-sistema .janela-controles .janela-controle,
+html[data-mobile="sim"] .estilo-sistema .janela-fechar,
+html[data-mobile="sim"] .estilo-sistema .janela-alca {
+  display: none !important;
+}
+
+html[data-mobile="sim"] .estilo-sistema .janela-barra {
+  padding-right: 210px !important;
+  box-sizing: border-box !important;
+}
+
+html[data-mobile="sim"] .estilo-sistema .migalha {
+  max-width: 100% !important;
+  overflow: hidden !important;
+  white-space: nowrap !important;
+}
+
+html[data-mobile="sim"] .estilo-sistema .migalha-atual {
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
 }

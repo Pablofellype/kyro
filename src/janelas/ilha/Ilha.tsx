@@ -33,7 +33,7 @@ import { useClaudeCode, sessaoAtiva, nomeDoModelo } from "../../estado/claudeCod
 import { useAtualizacao } from "../../estado/atualizacao";
 import { NATIVO, janelaAtual, liberarSistemaInicial, ouvirAtalho, ouvirEvento, usarAreaInterativa, usarCliqueFora, usarCursorFora, usarEstadoDaFrente, usarReavivamento } from "../../desktop/desktop";
 import { NO_LINUX } from "../../desktop/plataforma";
-import { escalaQueCabe, usarTamanhoDaTela } from "../usarTamanhoDaTela";
+import { escalaQueCabe, usarTamanhoDaTela, verificarSeEhMobile } from "../usarTamanhoDaTela";
 import { Saudacao } from "./animacoes/Saudacao";
 import { usarSaudacaoDiaria } from "./animacoes/usarSaudacaoDiaria";
 import { ALTURA_DA_SAUDACAO, EVENTO_DA_SAUDACAO, LARGURA_DA_SAUDACAO } from "./animacoes/pedirSaudacao";
@@ -420,7 +420,7 @@ export function Ilha() {
           ? { w: LARGURA_DO_QUADRO, h: ALTURA_DO_QUADRO, r: 30 }
           : { w: LARGURA_ABA[abaAtual] ?? LARGURA_EXPANDIDA, h: alturaDaVisao(abaAtual, secaoHoje, alturaConexoes), r: 30 };
   // Em tela pequena ou com zoom alto do sistema, a aba aberta encolhe para caber em vez de sair da tela.
-  const ehMobile = tela.largura <= 768;
+  const ehMobile = verificarSeEhMobile(tela);
   const margemTela = ehMobile ? 8 : MARGEM_DA_TELA;
   const escala = escalaQueCabe(ESCALA[cfg.tamanho], { largura: alvo.w, altura: alvo.h }, { largura: tela.largura - margemTela * 2, altura: tela.altura - (ehMobile ? 0 : ALTURA_DA_FAIXA) - margemTela });
   const crescendo = alvo.w * alvo.h >= anterior.current.w * anterior.current.h;

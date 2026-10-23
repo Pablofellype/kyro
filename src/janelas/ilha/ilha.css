@@ -2370,7 +2370,7 @@
 }
 
 
-@media (max-width: 768px) {
+@media (max-width: 768px), (orientation: landscape) and (max-height: 540px), (pointer: coarse) and (max-width: 1024px) {
   .ilha-raiz {
     left: auto !important;
     right: 8px !important;
@@ -2380,13 +2380,28 @@
   .ilha::after {
     display: none !important;
   }
-  .ilha {
-    border-radius: 999px !important;
-  }
   .ilha-gatilho {
     left: auto !important;
     right: 8px !important;
     transform: none !important;
     top: calc(max(6px, env(safe-area-inset-top, 6px)) + 7px) !important;
   }
+}
+
+html[data-mobile="sim"] .ilha-raiz {
+  left: auto !important;
+  right: 8px !important;
+  top: calc(max(6px, env(safe-area-inset-top, 6px)) + 7px) !important;
+}
+
+html[data-mobile="sim"] .ilha::before,
+html[data-mobile="sim"] .ilha::after {
+  display: none !important;
+}
+
+html[data-mobile="sim"] .ilha-gatilho {
+  left: auto !important;
+  right: 8px !important;
+  transform: none !important;
+  top: calc(max(6px, env(safe-area-inset-top, 6px)) + 7px) !important;
 }

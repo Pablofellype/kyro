@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { AnimatePresence } from "motion/react";
 import { Ilha } from "../ilha/Ilha";
 import { Dock } from "../dock/Dock";
@@ -12,18 +13,26 @@ import { useConfig } from "../../estado/configuracoes";
 import { usarTema } from "./usarTema";
 import { usarAtalhos } from "./usarAtalhos";
 import { useServicos } from "../../servicos/servicos";
-import { usarTamanhoDaTela } from "../usarTamanhoDaTela";
+import { usarTamanhoDaTela, verificarSeEhMobile } from "../usarTamanhoDaTela";
 
 export function AreaDeTrabalho() {
   usarTema();
   usarAtalhos();
   useServicos();
   const tela = usarTamanhoDaTela();
-  const ehMobile = tela.largura <= 768;
+  const ehMobile = verificarSeEhMobile(tela);
   const aberto = useInterface((s) => s.sistemaAberto);
   const minimizado = useInterface((s) => s.sistemaMinimizado);
   const janelas = useInterface((s) => s.janelasConexao);
   const primeira = useConfig((s) => s.primeiraExecucaoFeita);
+
+  useEffect(() => {
+    if (ehMobile) {
+      document.documentElement.setAttribute("data-mobile", "sim");
+    } else {
+      document.documentElement.removeAttribute("data-mobile");
+    }
+  }, [ehMobile]);
 
   const sistemaVisivel = ehMobile || (aberto && !minimizado);
 
