@@ -2419,6 +2419,10 @@ html[data-mobile="sim"] .ilha-gatilho {
   .ilha-relogio {
     min-width: 0 !important;
     overflow: hidden !important;
+    white-space: nowrap !important;
+  }
+  .ilha-mini {
+    white-space: nowrap !important;
   }
   .ilha-tempo {
     flex-shrink: 0 !important;

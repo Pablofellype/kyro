@@ -417,11 +417,14 @@ export function Ilha() {
   const numero = numeroDaRota(rotaAtual);
   const nome = T.rotas[rotaAtual] || "";
   const textoCompleto = `${grupo} / ${numero} ${nome}`;
+  const rotaLongaMobile = ehMobile && textoCompleto.length >= 23;
   const larguraTexto = Math.round(textoCompleto.length * 8.5 + 28);
 
   const espacoDisponivel = tela.largura - larguraTexto - 16;
   const larguraCompacta = ehMobile
-    ? Math.max(88, Math.min(230, espacoDisponivel))
+    ? rotaLongaMobile
+      ? Math.max(96, Math.min(128, espacoDisponivel))
+      : Math.max(88, Math.min(230, espacoDisponivel))
     : compacta.largura;
   const alturaConexoes = alturaDasConexoes(conexaoSelecionada, conexaoLigada);
   const quadroDeTarefasAberto = cfg.tarefasEmQuadro && abaAtual === "hoje" && secaoHoje === "tarefas";
@@ -550,10 +553,12 @@ export function Ilha() {
               <EspacoDoPersonagem agente={agenteDaVez} tamanho={22} posicao="compacta" />
             </div>
             <span className="ilha-compacta-texto ilha-relogio">
-              <span className="ilha-tempo">{new Date(relogio).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</span>
+              {!rotaLongaMobile && (
+                <span className="ilha-tempo">{new Date(relogio).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</span>
+              )}
               <span className="ilha-mini">{new Date(relogio).toLocaleDateString("pt-BR", { weekday: "short", day: "numeric", month: "short" }).replace(/\./g, "")}</span>
             </span>
-            <div className="ilha-compacta-lado" style={{ width: 22 }} />
+            {!rotaLongaMobile && <div className="ilha-compacta-lado" style={{ width: 22 }} />}
           </>
         );      default:
         return null;
