@@ -416,8 +416,10 @@ export function Ilha() {
   const rotaNome = `${numeroDaRota(rotaAtual)} ${T.rotas[rotaAtual] || ""}`;
   const textoTitulo = `${grupoNome} / ${rotaNome}`;
   const larguraEstimadaTitulo = Math.round(textoTitulo.length * 8.2 + 24);
-  const espacoParaIlha = Math.max(88, tela.largura - larguraEstimadaTitulo - 20);
-  const larguraCompacta = ehMobile ? Math.min(compacta.largura, espacoParaIlha) : compacta.largura;
+  const larguraBaseCompacta = ehMobile ? Math.min(175, compacta.largura) : compacta.largura;
+  const espacoParaIlha = Math.max(88, tela.largura - larguraEstimadaTitulo - 16);
+  const larguraCompacta = ehMobile ? Math.min(larguraBaseCompacta, espacoParaIlha) : compacta.largura;
+  const fatorCompressao = ehMobile && larguraCompacta < larguraBaseCompacta ? Math.max(0.55, larguraCompacta / larguraBaseCompacta) : 1;
   const alturaConexoes = alturaDasConexoes(conexaoSelecionada, conexaoLigada);
   const quadroDeTarefasAberto = cfg.tarefasEmQuadro && abaAtual === "hoje" && secaoHoje === "tarefas";
   const alvo = saudando
@@ -646,8 +648,23 @@ export function Ilha() {
                   tabIndex={0}
                   aria-label={T.ilha.expandir}
                   initial={{ opacity: 0, filter: "blur(8px)", scale: 0.97 }}
-                  animate={{ opacity: 1, filter: "blur(0px)", scale: 1, transition: { delay: 0.16, duration: 0.3 } }}
+                  animate={{
+                    opacity: 1,
+                    filter: "blur(0px)",
+                    scale: ehMobile ? fatorCompressao : 1,
+                    transition: { duration: 0.28, ease: [0.3, 0.9, 0.3, 1] },
+                  }}
                   exit={{ opacity: 0, filter: "blur(8px)", scale: 0.97, transition: { duration: 0.16 } }}
+                  style={{
+                    transformOrigin: "center center",
+                    ...(ehMobile && fatorCompressao < 1
+                      ? {
+                          width: `${larguraBaseCompacta}px`,
+                          left: "50%",
+                          marginLeft: `${-larguraBaseCompacta / 2}px`,
+                        }
+                      : {}),
+                  }}
                   onClick={acionarCompacta}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === " ") {
