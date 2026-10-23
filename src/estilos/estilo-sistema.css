@@ -1577,7 +1577,7 @@
   }
 
   .estilo-sistema .janela-barra {
-    padding-right: 210px !important;
+    padding-right: 12px !important;
     box-sizing: border-box !important;
   }
 
@@ -1602,7 +1602,7 @@ html[data-mobile="sim"] .estilo-sistema .janela-alca {
 }
 
 html[data-mobile="sim"] .estilo-sistema .janela-barra {
-  padding-right: 210px !important;
+  padding-right: 12px !important;
   box-sizing: border-box !important;
 }
 

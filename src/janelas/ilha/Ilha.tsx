@@ -4,7 +4,7 @@ import {
   Plus, Eye, EyeOff, Music, Timer, CalendarDays, MessageCircle, Plug, Bell, Volume2, VolumeX, AppWindow, ChevronUp, Pin, PinOff, Check, CircleAlert, Download, CodeXml, ShieldAlert, LoaderCircle, MessagesSquare,
   Users, Palette, type LucideIcon,
 } from "lucide-react";
-import { useConfig, type AbaIlha, type SecaoHoje, type VisaoIlha } from "../../estado/configuracoes";
+import { useConfig, GRUPO_DA_ROTA, type AbaIlha, type SecaoHoje, type VisaoIlha } from "../../estado/configuracoes";
 import { estadoComAviso, useIlha } from "../../estado/ilha";
 import { useInterface } from "../../estado/interface";
 import { useComunicacao } from "../../estado/comunicacao";
@@ -17,6 +17,7 @@ import { Personagem } from "../../personagens/Personagem";
 import { Marca } from "../../marcas/Marca";
 import { Anel } from "../../componentes/Graficos";
 import { T } from "../../textos/textos";
+import { numeroDaRota } from "../../componentes/CabecalhoAba";
 import { tocarSom } from "../../ponte/sons";
 import {
   VisaoHoje, VisaoCaptura, VisaoMidia, VisaoFoco, VisaoConexoes, VisaoAvisos,
@@ -408,6 +409,15 @@ export function Ilha() {
 
   if (!cfg.ativa || frente.telaCheia) return null;
 
+  // Em tela pequena ou com zoom alto do sistema, a aba aberta encolhe para caber em vez de sair da tela.
+  const ehMobile = verificarSeEhMobile(tela);
+  const rotaAtual = useInterface((s) => s.rota);
+  const grupoNome = T.gruposBarra[GRUPO_DA_ROTA[rotaAtual]] || "";
+  const rotaNome = `${numeroDaRota(rotaAtual)} ${T.rotas[rotaAtual] || ""}`;
+  const textoTitulo = `${grupoNome} / ${rotaNome}`;
+  const larguraEstimadaTitulo = Math.round(textoTitulo.length * 8.2 + 24);
+  const espacoParaIlha = Math.max(88, tela.largura - larguraEstimadaTitulo - 20);
+  const larguraCompacta = ehMobile ? Math.min(compacta.largura, espacoParaIlha) : compacta.largura;
   const alturaConexoes = alturaDasConexoes(conexaoSelecionada, conexaoLigada);
   const quadroDeTarefasAberto = cfg.tarefasEmQuadro && abaAtual === "hoje" && secaoHoje === "tarefas";
   const alvo = saudando
@@ -415,12 +425,10 @@ export function Ilha() {
     : estadoEfetivo === "escondida"
       ? { w: 120, h: 6, r: 6 }
       : estadoEfetivo === "compacta"
-        ? { w: compacta.largura, h: compacta.tipo === "revelacao" ? 56 : compacta.tipo === "midia" ? ALTURA_COMPACTA_MIDIA : ALTURA_COMPACTA, r: compacta.tipo === "midia" || compacta.tipo === "revelacao" ? 14 : 12 }
+        ? { w: larguraCompacta, h: compacta.tipo === "revelacao" ? 56 : compacta.tipo === "midia" ? ALTURA_COMPACTA_MIDIA : ALTURA_COMPACTA, r: compacta.tipo === "midia" || compacta.tipo === "revelacao" ? 14 : 12 }
         : quadroDeTarefasAberto
           ? { w: LARGURA_DO_QUADRO, h: ALTURA_DO_QUADRO, r: 30 }
           : { w: LARGURA_ABA[abaAtual] ?? LARGURA_EXPANDIDA, h: alturaDaVisao(abaAtual, secaoHoje, alturaConexoes), r: 30 };
-  // Em tela pequena ou com zoom alto do sistema, a aba aberta encolhe para caber em vez de sair da tela.
-  const ehMobile = verificarSeEhMobile(tela);
   const margemTela = ehMobile ? 8 : MARGEM_DA_TELA;
   const escala = escalaQueCabe(ESCALA[cfg.tamanho], { largura: alvo.w, altura: alvo.h }, { largura: tela.largura - margemTela * 2, altura: tela.altura - (ehMobile ? 0 : ALTURA_DA_FAIXA) - margemTela });
   const crescendo = alvo.w * alvo.h >= anterior.current.w * anterior.current.h;

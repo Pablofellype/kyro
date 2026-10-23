@@ -1178,7 +1178,7 @@ html.janela-sobreposta #raiz {
     height: calc(44px + max(6px, env(safe-area-inset-top, 6px))) !important;
     flex-basis: calc(44px + max(6px, env(safe-area-inset-top, 6px))) !important;
     padding-left: 12px !important;
-    padding-right: 210px !important;
+    padding-right: 12px !important;
     box-sizing: border-box !important;
   }
 
@@ -1229,7 +1229,7 @@ html[data-mobile="sim"] .janela.estilo-sistema .janela-barra,
   height: calc(44px + max(6px, env(safe-area-inset-top, 6px))) !important;
   flex-basis: calc(44px + max(6px, env(safe-area-inset-top, 6px))) !important;
   padding-left: 12px !important;
-  padding-right: 210px !important;
+  padding-right: 12px !important;
   box-sizing: border-box !important;
 }
 
