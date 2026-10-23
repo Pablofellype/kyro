@@ -8,118 +8,35 @@
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <style>
       * { margin: 0; padding: 0; box-sizing: border-box; }
-      body, html { width: 100%; height: 100%; background: #070709; overflow: hidden; }
+      body, html { width: 100%; height: 100%; background: #000000; overflow: hidden; }
 
       .carregando-kyro {
         position: fixed;
         inset: 0;
         display: flex;
-        flex-direction: column;
         align-items: center;
         justify-content: center;
-        background: radial-gradient(circle at 50% 46%, rgba(255, 42, 58, 0.12) 0%, rgba(10, 10, 12, 0.96) 55%, #070709 100%);
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        background: #000000;
         user-select: none;
         z-index: 99999;
       }
 
-      .kyro-splash-card {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        animation: entrada-suave 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-      }
-
-      .kyro-logo-wrapper {
-        position: relative;
+      .carregando-kyro img {
         width: 84px;
         height: 84px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-      }
-
-      .kyro-logo-glow {
-        position: absolute;
-        inset: -6px;
-        border-radius: 28px;
-        background: radial-gradient(circle, rgba(255, 42, 58, 0.45) 0%, rgba(255, 42, 58, 0) 70%);
-        filter: blur(14px);
-        animation: respirar-glow 2.2s ease-in-out infinite alternate;
-      }
-
-      .kyro-logo-img {
-        position: relative;
-        width: 80px;
-        height: 80px;
-        border-radius: 22px;
         object-fit: contain;
-        box-shadow: 0 12px 30px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.08);
-        animation: respirar-logo 2.2s ease-in-out infinite alternate;
+        animation: apple-respirar 2.4s ease-in-out infinite;
       }
 
-      .kyro-titulo {
-        margin-top: 22px;
-        font-size: 19px;
-        font-weight: 700;
-        letter-spacing: 0.32em;
-        text-transform: uppercase;
-        background: linear-gradient(180deg, #ffffff 0%, #cbd5e1 55%, #94a3b8 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        padding-left: 0.32em; /* centraliza visualmente com letter-spacing */
-      }
-
-      .kyro-barra-progresso {
-        position: relative;
-        width: 140px;
-        height: 3px;
-        background: rgba(255, 255, 255, 0.06);
-        border-radius: 99px;
-        overflow: hidden;
-        margin-top: 20px;
-        box-shadow: 0 0 10px rgba(0, 0, 0, 0.4);
-      }
-
-      .kyro-barra-shimmer {
-        position: absolute;
-        top: 0;
-        left: 0;
-        height: 100%;
-        width: 50%;
-        background: linear-gradient(90deg, transparent, #ff2a3a 50%, #ff717d 75%, transparent 100%);
-        border-radius: 99px;
-        animation: animar-shimmer 1.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-      }
-
-      .kyro-status {
-        margin-top: 14px;
-        font-size: 11px;
-        font-weight: 500;
-        letter-spacing: 0.14em;
-        text-transform: uppercase;
-        color: #71717a;
-        opacity: 0.85;
-      }
-
-      @keyframes entrada-suave {
-        0% { opacity: 0; transform: scale(0.92) translateY(8px); }
-        100% { opacity: 1; transform: scale(1) translateY(0); }
-      }
-
-      @keyframes respirar-logo {
-        0% { transform: scale(0.97); }
-        100% { transform: scale(1.02); }
-      }
-
-      @keyframes respirar-glow {
-        0% { opacity: 0.35; transform: scale(0.92); }
-        100% { opacity: 0.85; transform: scale(1.1); }
-      }
-
-      @keyframes animar-shimmer {
-        0% { transform: translateX(-120%); }
-        100% { transform: translateX(250%); }
+      @keyframes apple-respirar {
+        0%, 100% {
+          opacity: 0.82;
+          transform: scale(0.98);
+        }
+        50% {
+          opacity: 1;
+          transform: scale(1.02);
+        }
       }
 
       html.janela-sobreposta .carregando-kyro { display: none; }
@@ -128,17 +45,7 @@
   <body>
     <div id="raiz">
       <div class="carregando-kyro" aria-busy="true">
-        <div class="kyro-splash-card">
-          <div class="kyro-logo-wrapper">
-            <div class="kyro-logo-glow"></div>
-            <img class="kyro-logo-img" src="/apple-touch-icon.png" alt="Kyro" />
-          </div>
-          <h1 class="kyro-titulo">Kyro</h1>
-          <div class="kyro-barra-progresso">
-            <div class="kyro-barra-shimmer"></div>
-          </div>
-          <span class="kyro-status">Iniciando ambiente...</span>
-        </div>
+        <img src="/apple-touch-icon.png" alt="Kyro" />
       </div>
     </div>
     <script type="module" src="/src/main.tsx"></script>
