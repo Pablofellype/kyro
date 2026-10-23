@@ -4,7 +4,7 @@ import {
   Plus, Eye, EyeOff, Music, Timer, CalendarDays, MessageCircle, Plug, Bell, Volume2, VolumeX, AppWindow, ChevronUp, Pin, PinOff, Check, CircleAlert, Download, CodeXml, ShieldAlert, LoaderCircle, MessagesSquare,
   Users, Palette, type LucideIcon,
 } from "lucide-react";
-import { useConfig, type AbaIlha, type SecaoHoje, type VisaoIlha } from "../../estado/configuracoes";
+import { useConfig, GRUPO_DA_ROTA, type AbaIlha, type SecaoHoje, type VisaoIlha } from "../../estado/configuracoes";
 import { estadoComAviso, useIlha } from "../../estado/ilha";
 import { useInterface } from "../../estado/interface";
 import { useComunicacao } from "../../estado/comunicacao";
@@ -17,6 +17,7 @@ import { Personagem } from "../../personagens/Personagem";
 import { Marca } from "../../marcas/Marca";
 import { Anel } from "../../componentes/Graficos";
 import { T } from "../../textos/textos";
+import { numeroDaRota } from "../../componentes/CabecalhoAba";
 import { tocarSom } from "../../ponte/sons";
 import {
   VisaoHoje, VisaoCaptura, VisaoMidia, VisaoFoco, VisaoConexoes, VisaoAvisos,
@@ -412,23 +413,15 @@ export function Ilha() {
   const ehMobile = verificarSeEhMobile(tela);
   const rotaAtual = useInterface((s) => s.rota);
 
-  const LARGURA_TITULO: Record<string, number> = {
-    inicio: 155,
-    hoje: 150,
-    foco: 150,
-    metas: 175,
-    journal: 185,
-    estudos: 185,
-    financas: 190,
-    calendario: 215,
-    conexoes: 195,
-    configuracoes: 245,
-  };
+  const grupo = T.gruposBarra[GRUPO_DA_ROTA[rotaAtual]] || "";
+  const numero = numeroDaRota(rotaAtual);
+  const nome = T.rotas[rotaAtual] || "";
+  const textoCompleto = `${grupo} / ${numero} ${nome}`;
+  const larguraTexto = Math.round(textoCompleto.length * 8.5 + 28);
 
-  const larguraTexto = LARGURA_TITULO[rotaAtual] ?? 175;
-  const espacoDisponivel = tela.largura - larguraTexto - 24;
+  const espacoDisponivel = tela.largura - larguraTexto - 16;
   const larguraCompacta = ehMobile
-    ? Math.max(120, Math.min(230, espacoDisponivel))
+    ? Math.max(88, Math.min(230, espacoDisponivel))
     : compacta.largura;
   const alturaConexoes = alturaDasConexoes(conexaoSelecionada, conexaoLigada);
   const quadroDeTarefasAberto = cfg.tarefasEmQuadro && abaAtual === "hoje" && secaoHoje === "tarefas";
