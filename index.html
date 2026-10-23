@@ -2,41 +2,234 @@
 <html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>Kyro</title>
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <style>
-      * { margin: 0; padding: 0; box-sizing: border-box; }
-      body, html { width: 100%; height: 100%; background: #000000; overflow: hidden; }
+      *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+      body, html {
+        width: 100%;
+        height: 100%;
+        background: #030305;
+        overflow: hidden;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "SF Pro Display", sans-serif;
+        color: #f4f4f5;
+        user-select: none;
+        -webkit-user-select: none;
+      }
 
       .carregando-kyro {
         position: fixed;
         inset: 0;
         display: flex;
+        flex-direction: column;
         align-items: center;
         justify-content: center;
-        background: #000000;
-        user-select: none;
+        background: #030305;
         z-index: 99999;
+        overflow: hidden;
       }
 
-      .carregando-kyro img {
-        width: 84px;
-        height: 84px;
+      /* Grid sutil de fundo cinematográfico */
+      .kyro-bg-grid {
+        position: absolute;
+        inset: 0;
+        background-image: 
+          radial-gradient(circle at center, rgba(255, 42, 58, 0.08) 0%, transparent 65%),
+          linear-gradient(rgba(255, 255, 255, 0.015) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(255, 255, 255, 0.015) 1px, transparent 1px);
+        background-size: 100% 100%, 48px 48px, 48px 48px;
+        background-position: center, center, center;
+        opacity: 0.8;
+      }
+
+      /* Container do Holograma Central */
+      .kyro-stage {
+        position: relative;
+        width: 220px;
+        height: 220px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      /* Anel Orbital Externo */
+      .kyro-ring-outer {
+        position: absolute;
+        inset: 0;
+        border-radius: 50%;
+        border: 1px dashed rgba(255, 60, 75, 0.28);
+        animation: girar-horario 24s linear infinite;
+      }
+
+      /* Anel Médio com Marcadores Orbitais */
+      .kyro-ring-mid {
+        position: absolute;
+        inset: 18px;
+        border-radius: 50%;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        border-top-color: rgba(255, 60, 75, 0.85);
+        border-right-color: rgba(255, 60, 75, 0.3);
+        animation: girar-antihorario 10s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+        filter: drop-shadow(0 0 8px rgba(255, 42, 58, 0.35));
+      }
+
+      /* Ponto de luz orbital */
+      .kyro-ring-mid::before {
+        content: '';
+        position: absolute;
+        top: 2px;
+        right: 22px;
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: #ff5260;
+        box-shadow: 0 0 10px #ff2a3a, 0 0 20px #ff2a3a;
+      }
+
+      /* Pulso de Radar */
+      .kyro-radar-wave {
+        position: absolute;
+        inset: 25px;
+        border-radius: 50%;
+        border: 1px solid rgba(255, 60, 75, 0.6);
+        animation: radar-ping 3s cubic-bezier(0.1, 0.7, 0.1, 1) infinite;
+        pointer-events: none;
+      }
+
+      /* Aura Glow central */
+      .kyro-center-glow {
+        position: absolute;
+        width: 110px;
+        height: 110px;
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(255, 42, 58, 0.38) 0%, rgba(255, 42, 58, 0) 70%);
+        filter: blur(18px);
+        animation: pulsar-glow 2.4s ease-in-out infinite alternate;
+      }
+
+      /* A Logo 3D Oficial */
+      .kyro-logo-hero {
+        position: relative;
+        width: 88px;
+        height: 88px;
         object-fit: contain;
-        animation: apple-respirar 2.4s ease-in-out infinite;
+        filter: drop-shadow(0 14px 28px rgba(0, 0, 0, 0.85));
+        animation: flutuar-logo 3.2s ease-in-out infinite alternate;
+        z-index: 2;
       }
 
-      @keyframes apple-respirar {
-        0%, 100% {
-          opacity: 0.82;
-          transform: scale(0.98);
-        }
-        50% {
-          opacity: 1;
-          transform: scale(1.02);
-        }
+      /* Painel de HUD Inferior */
+      .kyro-hud {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        margin-top: 24px;
+        z-index: 2;
+      }
+
+      /* Título da Marca */
+      .kyro-brand {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 20px;
+        font-weight: 800;
+        letter-spacing: 0.38em;
+        text-transform: uppercase;
+        color: #ffffff;
+        text-shadow: 0 0 25px rgba(255, 255, 255, 0.25);
+        padding-left: 0.38em;
+      }
+
+      .kyro-brand-badge {
+        font-size: 9px;
+        font-weight: 700;
+        letter-spacing: 0.15em;
+        color: #ff3a4b;
+        background: rgba(255, 42, 58, 0.12);
+        border: 1px solid rgba(255, 42, 58, 0.25);
+        padding: 2px 6px;
+        border-radius: 4px;
+        margin-left: 4px;
+      }
+
+      /* Barra de Carregamento Futurista */
+      .kyro-meter-container {
+        width: 170px;
+        height: 3px;
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 99px;
+        margin-top: 22px;
+        position: relative;
+        overflow: hidden;
+        border: 1px solid rgba(255, 255, 255, 0.04);
+      }
+
+      .kyro-meter-fill {
+        position: absolute;
+        top: 0;
+        left: 0;
+        height: 100%;
+        width: 0%;
+        background: linear-gradient(90deg, #ff2a3a, #ff6e7b);
+        border-radius: 99px;
+        box-shadow: 0 0 12px rgba(255, 42, 58, 0.8);
+        transition: width 0.3s ease;
+      }
+
+      /* Metadados e Status */
+      .kyro-meta {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        width: 170px;
+        margin-top: 10px;
+        font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+        font-size: 10px;
+        letter-spacing: 0.08em;
+        color: #71717a;
+      }
+
+      .kyro-log {
+        color: #a1a1aa;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 130px;
+      }
+
+      .kyro-percent {
+        color: #ff3a4b;
+        font-weight: 600;
+      }
+
+      /* Animações Fluidas */
+      @keyframes girar-horario {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+      }
+
+      @keyframes girar-antihorario {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(-360deg); }
+      }
+
+      @keyframes radar-ping {
+        0% { transform: scale(0.65); opacity: 0.8; }
+        80% { transform: scale(1.35); opacity: 0; }
+        100% { transform: scale(1.35); opacity: 0; }
+      }
+
+      @keyframes pulsar-glow {
+        0% { opacity: 0.25; transform: scale(0.85); }
+        100% { opacity: 0.75; transform: scale(1.15); }
+      }
+
+      @keyframes flutuar-logo {
+        0% { transform: translateY(0px) scale(0.97); }
+        100% { transform: translateY(-6px) scale(1.02); }
       }
 
       html.janela-sobreposta .carregando-kyro { display: none; }
@@ -45,9 +238,63 @@
   <body>
     <div id="raiz">
       <div class="carregando-kyro" aria-busy="true">
-        <img src="/apple-touch-icon.png" alt="Kyro" />
+        <div class="kyro-bg-grid"></div>
+
+        <div class="kyro-stage">
+          <div class="kyro-ring-outer"></div>
+          <div class="kyro-ring-mid"></div>
+          <div class="kyro-radar-wave"></div>
+          <div class="kyro-center-glow"></div>
+          <img class="kyro-logo-hero" src="/apple-touch-icon.png" alt="Kyro" />
+        </div>
+
+        <div class="kyro-hud">
+          <div class="kyro-brand">
+            Kyro
+            <span class="kyro-brand-badge">OS</span>
+          </div>
+
+          <div class="kyro-meter-container">
+            <div class="kyro-meter-fill" id="kyro-barra"></div>
+          </div>
+
+          <div class="kyro-meta">
+            <span class="kyro-log" id="kyro-status-msg">Carregando núcleo...</span>
+            <span class="kyro-percent" id="kyro-progresso">0%</span>
+          </div>
+        </div>
       </div>
     </div>
+
+    <!-- Script leve de inicialização do HUD -->
+    <script>
+      (function() {
+        const barra = document.getElementById('kyro-barra');
+        const progresso = document.getElementById('kyro-progresso');
+        const msg = document.getElementById('kyro-status-msg');
+        if (!barra || !progresso || !msg) return;
+
+        const passos = [
+          { p: 18, t: "Iniciando núcleo..." },
+          { p: 46, t: "Sincronizando ilha..." },
+          { p: 78, t: "Calibrando ambiente..." },
+          { p: 98, t: "Pronto." }
+        ];
+
+        let index = 0;
+        function avancar() {
+          if (index >= passos.length) return;
+          const { p, t } = passos[index];
+          barra.style.width = p + '%';
+          progresso.textContent = p + '%';
+          msg.textContent = t;
+          index++;
+          setTimeout(avancar, 350);
+        }
+        setTimeout(avancar, 80);
+      })();
+    </script>
+
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
