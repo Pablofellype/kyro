@@ -1566,3 +1566,13 @@
 .estilo-sistema .alternador[aria-checked="true"] .alternador-gota {
   fill: #f2efe9;
 }
+
+
+@media (max-width: 768px) {
+  .estilo-sistema .janela-controles,
+  .estilo-sistema .janela-controle,
+  .estilo-sistema .janela-fechar,
+  .estilo-sistema .janela-alca {
+    display: none !important;
+  }
+}

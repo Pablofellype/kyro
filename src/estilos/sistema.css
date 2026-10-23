@@ -1181,6 +1181,11 @@ html.janela-sobreposta #raiz {
     padding-right: 12px !important;
   }
 
+  .janela.estilo-sistema .janela-controles,
+  .janela-controles,
+  .janela-controle,
+  .janela-fechar,
+  .janela-alca,
   .janela.estilo-sistema .janela-acoes {
     display: none !important;
   }
