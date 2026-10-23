@@ -1,7 +1,6 @@
 import { TourDoNiko } from "./TourDoNiko";
 import { EstilosDaMidia } from "../ilha/midia/EstilosDaMidia";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
-import { ArrowLeft } from "lucide-react";
 import { useInterface, type Geometria } from "../../estado/interface";
 import { useConfig, GRUPO_DA_ROTA } from "../../estado/configuracoes";
 import { Janela, areaUtil } from "../Janela";
@@ -28,8 +27,6 @@ export function JanelaSistema() {
   const rotaPedida = useInterface((s) => s.rota);
   const desligadas = useConfig((s) => s.funcoesDesligadas);
   const rota = rotaLigada(rotaPedida, desligadas) ? rotaPedida : "inicio";
-  const historico = useInterface((s) => s.historico);
-  const voltar = useInterface((s) => s.voltar);
   const geometriaSalva = useInterface((s) => s.geometria);
   const maximizada = useInterface((s) => s.sistemaMaximizado);
   const definirSistema = useInterface((s) => s.definirSistema);
@@ -63,8 +60,6 @@ export function JanelaSistema() {
       className="estilo-sistema"
       titulo={
         <span className="migalha">
-          <span className="migalha-app">{T.app.nome}</span>
-          <span className="migalha-ponto" aria-hidden="true" />
           <span>{T.gruposBarra[GRUPO_DA_ROTA[rota]]}</span>
           <span className="migalha-barra" aria-hidden="true">/</span>
           <span className="migalha-atual">
@@ -79,18 +74,6 @@ export function JanelaSistema() {
       minimo={MINIMO}
       idCamada="camada-sistema"
       nativa={NATIVO}
-      inicioBarra={
-        <button
-          type="button"
-          className="janela-controle"
-          aria-label={T.janela.voltar}
-          title={T.janela.voltar}
-          disabled={historico.length === 0}
-          onClick={voltar}
-        >
-          <ArrowLeft size={14} />
-        </button>
-      }
       aoFocar={focar}
       aoFechar={() => {
         void tocarSom("close");

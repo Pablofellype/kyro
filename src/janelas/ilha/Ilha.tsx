@@ -614,7 +614,7 @@ export function Ilha() {
           className="ilha"
           style={{ ["--fundo-ilha" as string]: aparencia.fundo }}
           initial={false}
-          animate={{ width: alvo.w, height: alvo.h, borderBottomLeftRadius: alvo.r, borderBottomRightRadius: alvo.r }}
+          animate={{ width: alvo.w, height: alvo.h, borderTopLeftRadius: ehMobile ? alvo.r : 0, borderTopRightRadius: ehMobile ? alvo.r : 0, borderBottomLeftRadius: alvo.r, borderBottomRightRadius: alvo.r }}
           transition={transicao}
         >
           <AnimatePresence>{destinoDoArquivo && <DestinoDoArquivo key="destino-do-arquivo" aoFechar={fecharDestinoDoArquivo} comChat={abas.includes("chat")} />}</AnimatePresence>
