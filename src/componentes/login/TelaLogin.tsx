@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
-import { Mail, Lock, Eye, EyeOff, ShieldCheck, LoaderCircle, AlertCircle } from "lucide-react";
+import { Mail, Lock, Eye, EyeOff, LoaderCircle, AlertCircle, ArrowRight, ShieldCheck } from "lucide-react";
 import { useAuth } from "../../estado/autenticacao";
+import { LogoNiko } from "../LogoNiko";
 import "./login.css";
 
 interface Props {
@@ -51,94 +52,122 @@ export function TelaLogin({ aoSucesso }: Props) {
   };
 
   return (
-    <div className="kyro-login-container">
-      <div className="kyro-login-card">
-        <header className="kyro-login-cabecalho">
-          <div className="kyro-login-logo-icone" aria-hidden="true">
-            <ShieldCheck size={26} />
+    <div className="estilo-sistema kyro-login-fundo">
+      <div className="kyro-login-janela">
+        {/* Barra superior estilo janela macOS/Kyro */}
+        <header className="kyro-login-barra">
+          <div className="kyro-login-bolinhas" aria-hidden="true">
+            <span className="kyro-login-bolinha fechar" />
+            <span className="kyro-login-bolinha minimizar" />
+            <span className="kyro-login-bolinha maximizar" />
           </div>
-          <h1 className="kyro-login-titulo">KYRO</h1>
-          <p className="kyro-login-sub">Sistema Pessoal de Produtividade & IA</p>
+
+          <div className="migalha">
+            <span className="migalha-app">KYRO</span>
+            <span className="migalha-ponto" aria-hidden="true" />
+            <span className="migalha-atual">ACESSO AO SISTEMA</span>
+          </div>
+
+          <div className="kyro-login-status-badge">
+            <span className="kyro-login-status-ponto" aria-hidden="true" />
+            <span>ONLINE</span>
+          </div>
         </header>
 
-        <form className="kyro-login-form" onSubmit={submeter}>
-          {erro && (
-            <div className="kyro-login-erro" role="alert">
-              <AlertCircle size={16} style={{ flexShrink: 0 }} />
-              <span>{erro}</span>
-            </div>
-          )}
-
-          <div className="kyro-login-campo">
-            <label className="kyro-login-rotulo" htmlFor="campo-email">
-              E-mail Autorizado
-            </label>
-            <div className="kyro-login-input-wrapper">
-              <span className="kyro-login-input-icone" aria-hidden="true">
-                <Mail size={16} />
-              </span>
-              <input
-                id="campo-email"
-                type="email"
-                className="kyro-login-input"
-                placeholder="seuemail@exemplo.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                autoComplete="email"
-                autoFocus
-                disabled={carregando}
-                required
-              />
-            </div>
+        {/* Corpo principal */}
+        <div className="kyro-login-corpo">
+          <div className="kyro-login-cabecalho">
+            <LogoNiko tamanho={58} brilho />
+            <h1 className="kyro-login-titulo">Acesso Autorizado</h1>
+            <p className="kyro-login-subtitulo">
+              Ambiente restrito protegido por credenciais criptografadas.
+            </p>
           </div>
 
-          <div className="kyro-login-campo">
-            <label className="kyro-login-rotulo" htmlFor="campo-senha">
-              Senha de Acesso
-            </label>
-            <div className="kyro-login-input-wrapper">
-              <span className="kyro-login-input-icone" aria-hidden="true">
-                <Lock size={16} />
-              </span>
-              <input
-                id="campo-senha"
-                type={mostrarSenha ? "text" : "password"}
-                className="kyro-login-input"
-                placeholder="••••••••"
-                value={senha}
-                onChange={(e) => setSenha(e.target.value)}
-                autoComplete="current-password"
-                disabled={carregando}
-                required
-              />
-              <button
-                type="button"
-                className="kyro-login-olho"
-                onClick={() => setMostrarSenha((v) => !v)}
-                tabIndex={-1}
-                aria-label={mostrarSenha ? "Ocultar senha" : "Ver senha"}
-              >
-                {mostrarSenha ? <EyeOff size={16} /> : <Eye size={16} />}
-              </button>
-            </div>
-          </div>
+          <div className="kyro-login-divisor" aria-hidden="true" />
 
-          <button type="submit" className="kyro-login-botao" disabled={carregando}>
-            {carregando ? (
-              <>
-                <LoaderCircle size={16} className="girando" />
-                <span>Autenticando...</span>
-              </>
-            ) : (
-              <span>Entrar no Sistema</span>
+          <form className="kyro-login-form" onSubmit={submeter}>
+            {erro && (
+              <div className="kyro-login-alerta-erro" role="alert">
+                <AlertCircle size={15} style={{ flexShrink: 0 }} />
+                <span>{erro}</span>
+              </div>
             )}
-          </button>
-        </form>
 
-        <footer className="kyro-login-rodape">
-          <ShieldCheck size={12} />
-          <span>Acesso protegido e restrito</span>
-        </footer>
+            <div className="kyro-login-campo-grupo">
+              <label className="kyro-login-rotulo" htmlFor="login-email">
+                <span>E-MAIL AUTORIZADO</span>
+              </label>
+              <div className="kyro-login-input-caixa">
+                <span className="kyro-login-icone-campo" aria-hidden="true">
+                  <Mail size={15} />
+                </span>
+                <input
+                  id="login-email"
+                  type="email"
+                  className="kyro-login-input"
+                  placeholder="pablofellype03@gmail.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  autoComplete="email"
+                  autoFocus
+                  disabled={carregando}
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="kyro-login-campo-grupo">
+              <label className="kyro-login-rotulo" htmlFor="login-senha">
+                <span>SENHA DE ACESSO</span>
+              </label>
+              <div className="kyro-login-input-caixa">
+                <span className="kyro-login-icone-campo" aria-hidden="true">
+                  <Lock size={15} />
+                </span>
+                <input
+                  id="login-senha"
+                  type={mostrarSenha ? "text" : "password"}
+                  className="kyro-login-input"
+                  placeholder="••••••••"
+                  value={senha}
+                  onChange={(e) => setSenha(e.target.value)}
+                  autoComplete="current-password"
+                  disabled={carregando}
+                  required
+                />
+                <button
+                  type="button"
+                  className="kyro-login-olho"
+                  onClick={() => setMostrarSenha((v) => !v)}
+                  tabIndex={-1}
+                  aria-label={mostrarSenha ? "Ocultar senha" : "Ver senha"}
+                >
+                  {mostrarSenha ? <EyeOff size={15} /> : <Eye size={15} />}
+                </button>
+              </div>
+            </div>
+
+            <button type="submit" className="kyro-login-botao-entrar" disabled={carregando}>
+              {carregando ? (
+                <>
+                  <LoaderCircle size={15} className="girando" />
+                  <span>Verificando Acesso...</span>
+                </>
+              ) : (
+                <>
+                  <span>Entrar no Sistema</span>
+                  <ArrowRight size={15} />
+                </>
+              )}
+            </button>
+          </form>
+
+          <footer className="kyro-login-rodape-info">
+            <ShieldCheck size={13} style={{ color: "var(--sucesso, #3dd68c)" }} />
+            <span>NEON POSTGRES · SÃO PAULO (BR)</span>
+          </footer>
+        </div>
       </div>
     </div>
   );

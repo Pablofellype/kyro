@@ -1,102 +1,173 @@
-.kyro-login-container {
+.estilo-sistema.kyro-login-fundo {
   position: fixed;
   inset: 0;
   width: 100vw;
   height: 100vh;
   height: 100dvh;
+  z-index: 999999;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: radial-gradient(circle at 50% 20%, #161922 0%, #0a0b0e 100%);
-  color: #f1f3f7;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  z-index: 999999;
-  padding: 20px;
+  padding: 16px;
+  box-sizing: border-box;
+  background: radial-gradient(800px 500px at 50% 30%, rgba(255, 59, 71, 0.08), transparent 70%), #0b0b0d;
+  font-family: var(--fonte-texto);
+  color: var(--texto);
+  -webkit-font-smoothing: antialiased;
+}
+
+.kyro-login-janela {
+  position: relative;
+  width: 100%;
+  max-width: 420px;
+  border-radius: 18px;
+  border: 1px solid var(--borda-controle);
+  background: var(--superficie);
+  box-shadow: 0 28px 70px rgba(0, 0, 0, 0.65), 0 2px 10px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Barra superior da janela */
+.kyro-login-barra {
+  height: 42px;
+  flex: 0 0 42px;
+  background: var(--fundo-barra, #09090b);
+  border-bottom: 1px solid var(--borda-suave);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 14px;
   box-sizing: border-box;
 }
 
-.kyro-login-card {
-  width: 100%;
-  max-width: 380px;
-  background: rgba(22, 24, 30, 0.75);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 20px;
-  padding: 36px 28px;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1);
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-}
-
-.kyro-login-cabecalho {
-  text-align: center;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-}
-
-.kyro-login-logo-icone {
-  width: 48px;
-  height: 48px;
-  border-radius: 14px;
-  background: linear-gradient(135deg, #2b3040, #141720);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+.kyro-login-bolinhas {
   display: flex;
   align-items: center;
-  justify-content: center;
-  color: #3b82f6;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
-  margin-bottom: 4px;
+  gap: 7px;
+  width: 54px;
 }
 
-.kyro-login-titulo {
-  font-size: 22px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  color: #ffffff;
-  margin: 0;
+.kyro-login-bolinha {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  display: inline-block;
+  opacity: 0.85;
+}
+
+.kyro-login-bolinha.fechar {
+  background: #ff5f56;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+}
+
+.kyro-login-bolinha.minimizar {
+  background: #ffbd2e;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+}
+
+.kyro-login-bolinha.maximizar {
+  background: #27c93f;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+}
+
+.kyro-login-status-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--fonte-mono);
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  color: var(--texto-4);
   text-transform: uppercase;
 }
 
-.kyro-login-sub {
-  font-size: 13px;
-  color: #8b92a5;
-  margin: 0;
+.kyro-login-status-ponto {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--sucesso, #3dd68c);
+  box-shadow: 0 0 6px rgba(61, 214, 140, 0.6);
 }
 
+/* Corpo da janela */
+.kyro-login-corpo {
+  padding: 32px 28px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  background: radial-gradient(400px 200px at 50% 0%, color-mix(in srgb, var(--destaque) 7%, transparent), transparent 70%), var(--superficie);
+}
+
+.kyro-login-cabecalho {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 10px;
+}
+
+.kyro-login-titulo {
+  font-family: var(--fonte-titulo);
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--texto);
+  margin: 0;
+  line-height: 1.1;
+}
+
+.kyro-login-subtitulo {
+  font-size: 13px;
+  color: var(--texto-3);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.kyro-login-divisor {
+  height: 1px;
+  background: var(--tracejado);
+  width: 100%;
+  opacity: 0.6;
+  margin: 2px 0;
+}
+
+/* Formulário */
 .kyro-login-form {
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
 
-.kyro-login-campo {
+.kyro-login-campo-grupo {
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
 
 .kyro-login-rotulo {
+  font-family: var(--fonte-mono);
   font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.05em;
+  font-weight: 500;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: #7b8296;
+  color: var(--texto-2);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
-.kyro-login-input-wrapper {
+.kyro-login-input-caixa {
   position: relative;
   display: flex;
   align-items: center;
 }
 
-.kyro-login-input-icone {
+.kyro-login-icone-campo {
   position: absolute;
   left: 12px;
-  color: #5d6478;
+  color: var(--texto-4);
   pointer-events: none;
   display: flex;
   align-items: center;
@@ -105,111 +176,111 @@
 
 .kyro-login-input {
   width: 100%;
-  height: 44px;
-  background: rgba(10, 12, 16, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 12px;
+  height: 40px;
+  background: var(--superficie-2, #1b1b1f);
+  border: 1px solid var(--borda-controle, #2a2a2e);
+  border-radius: 10px;
   padding: 0 40px 0 38px;
-  color: #ffffff;
-  font-size: 14px;
+  color: var(--texto, #f2efe9);
+  font-family: var(--fonte-texto);
+  font-size: 13.5px;
   outline: none;
-  transition: all 0.2s ease;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
   box-sizing: border-box;
 }
 
 .kyro-login-input:focus {
-  border-color: rgba(59, 130, 246, 0.5);
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
-  background: rgba(10, 12, 16, 0.85);
+  border-color: var(--destaque, #ff3b47);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--destaque) 20%, transparent);
+  background: var(--superficie-ativa, #141417);
 }
 
 .kyro-login-input::placeholder {
-  color: #484f63;
+  color: var(--texto-4, #55534f);
 }
 
 .kyro-login-olho {
   position: absolute;
-  right: 12px;
+  right: 10px;
   background: transparent;
   border: none;
-  color: #5d6478;
+  color: var(--texto-4);
   cursor: pointer;
-  padding: 4px;
+  padding: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 6px;
-  transition: color 0.15s ease;
+  transition: color 0.15s;
 }
 
 .kyro-login-olho:hover {
-  color: #9aa1b5;
+  color: var(--texto);
 }
 
-.kyro-login-erro {
-  background: rgba(239, 68, 68, 0.12);
-  border: 1px solid rgba(239, 68, 68, 0.25);
-  color: #fca5a5;
-  padding: 10px 14px;
-  border-radius: 10px;
-  font-size: 12px;
+/* Erro */
+.kyro-login-alerta-erro {
+  background: color-mix(in srgb, var(--erro, #ff5a63) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--erro, #ff5a63) 28%, transparent);
+  color: var(--erro, #ff5a63);
+  padding: 9px 12px;
+  border-radius: 8px;
+  font-size: 12.5px;
   display: flex;
   align-items: center;
   gap: 8px;
-  animation: surgimentoSuave 0.2s ease;
 }
 
-.kyro-login-botao {
+/* Botão principal */
+.kyro-login-botao-entrar {
   width: 100%;
-  height: 44px;
-  background: #ffffff;
-  color: #0b0d13;
-  border: none;
-  border-radius: 12px;
-  font-size: 14px;
+  height: 40px;
+  margin-top: 4px;
+  border-radius: 10px;
+  font-size: 13.5px;
   font-weight: 600;
+  letter-spacing: 0.02em;
+  background: var(--destaque, #ff3b47);
+  color: #ffffff;
+  border: none;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  margin-top: 6px;
-  transition: all 0.2s ease;
-  box-shadow: 0 4px 14px rgba(255, 255, 255, 0.15);
+  transition: opacity 0.15s ease, transform 0.08s ease, filter 0.15s ease;
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--destaque) 35%, transparent);
 }
 
-.kyro-login-botao:hover:not(:disabled) {
-  background: #f1f3f7;
+.kyro-login-botao-entrar:hover:not(:disabled) {
+  filter: brightness(1.1);
   transform: translateY(-1px);
-  box-shadow: 0 6px 18px rgba(255, 255, 255, 0.25);
 }
 
-.kyro-login-botao:active:not(:disabled) {
-  transform: translateY(0);
+.kyro-login-botao-entrar:active:not(:disabled) {
+  transform: scale(0.98);
 }
 
-.kyro-login-botao:disabled {
-  opacity: 0.6;
+.kyro-login-botao-entrar:disabled {
+  opacity: 0.55;
   cursor: not-allowed;
 }
 
-.kyro-login-rodape {
-  text-align: center;
-  font-size: 11px;
-  color: #555b6d;
+/* Rodapé */
+.kyro-login-rodape-info {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
-}
-
-@keyframes surgimentoSuave {
-  from { opacity: 0; transform: translateY(-4px); }
-  to { opacity: 1; transform: translateY(0); }
+  font-family: var(--fonte-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  color: var(--texto-4);
+  text-transform: uppercase;
 }
 
 .girando {
-  animation: rodar 1s linear infinite;
+  animation: rodar 0.9s linear infinite;
 }
 
 @keyframes rodar {
