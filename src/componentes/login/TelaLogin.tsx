@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from "react";
-import { Mail, Lock, Eye, EyeOff, LoaderCircle, AlertCircle, ArrowRight, ShieldCheck } from "lucide-react";
+import { Mail, Lock, Eye, EyeOff, LoaderCircle, AlertCircle, ArrowRight, ShieldCheck, Download } from "lucide-react";
 import { useAuth, urlApi } from "../../estado/autenticacao";
 import { LogoNiko } from "../LogoNiko";
+import { ModalInstalacao } from "./ModalInstalacao";
 import "./login.css";
 
 interface Props {
@@ -14,6 +15,7 @@ export function TelaLogin({ aoSucesso }: Props) {
   const [mostrarSenha, setMostrarSenha] = useState(false);
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const [modalInstalacaoAberto, setModalInstalacaoAberto] = useState(false);
 
   const definirUsuario = useAuth((s) => s.definirUsuario);
 
@@ -163,12 +165,33 @@ export function TelaLogin({ aoSucesso }: Props) {
             </button>
           </form>
 
+          <div className="kyro-login-divisor" aria-hidden="true" />
+
+          {/* Botão de Instalação Desktop */}
+          <button
+            type="button"
+            className="kyro-login-botao-instalar"
+            onClick={() => setModalInstalacaoAberto(true)}
+            title="Baixar instalador para Windows ou Linux"
+          >
+            <span className="kyro-login-botao-instalar-esquerda">
+              <Download size={14} className="kyro-login-icone-download" />
+              <span>Instalar Kyro no seu Computador</span>
+            </span>
+            <span className="kyro-login-badge-versao">v0.2.7</span>
+          </button>
+
           <footer className="kyro-login-rodape-info">
             <ShieldCheck size={13} style={{ color: "var(--sucesso, #3dd68c)" }} />
             <span>NEON POSTGRES · SÃO PAULO (BR)</span>
           </footer>
         </div>
       </div>
+
+      <ModalInstalacao
+        aberto={modalInstalacaoAberto}
+        aoFechar={() => setModalInstalacaoAberto(false)}
+      />
     </div>
   );
 }

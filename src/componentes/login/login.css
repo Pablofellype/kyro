@@ -279,6 +279,448 @@
   text-transform: uppercase;
 }
 
+/* Botão de Instalar Kyro Desktop */
+.kyro-login-botao-instalar {
+  width: 100%;
+  height: 38px;
+  background: var(--superficie-2, #18181b);
+  border: 1px solid var(--borda-controle, #27272a);
+  border-radius: 10px;
+  color: var(--texto-2, #d4d4d8);
+  font-family: var(--fonte-texto);
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  box-sizing: border-box;
+  transition: all 0.15s ease;
+}
+
+.kyro-login-botao-instalar:hover {
+  background: var(--superficie-ativa, #222226);
+  border-color: color-mix(in srgb, var(--destaque, #ff3b47) 45%, var(--borda-controle));
+  color: var(--texto, #ffffff);
+  transform: translateY(-1px);
+}
+
+.kyro-login-botao-instalar:active {
+  transform: scale(0.99);
+}
+
+.kyro-login-botao-instalar-esquerda {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.kyro-login-icone-download {
+  color: var(--destaque, #ff3b47);
+}
+
+.kyro-login-badge-versao {
+  font-family: var(--fonte-mono);
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--destaque, #ff3b47) 14%, transparent);
+  color: var(--destaque, #ff3b47);
+  border: 1px solid color-mix(in srgb, var(--destaque, #ff3b47) 28%, transparent);
+}
+
+/* Modal de Instalação Kyro Desktop */
+.kyro-instalador-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000000;
+  background: rgba(0, 0, 0, 0.76);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  box-sizing: border-box;
+  animation: fadeInModal 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes fadeInModal {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.kyro-instalador-janela {
+  position: relative;
+  width: 100%;
+  max-width: 620px;
+  max-height: 90vh;
+  border-radius: 18px;
+  border: 1px solid var(--borda-controle, #27272a);
+  background: var(--superficie, #121214);
+  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.75), 0 2px 14px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  animation: scaleInModal 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes scaleInModal {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.kyro-instalador-fechar-btn {
+  background: transparent;
+  border: none;
+  color: var(--texto-4, #71717a);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border-radius: 6px;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.kyro-instalador-fechar-btn:hover {
+  color: var(--texto, #ffffff);
+  background: var(--superficie-2, #1f1f23);
+}
+
+.kyro-instalador-cabecalho {
+  padding: 20px 22px 14px;
+  border-bottom: 1px solid var(--borda-suave, #1e1e22);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  background: radial-gradient(500px 180px at 50% 0%, color-mix(in srgb, var(--destaque) 6%, transparent), transparent 70%);
+}
+
+.kyro-instalador-titulo-linha {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.kyro-instalador-icone-destaque {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--destaque, #ff3b47) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--destaque, #ff3b47) 24%, transparent);
+  color: var(--destaque, #ff3b47);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.kyro-instalador-titulo {
+  font-family: var(--fonte-titulo);
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--texto, #ffffff);
+  margin: 0 0 3px 0;
+  line-height: 1.2;
+}
+
+.kyro-instalador-subtitulo {
+  font-size: 12.5px;
+  color: var(--texto-3, #a1a1aa);
+  margin: 0;
+  line-height: 1.4;
+}
+
+/* Abas de filtro OS */
+.kyro-instalador-abas {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--superficie-2, #18181b);
+  padding: 4px;
+  border-radius: 10px;
+  border: 1px solid var(--borda-controle, #27272a);
+  align-self: flex-start;
+}
+
+.kyro-instalador-aba {
+  background: transparent;
+  border: none;
+  border-radius: 7px;
+  padding: 6px 12px;
+  font-family: var(--fonte-texto);
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--texto-3, #a1a1aa);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.15s ease;
+}
+
+.kyro-instalador-aba:hover {
+  color: var(--texto, #ffffff);
+}
+
+.kyro-instalador-aba.ativa {
+  background: var(--superficie-ativa, #242429);
+  color: var(--texto, #ffffff);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+}
+
+/* Lista de pacotes */
+.kyro-instalador-lista {
+  padding: 14px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 380px;
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+
+.kyro-instalador-lista::-webkit-scrollbar {
+  width: 6px;
+}
+
+.kyro-instalador-lista::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.kyro-instalador-lista::-webkit-scrollbar-thumb {
+  background: var(--borda-controle, #27272a);
+  border-radius: 4px;
+}
+
+.kyro-instalador-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--superficie-2, #18181b);
+  border: 1px solid var(--borda-controle, #27272a);
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.kyro-instalador-card:hover {
+  border-color: color-mix(in srgb, var(--destaque, #ff3b47) 35%, var(--borda-controle));
+  background: var(--superficie-ativa, #1c1c20);
+}
+
+.kyro-instalador-card-icone {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: var(--fundo, #0f0f11);
+  border: 1px solid var(--borda-suave, #26262a);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--texto-3, #a1a1aa);
+  flex-shrink: 0;
+}
+
+.kyro-instalador-card-icone[data-os="windows"] {
+  color: #38bdf8;
+}
+
+.kyro-instalador-card-icone[data-os="linux"] {
+  color: #facc15;
+}
+
+.kyro-instalador-card-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.kyro-instalador-card-titulo-linha {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.kyro-instalador-card-nome {
+  font-family: var(--fonte-texto);
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--texto, #ffffff);
+}
+
+.kyro-instalador-badge-ext {
+  font-family: var(--fonte-mono);
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--fundo, #0e0e10);
+  border: 1px solid var(--borda-controle, #2a2a2e);
+  color: var(--texto-2, #d4d4d8);
+}
+
+.kyro-instalador-badge-destaque {
+  font-family: var(--fonte-mono);
+  font-size: 9.5px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--destaque, #ff3b47) 18%, transparent);
+  color: var(--destaque, #ff3b47);
+  border: 1px solid color-mix(in srgb, var(--destaque, #ff3b47) 32%, transparent);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.kyro-instalador-card-desc {
+  font-size: 11.5px;
+  color: var(--texto-3, #a1a1aa);
+  margin: 0;
+  line-height: 1.35;
+}
+
+.kyro-instalador-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+  font-family: var(--fonte-mono);
+  font-size: 10px;
+  color: var(--texto-4, #71717a);
+}
+
+.kyro-instalador-card-arquivo {
+  color: var(--texto-3, #a1a1aa);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 240px;
+}
+
+.kyro-instalador-card-ponto {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--texto-4, #71717a);
+}
+
+.kyro-instalador-card-tamanho {
+  color: var(--texto-2, #e4e4e7);
+  font-weight: 500;
+}
+
+.kyro-instalador-card-acao {
+  flex-shrink: 0;
+}
+
+.kyro-instalador-btn-baixar {
+  background: var(--superficie-ativa, #242429);
+  border: 1px solid var(--borda-controle, #2d2d32);
+  color: var(--texto, #ffffff);
+  border-radius: 8px;
+  height: 34px;
+  padding: 0 14px;
+  font-family: var(--fonte-texto);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.15s ease;
+}
+
+.kyro-instalador-btn-baixar:hover {
+  background: var(--destaque, #ff3b47);
+  border-color: var(--destaque, #ff3b47);
+  color: #ffffff;
+  box-shadow: 0 3px 10px color-mix(in srgb, var(--destaque) 35%, transparent);
+}
+
+.kyro-instalador-btn-baixar.baixado {
+  background: color-mix(in srgb, var(--sucesso, #3dd68c) 20%, transparent);
+  border-color: var(--sucesso, #3dd68c);
+  color: var(--sucesso, #3dd68c);
+}
+
+/* Aviso de regras */
+.kyro-instalador-aviso {
+  margin: 0 20px 12px;
+  padding: 10px 12px;
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--destaque, #ff3b47) 7%, transparent);
+  border: 1px solid color-mix(in srgb, var(--destaque, #ff3b47) 20%, transparent);
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.kyro-instalador-aviso-icone {
+  color: var(--destaque, #ff3b47);
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.kyro-instalador-aviso-texto {
+  font-size: 11.5px;
+  color: var(--texto-2, #d4d4d8);
+  line-height: 1.4;
+}
+
+.kyro-instalador-aviso-texto strong {
+  color: var(--texto, #ffffff);
+}
+
+/* Rodapé */
+.kyro-instalador-rodape {
+  padding: 12px 20px;
+  border-top: 1px solid var(--borda-suave, #1e1e22);
+  background: var(--fundo-barra, #09090b);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.kyro-instalador-rodape-seguranca {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--fonte-mono);
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  color: var(--texto-4, #71717a);
+}
+
+.kyro-instalador-btn-fechar-texto {
+  background: transparent;
+  border: none;
+  font-family: var(--fonte-texto);
+  font-size: 12px;
+  color: var(--texto-3, #a1a1aa);
+  cursor: pointer;
+  padding: 4px 10px;
+  border-radius: 6px;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.kyro-instalador-btn-fechar-texto:hover {
+  color: var(--texto, #ffffff);
+  background: var(--superficie-2, #18181b);
+}
+
 .girando {
   animation: rodar 0.9s linear infinite;
 }
