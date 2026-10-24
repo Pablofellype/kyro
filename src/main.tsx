@@ -68,7 +68,7 @@ async function iniciar() {
     throw new Error("ponte_indisponivel");
   }
   if (sobreposta) document.documentElement.classList.add("janela-sobreposta");
-  let Raiz: () => React.ReactElement;
+  let Raiz: () => React.ReactElement | null;
   if (!NATIVO) Raiz = (await import("./janelas/area-de-trabalho/AreaDeTrabalho")).AreaDeTrabalho;
   else {
     const apps = await import("./desktop/Aplicativos");

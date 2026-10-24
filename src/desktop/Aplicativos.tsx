@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { AnimatePresence } from "motion/react";
+import { LoaderCircle } from "lucide-react";
 import { Ilha } from "../janelas/ilha/Ilha";
 import { Dock } from "../janelas/dock/Dock";
 import { AssistiveTouch } from "../janelas/assistive/AssistiveTouch";
@@ -17,6 +18,8 @@ import { usarPreferenciasDaJanela } from "../servicos/usarPreferenciasDaJanela";
 import { definirMonitorDaIlha, janelaAtual, ouvirComandos, ouvirEvento, sincronizarInicioComWindows } from "./desktop";
 import { usarSincronia } from "./sincronia";
 import { usarAtalhosDaIlha, usarAtalhosGlobais } from "./usarAtalhosGlobais";
+import { useAuth } from "../estado/autenticacao";
+import { TelaLogin } from "../componentes/login/TelaLogin";
 
 export function AppSistema() {
   usarTema();
@@ -27,6 +30,14 @@ export function AppSistema() {
   const janelas = useInterface((s) => s.janelasConexao);
   const primeira = useConfig((s) => s.primeiraExecucaoFeita);
   const iniciarComWindows = useConfig((s) => s.iniciarComWindows);
+
+  const usuario = useAuth((s) => s.usuario);
+  const carregandoAuth = useAuth((s) => s.carregando);
+  const verificar = useAuth((s) => s.verificar);
+
+  useEffect(() => {
+    void verificar();
+  }, [verificar]);
 
   useEffect(() => {
     void sincronizarInicioComWindows(iniciarComWindows);
@@ -50,6 +61,18 @@ export function AppSistema() {
     void ouvirEvento("niko://captura", () => useInterface.getState().abrirCaptura(true)).then((f) => (desligar = f));
     return () => desligar();
   }, []);
+
+  if (carregandoAuth) {
+    return (
+      <div className="area-trabalho area-nativa estilo-sistema" style={{ display: "grid", placeItems: "center", minHeight: "100vh" }}>
+        <LoaderCircle size={28} className="girando" style={{ color: "var(--destaque, #ff3b47)" }} />
+      </div>
+    );
+  }
+
+  if (!usuario) {
+    return <TelaLogin />;
+  }
 
   return (
     <div className="area-trabalho area-nativa estilo-sistema">
@@ -81,12 +104,24 @@ function usarMonitorDaIlha() {
 }
 
 export function AppIlha() {
+  const usuario = useAuth((s) => s.usuario);
   usarMostrarAoMontar();
   usarMonitorDaIlha();
   usarTema();
   usarSincronia();
   usarAtalhosDaIlha();
   useServicos();
+
+  useEffect(() => {
+    if (!usuario) {
+      void janelaAtual().then((j) => j.hide()).catch(() => undefined);
+    } else {
+      void janelaAtual().then((j) => j.show()).catch(() => undefined);
+    }
+  }, [usuario]);
+
+  if (!usuario) return null;
+
   return (
     <div className="area-sobreposta">
       <Ilha />
@@ -95,10 +130,22 @@ export function AppIlha() {
 }
 
 export function AppDock() {
+  const usuario = useAuth((s) => s.usuario);
   usarMostrarAoMontar();
   usarTema();
   usarPreferenciasDaJanela();
   usarSincronia();
+
+  useEffect(() => {
+    if (!usuario) {
+      void janelaAtual().then((j) => j.hide()).catch(() => undefined);
+    } else {
+      void janelaAtual().then((j) => j.show()).catch(() => undefined);
+    }
+  }, [usuario]);
+
+  if (!usuario) return null;
+
   return (
     <div className="area-sobreposta">
       <Dock />
@@ -107,13 +154,20 @@ export function AppDock() {
 }
 
 export function AppAssistive() {
+  const usuario = useAuth((s) => s.usuario);
   usarTema();
   usarSincronia();
   const ativo = useConfig((s) => s.assistive.ativo);
+
   useEffect(() => {
     let vivo = true;
-    void janelaAtual().then((j) => { if (vivo) return ativo ? j.show() : j.hide(); }).catch(() => undefined);
+    void janelaAtual().then((j) => {
+      if (vivo) return (ativo && usuario) ? j.show() : j.hide();
+    }).catch(() => undefined);
     return () => { vivo = false; };
-  }, [ativo]);
+  }, [ativo, usuario]);
+
+  if (!usuario) return null;
+
   return <div className="area-sobreposta"><AssistiveTouch /></div>;
 }

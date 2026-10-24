@@ -15,6 +15,13 @@ interface EstadoAuth {
   verificar: () => Promise<boolean>;
 }
 
+export function urlApi(caminho: string): string {
+  // Se for Tauri native .exe e não estiver no localhost, pode usar a URL da Vercel
+  const tauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+  const baseUrl = import.meta.env.VITE_API_URL || (tauri ? "https://kyro-pablofellype03.vercel.app" : "");
+  return `${baseUrl}${caminho}`;
+}
+
 export const useAuth = create<EstadoAuth>((set, get) => ({
   usuario: null,
   carregando: true,
@@ -36,7 +43,7 @@ export const useAuth = create<EstadoAuth>((set, get) => ({
     const token = get().token;
     if (token) {
       try {
-        await fetch("/api/auth?acao=logout", {
+        await fetch(urlApi("/api/auth?acao=logout"), {
           method: "POST",
           headers: { Authorization: `Bearer ${token}` },
         });
@@ -54,7 +61,7 @@ export const useAuth = create<EstadoAuth>((set, get) => ({
       return false;
     }
     try {
-      const res = await fetch("/api/auth?acao=verificar", {
+      const res = await fetch(urlApi("/api/auth?acao=verificar"), {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error("erro_rede");

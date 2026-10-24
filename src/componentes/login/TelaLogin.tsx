@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { Mail, Lock, Eye, EyeOff, LoaderCircle, AlertCircle, ArrowRight, ShieldCheck } from "lucide-react";
-import { useAuth } from "../../estado/autenticacao";
+import { useAuth, urlApi } from "../../estado/autenticacao";
 import { LogoNiko } from "../LogoNiko";
 import "./login.css";
 
@@ -29,7 +29,7 @@ export function TelaLogin({ aoSucesso }: Props) {
 
     setCarregando(true);
     try {
-      const res = await fetch("/api/auth?acao=login", {
+      const res = await fetch(urlApi("/api/auth?acao=login"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: emailLimpo, senha }),
