@@ -176,8 +176,9 @@ export async function ouvirEvento(nome: string, fn: () => void, soDestaJanela = 
 function enviarPelaPonte(base: string, token: string | null) {
   const original = window.fetch.bind(window);
   window.fetch = (entrada: RequestInfo | URL, opcoes?: RequestInit) => {
-    if (typeof entrada === "string" && entrada.startsWith("/ponte")) {
+    if (typeof entrada === "string" && (entrada.startsWith("/ponte") || entrada.startsWith("/api"))) {
       const cabecalhos = new Headers(opcoes?.headers);
+      cabecalhos.set("x-niko", "1");
       if (token) cabecalhos.set("x-niko-token", token);
       return original(`${base}${entrada}`, { ...opcoes, headers: cabecalhos });
     }

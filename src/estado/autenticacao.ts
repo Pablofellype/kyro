@@ -16,9 +16,7 @@ interface EstadoAuth {
 }
 
 export function urlApi(caminho: string): string {
-  // Se for Tauri native .exe e não estiver no localhost, pode usar a URL da Vercel
-  const tauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
-  const baseUrl = import.meta.env.VITE_API_URL || (tauri ? "https://kyro-pablofellype03.vercel.app" : "");
+  const baseUrl = import.meta.env.VITE_API_URL || "";
   return `${baseUrl}${caminho}`;
 }
 

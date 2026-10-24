@@ -1,3 +1,4 @@
+import { loginUsuario, validarSessao, logoutSessao } from "../src/servicos/autenticacao.ts";
 import type { Plugin, Connect } from "./tiposVite.ts";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { randomBytes } from "node:crypto";
@@ -87,8 +88,8 @@ export const rotas: Connect.NextHandleFunction = async (req, res, proximo) => {
   const url = new URL(req.url ?? "/", "http://localhost");
 
   if (url.pathname === "/api/auth") {
+    if (!hostLocal(req) || !origemConfiavel(req)) return responder(res, 403, { erro: "origem_nao_permitida" });
     const acao = url.searchParams.get("acao") || "verificar";
-    const { loginUsuario, validarSessao, logoutSessao } = await import("../src/servicos/autenticacao.ts");
     try {
       if (req.method === "POST" && acao === "login") {
         const { email, senha } = (await lerCorpo(req)) as { email?: string; senha?: string };

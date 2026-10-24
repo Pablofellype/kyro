@@ -53,3 +53,44 @@ test("ponte no carregador nativo atende somente pedidos locais autorizados", asy
     await servidor.close();
   }
 });
+
+test("rota local de autenticação exige a ponte e aceita o formato de login", async () => {
+  const servidor = await createServer({
+    root: raiz,
+    configFile: arquivo,
+    configLoader: "native",
+    logLevel: "silent",
+    appType: "custom",
+    server: { host: "127.0.0.1", port: 0, strictPort: true, hmr: false, watch: null, preTransformRequests: false },
+    optimizeDeps: { noDiscovery: true, entries: [] },
+  });
+  try {
+    await servidor.listen();
+    const endereco = servidor.httpServer.address();
+    const url = `http://127.0.0.1:${endereco.port}/api/auth?acao=login`;
+    const semAutorizacao = await fetch(url, {
+      method: "POST",
+      headers: { "content-type": "application/json", connection: "close" },
+      body: JSON.stringify({ email: "teste@example.com", senha: "senha" }),
+      signal: AbortSignal.timeout(LIMITE_PEDIDO_LOCAL_MS),
+    });
+    assert.equal(semAutorizacao.status, 403);
+    await semAutorizacao.body.cancel();
+
+    const autorizado = await fetch(url, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        connection: "close",
+        "x-niko": "1",
+        "x-niko-token": process.env.NIKO_TOKEN,
+      },
+      body: JSON.stringify({ email: "", senha: "" }),
+      signal: AbortSignal.timeout(LIMITE_PEDIDO_LOCAL_MS),
+    });
+    assert.equal(autorizado.status, 400);
+    assert.equal((await autorizado.json()).sucesso, false);
+  } finally {
+    await servidor.close();
+  }
+});
