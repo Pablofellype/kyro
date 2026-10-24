@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Sun, Moon, PanelLeftClose, PanelLeftOpen, Check, Settings, ChevronDown } from "lucide-react";
+import { Sun, Moon, PanelLeftClose, PanelLeftOpen, Check, Settings, ChevronDown, LogOut } from "lucide-react";
 import { useConfig, GRUPO_DA_ROTA } from "../../estado/configuracoes";
 import { useInterface } from "../../estado/interface";
 import { useRotina, tarefasDoDia } from "../../estado/rotina";
 import { useEstudos, revisoesParaHoje } from "../../estado/estudos";
 import { useAgentes } from "../../estado/agentes";
 import { useOrganizacao } from "../../estado/organizacao";
+import { useAuth } from "../../estado/autenticacao";
 import { T } from "../../textos/textos";
 import { ICONE_ROTA } from "./rotas";
 import { LogoNiko } from "../../componentes/LogoNiko";
@@ -155,6 +156,7 @@ export function BarraLateral({ recolhida }: { recolhida: boolean }) {
   const mudarStatus = useRotina((s) => s.mudarStatus);
   const contadores = useContadores();
   const { rolagem, caixa } = usarIndicador(rota, recolhida);
+  const logout = useAuth((s) => s.logout);
   const [fade, setFade] = useState({ topo: false, base: false });
   const desligadas = useConfig((s) => s.funcoesDesligadas);
   const hoje = tarefasDoDia(tarefas, hojeISO()).filter((t) => t.status !== "cancelada").slice(0, 5);
@@ -281,6 +283,9 @@ export function BarraLateral({ recolhida }: { recolhida: boolean }) {
               <button type="button" className="barra-icone" data-tour="ajustes" aria-current={emAjustes ? "page" : undefined} aria-label={T.rotas.configuracoes} title={T.rotas.configuracoes} onClick={() => irPara("configuracoes")}>
                 <Settings size={15} />
               </button>
+              <button type="button" className="barra-icone" aria-label="Sair da conta" title="Sair da conta" onClick={() => void logout()}>
+                <LogOut size={15} />
+              </button>
             </>
           )}
         </div>
@@ -291,6 +296,9 @@ export function BarraLateral({ recolhida }: { recolhida: boolean }) {
             </button>
             <button type="button" className="barra-icone barra-icone-largo" data-tour="ajustes" aria-current={emAjustes ? "page" : undefined} aria-label={T.rotas.configuracoes} title={T.rotas.configuracoes} onClick={() => irPara("configuracoes")}>
               <Settings size={16} />
+            </button>
+            <button type="button" className="barra-icone barra-icone-largo" aria-label="Sair da conta" title="Sair da conta" onClick={() => void logout()}>
+              <LogOut size={16} />
             </button>
           </>
         )}

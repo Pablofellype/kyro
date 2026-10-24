@@ -4,7 +4,7 @@ import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } 
 import { CSS } from "@dnd-kit/utilities";
 import {
   User, Palette, PanelTop, PanelBottom, CircleDot, Timer, Users, Volume2, Gauge, Maximize, Keyboard, EyeOff, Database, Terminal, Info, Code,
-  GripVertical, Download, Upload, RotateCcw, Trash2, DatabaseBackup, Hand, Search, ArrowUpRight,
+  GripVertical, Download, Upload, RotateCcw, Trash2, DatabaseBackup, Hand, Search, ArrowUpRight, LogOut,
 } from "lucide-react";
 import { CabecalhoAba } from "../../componentes/CabecalhoAba";
 import { Botao, Campo, Modal, Segmentado, AvisoFaixa, LinhaAlternador, Alternador, ConfirmarModal } from "../../componentes/basicos";
@@ -13,6 +13,7 @@ import { useConfig, BARRA_PADRAO, CATEGORIAS_DE_AVISO, ESCALAS_DO_DOCK, type Mod
 import { useAgentes, AGENTES } from "../../estado/agentes";
 import { useComunicacao } from "../../estado/comunicacao";
 import { useInterface } from "../../estado/interface";
+import { useAuth } from "../../estado/autenticacao";
 import { usePomodoro } from "../../estado/pomodoro";
 import { T } from "../../textos/textos";
 import { contraste, hexValido, FUNDO_DESTAQUE } from "../../utilitarios/cores";
@@ -306,6 +307,8 @@ function numeroLimitado(texto: string, min: number, max: number, padrao: number)
 
 export default function Configuracoes() {
   const cfg = useConfig();
+  const usuario = useAuth((st) => st.usuario);
+  const logout = useAuth((st) => st.logout);
   const monitores = usarMonitores();
   const avisar = useInterface((s) => s.avisar);
   const irPara = useInterface((s) => s.irPara);
@@ -371,6 +374,15 @@ export default function Configuracoes() {
             <label className="ajuste-perfil-rotulo" htmlFor="cf-nome">{T.configuracoes.nomePerfil}</label>
             <input id="cf-nome" className="campo ajuste-perfil-nome" value={cfg.nome} maxLength={40} placeholder={T.barraLateral.perfil} onChange={(e) => cfg.definir({ nome: e.target.value })} />
           </EditorFoto>
+        </div>
+        <div className="linha-entre linha-config">
+          <div className="coluna" style={{ gap: 2 }}>
+            <span>Sessão da conta</span>
+            <span className="campo-dica">{usuario ? usuario.email : "Acesso local"}</span>
+          </div>
+          <Botao variante="perigo" pequeno icone={<LogOut size={13} />} onClick={() => void logout()}>
+            Sair da conta
+          </Botao>
         </div>
         <AlternadorAjuste rotulo={T.configuracoes.viradaDia} dica={T.configuracoes.viradaDiaDica} ligado={cfg.viradaAs4h} aoMudar={(v) => cfg.definir({ viradaAs4h: v })} />
         <AlternadorAjuste rotulo={T.configuracoes.iniciarComWindows} dica={T.configuracoes.iniciarComWindowsDica} ligado={cfg.iniciarComWindows} aoMudar={(v) => cfg.definir({ iniciarComWindows: v })} />
