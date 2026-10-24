@@ -22,7 +22,7 @@ export function usarAtalhos() {
     const aoTeclar = (e: KeyboardEvent) => {
       const ui = useInterface.getState();
       const cfg = useConfig.getState();
-      if (!e.key) return;
+      if (typeof e?.key !== "string") return;
       const tecla = e.key.toLowerCase();
 
       const acao = ACOES_GLOBAIS.find((a) => cfg.atalhosGlobais[a] && combinaCom(e, cfg.atalhosGlobais[a]));
