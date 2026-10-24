@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { X, Download, Monitor, Terminal, ShieldCheck, Check, HardDrive, Package } from "lucide-react";
+import { X, Download, Monitor, Terminal, ShieldCheck, Check, HardDrive, Package, ExternalLink } from "lucide-react";
 
 interface OpcaoDownload {
   id: string;
@@ -13,58 +13,60 @@ interface OpcaoDownload {
   url: string;
 }
 
+const REPOSITORIO_KYRO = "https://github.com/Pablofellype/kyro";
+
 const OPCOES_INSTALACAO: OpcaoDownload[] = [
   {
     id: "win-exe",
     os: "windows",
-    nome: "Instalador Setup Windows",
-    arquivo: "Niko_0.2.7_x64-setup.exe",
+    nome: "Instalador Setup Kyro (.exe)",
+    arquivo: "Kyro_0.2.7_x64-setup.exe",
     extensao: ".exe",
     tamanho: "30.6 MB",
-    descricao: "Instalação automática recomendada para Windows 10 e Windows 11 (64-bit). Cria atalhos e configura inicialização.",
+    descricao: "Instalação automática recomendada do Kyro para Windows 10 e Windows 11 (64-bit). Configuração completa e atalhos.",
     destaque: "Recomendado",
-    url: "https://github.com/vitorcgo/Niko/releases/download/v0.2.7/Niko_0.2.7_x64-setup.exe",
+    url: `${REPOSITORIO_KYRO}/releases/latest/download/Kyro_0.2.7_x64-setup.exe`,
   },
   {
     id: "win-msi",
     os: "windows",
-    nome: "Pacote Windows Installer",
-    arquivo: "Niko_0.2.7_x64_pt-BR.msi",
+    nome: "Pacote Kyro Windows Installer (.msi)",
+    arquivo: "Kyro_0.2.7_x64_pt-BR.msi",
     extensao: ".msi",
     tamanho: "42.3 MB",
-    descricao: "Instalador MSI nativo do Windows em Português (Brasil). Ideal para instalações limpas e gerenciadas.",
-    url: "https://github.com/vitorcgo/Niko/releases/download/v0.2.7/Niko_0.2.7_x64_pt-BR.msi",
+    descricao: "Instalador MSI nativo do Kyro em Português (Brasil). Instalação limpa para ambientes corporativos.",
+    url: `${REPOSITORIO_KYRO}/releases/latest/download/Kyro_0.2.7_x64_pt-BR.msi`,
   },
   {
     id: "linux-appimage",
     os: "linux",
-    nome: "Pacote Linux AppImage",
-    arquivo: "Niko_0.2.7_amd64.AppImage",
+    nome: "Kyro Linux AppImage Universal",
+    arquivo: "Kyro_0.2.7_amd64.AppImage",
     extensao: ".AppImage",
     tamanho: "123 MB",
-    descricao: "Executável universal e portátil para qualquer distribuição Linux x86_64. Não requer instalação (chmod +x).",
+    descricao: "Executável autônomo do Kyro para qualquer distribuição Linux x86_64. Não requer instalação (chmod +x).",
     destaque: "Portátil",
-    url: "https://github.com/vitorcgo/Niko/releases/download/v0.2.7/Niko_0.2.7_amd64.AppImage",
+    url: `${REPOSITORIO_KYRO}/releases/latest/download/Kyro_0.2.7_amd64.AppImage`,
   },
   {
     id: "linux-deb",
     os: "linux",
-    nome: "Pacote Debian / Ubuntu",
-    arquivo: "Niko_0.2.7_amd64.deb",
+    nome: "Pacote Kyro Debian / Ubuntu (.deb)",
+    arquivo: "Kyro_0.2.7_amd64.deb",
     extensao: ".deb",
     tamanho: "53.3 MB",
-    descricao: "Pacote de instalação para Ubuntu, Debian, Linux Mint, Pop!_OS e derivadas com gerenciador apt.",
-    url: "https://github.com/vitorcgo/Niko/releases/download/v0.2.7/Niko_0.2.7_amd64.deb",
+    descricao: "Pacote oficial para Ubuntu, Debian, Linux Mint e Pop!_OS via gerenciador apt.",
+    url: `${REPOSITORIO_KYRO}/releases/latest/download/Kyro_0.2.7_amd64.deb`,
   },
   {
     id: "linux-rpm",
     os: "linux",
-    nome: "Pacote Red Hat / Fedora",
-    arquivo: "Niko-0.2.7-1.x86_64.rpm",
+    nome: "Pacote Kyro Red Hat / Fedora (.rpm)",
+    arquivo: "Kyro-0.2.7-1.x86_64.rpm",
     extensao: ".rpm",
     tamanho: "53.3 MB",
-    descricao: "Pacote RPM para Fedora, RHEL, CentOS Stream, Rocky Linux e openSUSE (dnf / rpm / zypper).",
-    url: "https://github.com/vitorcgo/Niko/releases/download/v0.2.7/Niko-0.2.7-1.x86_64.rpm",
+    descricao: "Pacote RPM do Kyro para Fedora, RHEL, CentOS Stream, Rocky Linux e openSUSE.",
+    url: `${REPOSITORIO_KYRO}/releases/latest/download/Kyro-0.2.7-1.x86_64.rpm`,
   },
 ];
 
@@ -94,7 +96,6 @@ export function ModalInstalacao({ aberto, aoFechar }: Props) {
 
   const iniciarDownload = (opcao: OpcaoDownload) => {
     setBaixadoId(opcao.id);
-    // Cria elemento âncora temporário para disparar o download
     const link = document.createElement("a");
     link.href = opcao.url;
     link.download = opcao.arquivo;
@@ -123,7 +124,7 @@ export function ModalInstalacao({ aberto, aoFechar }: Props) {
           <div className="migalha">
             <span className="migalha-app">KYRO</span>
             <span className="migalha-ponto" aria-hidden="true" />
-            <span className="migalha-atual">DOWNLOAD & INSTALAÇÃO</span>
+            <span className="migalha-atual">INSTALADOR OFICIAL</span>
           </div>
 
           <button
@@ -145,7 +146,7 @@ export function ModalInstalacao({ aberto, aoFechar }: Props) {
             <div>
               <h2 className="kyro-instalador-titulo">Instalar Kyro Desktop</h2>
               <p className="kyro-instalador-subtitulo">
-                Escolha o pacote oficial compatível com seu sistema operacional (Versão 0.2.7 · 64-bit).
+                Binários oficiais do Kyro (v0.2.7 · 64-bit) para Windows e Linux.
               </p>
             </div>
           </div>
@@ -238,7 +239,7 @@ export function ModalInstalacao({ aberto, aoFechar }: Props) {
         <div className="kyro-instalador-aviso">
           <ShieldCheck size={16} className="kyro-instalador-aviso-icone" />
           <div className="kyro-instalador-aviso-texto">
-            <strong>Regra de Acesso:</strong> Após a instalação, execute o aplicativo e faça login com seu e-mail autorizado. As ferramentas nativas (ilha dinâmica, dock e barra inteligente) serão ativadas exclusivamente para usuários com sessão ativa.
+            <strong>Regra de Acesso Kyro:</strong> Após a instalação, execute o aplicativo e faça login com seu e-mail autorizado. As ferramentas nativas (ilha dinâmica, dock e barra inteligente) serão ativadas exclusivamente para usuários com sessão ativa no Neon Postgres.
           </div>
         </div>
 
@@ -246,12 +247,24 @@ export function ModalInstalacao({ aberto, aoFechar }: Props) {
         <footer className="kyro-instalador-rodape">
           <div className="kyro-instalador-rodape-seguranca">
             <span className="kyro-login-status-ponto" aria-hidden="true" />
-            <span>VERSÃO 0.2.7 ESTÁVEL · REPOSITÓRIO OFICIAL</span>
+            <span>KYRO 0.2.7 ESTÁVEL · REPOSITÓRIO OFICIAL PABLO FELLYPE</span>
           </div>
 
-          <button type="button" className="kyro-instalador-btn-fechar-texto" onClick={aoFechar}>
-            Fechar
-          </button>
+          <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+            <a
+              href={`${REPOSITORIO_KYRO}/releases`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="kyro-instalador-btn-fechar-texto"
+              style={{ display: "inline-flex", alignItems: "center", gap: "4px", textDecoration: "none" }}
+            >
+              <ExternalLink size={12} />
+              <span>Releases no GitHub</span>
+            </a>
+            <button type="button" className="kyro-instalador-btn-fechar-texto" onClick={aoFechar}>
+              Fechar
+            </button>
+          </div>
         </footer>
       </div>
     </div>

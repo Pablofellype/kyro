@@ -1,13 +1,13 @@
-!macro EncerrarProcessosDoNiko
-  nsExec::Exec `"$SYSDIR\taskkill.exe" /F /T /IM niko.exe`
+!macro EncerrarProcessosDoKyro
+  nsExec::Exec `"$SYSDIR\taskkill.exe" /F /T /IM kyro.exe`
   Pop $0
   Sleep 800
 !macroend
 
 !macro NSIS_HOOK_PREINSTALL
-  !insertmacro EncerrarProcessosDoNiko
+  !insertmacro EncerrarProcessosDoKyro
 !macroend
 
 !macro NSIS_HOOK_PREUNINSTALL
-  !insertmacro EncerrarProcessosDoNiko
+  !insertmacro EncerrarProcessosDoKyro
 !macroend
