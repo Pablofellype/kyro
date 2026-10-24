@@ -85,6 +85,37 @@ function origemConfiavel(req: IncomingMessage): boolean {
 
 export const rotas: Connect.NextHandleFunction = async (req, res, proximo) => {
   const url = new URL(req.url ?? "/", "http://localhost");
+
+  if (url.pathname === "/api/auth") {
+    const acao = url.searchParams.get("acao") || "verificar";
+    const { loginUsuario, validarSessao, logoutSessao } = await import("../src/servicos/autenticacao.ts");
+    try {
+      if (req.method === "POST" && acao === "login") {
+        const { email, senha } = (await lerCorpo(req)) as { email?: string; senha?: string };
+        if (!email || !senha) return responder(res, 400, { sucesso: false, erro: "E-mail e senha são obrigatórios." });
+        const resultado = await loginUsuario(String(email), String(senha));
+        if (!resultado.sucesso) return responder(res, 401, resultado);
+        return responder(res, 200, resultado);
+      }
+      if (req.method === "GET" && acao === "verificar") {
+        const authHeader = req.headers.authorization;
+        const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : (url.searchParams.get("token") || "");
+        if (!token) return responder(res, 200, { autenticado: false });
+        const usuario = await validarSessao(token);
+        return responder(res, 200, usuario ? { autenticado: true, usuario } : { autenticado: false });
+      }
+      if (req.method === "POST" && acao === "logout") {
+        const authHeader = req.headers.authorization;
+        const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : "";
+        if (token) await logoutSessao(token);
+        return responder(res, 200, { sucesso: true });
+      }
+    } catch (e) {
+      return responder(res, 500, { sucesso: false, erro: (e as Error).message });
+    }
+    return responder(res, 404, { erro: "Ação não encontrada." });
+  }
+
   if (!url.pathname.startsWith("/ponte/")) return proximo();
   if (!hostLocal(req)) return responder(res, 403, { erro: "host_nao_permitido" });
   if (ehRotaDoGancho(url.pathname) && req.method === "POST") return receberEventoDoGancho(req, res);

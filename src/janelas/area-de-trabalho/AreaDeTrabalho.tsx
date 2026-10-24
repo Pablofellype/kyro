@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { AnimatePresence } from "motion/react";
+import { LoaderCircle } from "lucide-react";
 import { Ilha } from "../ilha/Ilha";
 import { Dock } from "../dock/Dock";
 import { AssistiveTouch } from "../assistive/AssistiveTouch";
@@ -14,6 +15,8 @@ import { usarTema } from "./usarTema";
 import { usarAtalhos } from "./usarAtalhos";
 import { useServicos } from "../../servicos/servicos";
 import { usarTamanhoDaTela, verificarSeEhMobile } from "../usarTamanhoDaTela";
+import { useAuth } from "../../estado/autenticacao";
+import { TelaLogin } from "../../componentes/login/TelaLogin";
 
 export function AreaDeTrabalho() {
   usarTema();
@@ -26,6 +29,14 @@ export function AreaDeTrabalho() {
   const janelas = useInterface((s) => s.janelasConexao);
   const primeira = useConfig((s) => s.primeiraExecucaoFeita);
 
+  const usuario = useAuth((s) => s.usuario);
+  const carregandoAuth = useAuth((s) => s.carregando);
+  const verificar = useAuth((s) => s.verificar);
+
+  useEffect(() => {
+    void verificar();
+  }, [verificar]);
+
   useEffect(() => {
     if (ehMobile) {
       document.documentElement.setAttribute("data-mobile", "sim");
@@ -33,6 +44,18 @@ export function AreaDeTrabalho() {
       document.documentElement.removeAttribute("data-mobile");
     }
   }, [ehMobile]);
+
+  if (carregandoAuth) {
+    return (
+      <div className="kyro-login-container">
+        <LoaderCircle size={28} className="girando" style={{ color: "#3b82f6" }} />
+      </div>
+    );
+  }
+
+  if (!usuario) {
+    return <TelaLogin />;
+  }
 
   const sistemaVisivel = ehMobile || (aberto && !minimizado);
 
