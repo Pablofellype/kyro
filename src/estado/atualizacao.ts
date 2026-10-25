@@ -28,6 +28,20 @@ interface EstadoAtualizacao {
 
 let pendente: Update | null = null;
 
+const URL_ULTIMA_RELEASE = "https://api.github.com/repos/Pablofellype/kyro/releases/latest";
+
+async function lerUltimaRelease(): Promise<{ versao: string; notas: string }> {
+  const resposta = await fetch(URL_ULTIMA_RELEASE, {
+    headers: { Accept: "application/vnd.github+json" },
+    signal: AbortSignal.timeout(15000),
+  });
+  if (!resposta.ok) throw new Error(`github_http_${resposta.status}`);
+  const release = await resposta.json() as { tag_name?: unknown; body?: unknown };
+  const tag = typeof release.tag_name === "string" ? release.tag_name.replace(/^v/, "") : "";
+  if (!/^\d+\.\d+\.\d+$/.test(tag)) throw new Error("release_invalida");
+  return { versao: tag, notas: typeof release.body === "string" ? release.body : "" };
+}
+
 export const useAtualizacao = create<EstadoAtualizacao>()((set, get) => ({
   fase: "nada",
   verificacao: "nada",
@@ -53,16 +67,13 @@ export const useAtualizacao = create<EstadoAtualizacao>()((set, get) => ({
     try {
       await get().carregarVersao();
       if (!get().versaoAtual) throw new Error("versao_indisponivel");
-      const resposta = await fetch("/ponte/atualizacao", { headers: { "x-niko": "1" }, signal: AbortSignal.timeout(20000) });
-      if (!resposta.ok) throw new Error(`http_${resposta.status}`);
-      const dados = await resposta.json() as { versao: string | null; notas: string };
-      if (dados.versao !== null && typeof dados.versao !== "string") throw new Error("versao_invalida");
+      const dados = await lerUltimaRelease();
       const anterior = pendente;
       pendente = null;
       await anterior?.close().catch(() => undefined);
       const ultimaVerificacao = new Date().toISOString();
       if (!dados.versao || !versaoMaisNova(dados.versao, get().versaoAtual)) {
-        set({ fase: "nada", verificacao: dados.versao ? "atualizado" : "sem_versoes", automatica: false, versao: dados.versao ?? "", notas: dados.notas, ultimaVerificacao });
+        set({ fase: "nada", verificacao: dados.versao ? "atualizado" : "sem_versoes", automatica: false, versao: dados.versao, notas: dados.notas, ultimaVerificacao });
         return;
       }
       if (NATIVO) {

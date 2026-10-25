@@ -3,6 +3,7 @@ import { Mail, Lock, Eye, EyeOff, LoaderCircle, AlertCircle, ArrowRight, ShieldC
 import { useAuth, urlApi } from "../../estado/autenticacao";
 import { LogoNiko } from "../LogoNiko";
 import { ModalInstalacao } from "./ModalInstalacao";
+import manifesto from "../../../package.json";
 import "./login.css";
 
 interface Props {
@@ -178,7 +179,7 @@ export function TelaLogin({ aoSucesso }: Props) {
               <Download size={14} className="kyro-login-icone-download" />
               <span>Instalar Kyro no seu Computador</span>
             </span>
-            <span className="kyro-login-badge-versao">v0.2.7</span>
+            <span className="kyro-login-badge-versao">v{manifesto.version}</span>
           </button>
 
           <footer className="kyro-login-rodape-info">

@@ -179,6 +179,23 @@ export const T = {
     tiposDeMudanca: { novo: "Novo", melhoria: "Melhoria", correcao: "Correção" },
     historico: [
       {
+        versao: "0.2.9",
+        data: "2026-10-24",
+        mudancas: [
+          ["correcao", "A verificacao de atualizacoes consulta as releases publicadas no GitHub no web e no desktop."],
+          ["correcao", "O perfil mostra o nome da conta autenticada tambem no web."],
+          ["melhoria", "Os links de download usam automaticamente a versao atual do pacote."],
+        ],
+      },
+      {
+        versao: "0.2.8",
+        data: "2026-10-24",
+        mudancas: [
+          ["correcao", "O login do desktop usa a ponte local com o banco Neon."],
+          ["correcao", "A sessao autenticada e sincronizada entre as janelas do desktop."],
+        ],
+      },
+      {
         versao: "0.2.7",
         data: "2026-10-22",
         mudancas: [

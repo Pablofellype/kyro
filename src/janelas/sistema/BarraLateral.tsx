@@ -157,6 +157,8 @@ export function BarraLateral({ recolhida }: { recolhida: boolean }) {
   const contadores = useContadores();
   const { rolagem, caixa } = usarIndicador(rota, recolhida);
   const logout = useAuth((s) => s.logout);
+  const usuario = useAuth((s) => s.usuario);
+  const nomeExibido = nome || usuario?.nome || T.barraLateral.perfil;
   const [fade, setFade] = useState({ topo: false, base: false });
   const desligadas = useConfig((s) => s.funcoesDesligadas);
   const hoje = tarefasDoDia(tarefas, hojeISO()).filter((t) => t.status !== "cancelada").slice(0, 5);
@@ -273,7 +275,7 @@ export function BarraLateral({ recolhida }: { recolhida: boolean }) {
         <div className="barra-base-linha">
           <button type="button" className="barra-perfil" title={T.perfil.abrirPerfil} onClick={() => irPara("configuracoes", { secao: "geral" })}>
             <Avatar tamanho={28} />
-            {!recolhida && <span className="cortar">{nome || T.barraLateral.perfil}</span>}
+            {!recolhida && <span className="cortar">{nomeExibido}</span>}
           </button>
           {!recolhida && (
             <>

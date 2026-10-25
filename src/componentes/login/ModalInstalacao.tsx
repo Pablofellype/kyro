@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { X, Download, Monitor, Terminal, ShieldCheck, Check, HardDrive, Package, ExternalLink } from "lucide-react";
+import manifesto from "../../../package.json";
 
 interface OpcaoDownload {
   id: string;
@@ -14,59 +15,60 @@ interface OpcaoDownload {
 }
 
 const REPOSITORIO_KYRO = "https://github.com/Pablofellype/kyro";
+const VERSAO = manifesto.version;
 
 const OPCOES_INSTALACAO: OpcaoDownload[] = [
   {
     id: "win-exe",
     os: "windows",
     nome: "Instalador Setup Kyro (.exe)",
-    arquivo: "Kyro_0.2.7_x64-setup.exe",
+    arquivo: `Kyro_${VERSAO}_x64-setup.exe`,
     extensao: ".exe",
     tamanho: "30.6 MB",
     descricao: "Instalação automática recomendada do Kyro para Windows 10 e Windows 11 (64-bit). Configuração completa e atalhos.",
     destaque: "Recomendado",
-    url: `${REPOSITORIO_KYRO}/releases/latest/download/Kyro_0.2.7_x64-setup.exe`,
+    url: `${REPOSITORIO_KYRO}/releases/latest/download/Kyro_${VERSAO}_x64-setup.exe`,
   },
   {
     id: "win-msi",
     os: "windows",
     nome: "Pacote Kyro Windows Installer (.msi)",
-    arquivo: "Kyro_0.2.7_x64_pt-BR.msi",
+    arquivo: `Kyro_${VERSAO}_x64_pt-BR.msi`,
     extensao: ".msi",
     tamanho: "42.3 MB",
     descricao: "Instalador MSI nativo do Kyro em Português (Brasil). Instalação limpa para ambientes corporativos.",
-    url: `${REPOSITORIO_KYRO}/releases/latest/download/Kyro_0.2.7_x64_pt-BR.msi`,
+    url: `${REPOSITORIO_KYRO}/releases/latest/download/Kyro_${VERSAO}_x64_pt-BR.msi`,
   },
   {
     id: "linux-appimage",
     os: "linux",
     nome: "Kyro Linux AppImage Universal",
-    arquivo: "Kyro_0.2.7_amd64.AppImage",
+    arquivo: `Kyro_${VERSAO}_amd64.AppImage`,
     extensao: ".AppImage",
     tamanho: "123 MB",
     descricao: "Executável autônomo do Kyro para qualquer distribuição Linux x86_64. Não requer instalação (chmod +x).",
     destaque: "Portátil",
-    url: `${REPOSITORIO_KYRO}/releases/latest/download/Kyro_0.2.7_amd64.AppImage`,
+    url: `${REPOSITORIO_KYRO}/releases/latest/download/Kyro_${VERSAO}_amd64.AppImage`,
   },
   {
     id: "linux-deb",
     os: "linux",
     nome: "Pacote Kyro Debian / Ubuntu (.deb)",
-    arquivo: "Kyro_0.2.7_amd64.deb",
+    arquivo: `Kyro_${VERSAO}_amd64.deb`,
     extensao: ".deb",
     tamanho: "53.3 MB",
     descricao: "Pacote oficial para Ubuntu, Debian, Linux Mint e Pop!_OS via gerenciador apt.",
-    url: `${REPOSITORIO_KYRO}/releases/latest/download/Kyro_0.2.7_amd64.deb`,
+    url: `${REPOSITORIO_KYRO}/releases/latest/download/Kyro_${VERSAO}_amd64.deb`,
   },
   {
     id: "linux-rpm",
     os: "linux",
     nome: "Pacote Kyro Red Hat / Fedora (.rpm)",
-    arquivo: "Kyro-0.2.7-1.x86_64.rpm",
+    arquivo: `Kyro-${VERSAO}-1.x86_64.rpm`,
     extensao: ".rpm",
     tamanho: "53.3 MB",
     descricao: "Pacote RPM do Kyro para Fedora, RHEL, CentOS Stream, Rocky Linux e openSUSE.",
-    url: `${REPOSITORIO_KYRO}/releases/latest/download/Kyro-0.2.7-1.x86_64.rpm`,
+    url: `${REPOSITORIO_KYRO}/releases/latest/download/Kyro-${VERSAO}-1.x86_64.rpm`,
   },
 ];
 
@@ -146,7 +148,7 @@ export function ModalInstalacao({ aberto, aoFechar }: Props) {
             <div>
               <h2 className="kyro-instalador-titulo">Instalar Kyro Desktop</h2>
               <p className="kyro-instalador-subtitulo">
-                Binários oficiais do Kyro (v0.2.7 · 64-bit) para Windows e Linux.
+                Binários oficiais do Kyro (v{VERSAO} · 64-bit) para Windows e Linux.
               </p>
             </div>
           </div>
@@ -247,7 +249,7 @@ export function ModalInstalacao({ aberto, aoFechar }: Props) {
         <footer className="kyro-instalador-rodape">
           <div className="kyro-instalador-rodape-seguranca">
             <span className="kyro-login-status-ponto" aria-hidden="true" />
-            <span>KYRO 0.2.7 ESTÁVEL · REPOSITÓRIO OFICIAL PABLO FELLYPE</span>
+            <span>KYRO {VERSAO} ESTÁVEL · REPOSITÓRIO OFICIAL PABLO FELLYPE</span>
           </div>
 
           <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
