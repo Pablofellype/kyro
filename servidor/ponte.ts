@@ -1,4 +1,5 @@
 import { loginUsuario, validarSessao, logoutSessao } from "../src/servicos/autenticacao.ts";
+import { gravarDadosUsuario, lerDadosUsuario, validarItensDadosUsuario, zerarDadosUsuario } from "../src/servicos/dadosUsuario.ts";
 import type { Plugin, Connect } from "./tiposVite.ts";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { randomBytes } from "node:crypto";
@@ -98,6 +99,11 @@ function origemConfiavel(req: IncomingMessage): boolean {
   }
 }
 
+function tokenDaRequisicao(req: IncomingMessage): string {
+  const valor = req.headers.authorization;
+  return typeof valor === "string" && valor.startsWith("Bearer ") ? valor.slice(7).trim() : "";
+}
+
 export const rotas: Connect.NextHandleFunction = async (req, res, proximo) => {
   const url = new URL(req.url ?? "/", "http://localhost");
 
@@ -129,6 +135,30 @@ export const rotas: Connect.NextHandleFunction = async (req, res, proximo) => {
       return responder(res, 500, { sucesso: false, erro: (e as Error).message });
     }
     return responder(res, 404, { erro: "Ação não encontrada." });
+  }
+
+  if (url.pathname === "/api/dados") {
+    if (!hostLocal(req) || !origemConfiavel(req)) return responder(res, 403, { erro: "origem_nao_permitida" });
+    try {
+      const token = tokenDaRequisicao(req);
+      const usuario = token ? await validarSessao(token) : null;
+      if (!usuario) return responder(res, 401, { erro: "nao_autenticado" });
+      if (req.method === "GET") return responder(res, 200, { dados: await lerDadosUsuario(usuario.id) });
+      if (req.method === "POST" && url.searchParams.get("acao") === "zerar") {
+        const corpo = await lerCorpo(req);
+        if (corpo.confirmacao !== "APAGAR") return responder(res, 400, { erro: "confirmacao_invalida" });
+        await zerarDadosUsuario(usuario.id);
+        return responder(res, 200, { ok: true });
+      }
+      if (req.method === "POST") {
+        const corpo = await lerCorpo(req);
+        await gravarDadosUsuario(usuario.id, validarItensDadosUsuario(corpo.itens));
+        return responder(res, 200, { ok: true });
+      }
+      return responder(res, 405, { erro: "metodo_nao_permitido" });
+    } catch (e) {
+      return responder(res, 400, { erro: (e as Error).message });
+    }
   }
 
   if (!url.pathname.startsWith("/ponte/")) return proximo();

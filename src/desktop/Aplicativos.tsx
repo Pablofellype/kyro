@@ -99,6 +99,7 @@ function usarMonitorDaIlha() {
 export function AppIlha() {
   const usuario = useAuth((s) => s.usuario);
   const verificar = useAuth((s) => s.verificar);
+  const ativa = useConfig((s) => s.ilha.ativa);
   usarMonitorDaIlha();
   usarTema();
   usarSincronia();
@@ -110,12 +111,14 @@ export function AppIlha() {
   }, [verificar]);
 
   useEffect(() => {
-    if (!usuario) {
-      void janelaAtual().then((j) => j.hide()).catch(() => undefined);
-    } else {
-      void janelaAtual().then((j) => j.show()).catch(() => undefined);
-    }
-  }, [usuario]);
+    let vivo = true;
+    void janelaAtual().then((j) => {
+      if (!vivo) return;
+      if (usuario && ativa) void j.show();
+      else void j.hide();
+    }).catch(() => undefined);
+    return () => { vivo = false; };
+  }, [ativa, usuario]);
 
   if (!usuario) return null;
 

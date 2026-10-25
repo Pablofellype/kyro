@@ -1,6 +1,6 @@
 [package]
 name = "kyro"
-version = "0.2.9"
+version = "0.2.10"
 description = "Kyro"
 authors = ["Pablo Fellype"]
 edition = "2021"

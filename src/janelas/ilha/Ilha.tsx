@@ -266,6 +266,7 @@ export function Ilha() {
   const reavivamento = usarReavivamento();
   const frente = usarEstadoDaFrente(cfg.ativa, { esconderTelaCheia, apps: appsEsconder }, reavivamento);
   const tela = usarTamanhoDaTela();
+  const rotaAtual = useInterface((s) => s.rota);
   const [lateraisLivresNativo, setLateraisLivresNativo] = useState(true);
   useEffect(() => {
     setLateraisLivresNativo((anterior) => areaDeTrabalhoNaFrente(frente, anterior));
@@ -411,7 +412,6 @@ export function Ilha() {
 
   // Em tela pequena ou com zoom alto do sistema, a aba aberta encolhe para caber em vez de sair da tela.
   const ehMobile = verificarSeEhMobile(tela);
-  const rotaAtual = useInterface((s) => s.rota);
 
   const grupo = T.gruposBarra[GRUPO_DA_ROTA[rotaAtual]] || "";
   const numero = numeroDaRota(rotaAtual);

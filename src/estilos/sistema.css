@@ -1113,6 +1113,10 @@ html.janela-sobreposta #raiz {
   background: var(--fundo) !important;
 }
 
+.area-trabalho.area-nativa {
+  background: #eef1f6 url("/fundo/papel-de-parede.jpg") center / cover no-repeat !important;
+}
+
 .janela.janela-nativa {
   position: fixed;
   inset: 0;

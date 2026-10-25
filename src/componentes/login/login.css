@@ -2299,7 +2299,8 @@
   min-width: 0;
   padding: 0 13px;
   border: 0;
-  outline: 0;
+  outline: none !important;
+  outline-offset: 0 !important;
   background: transparent;
   color: var(--novo-texto);
   font-family: var(--fonte-texto);
@@ -2319,6 +2320,8 @@
   place-items: center;
   border-radius: 5px;
   color: #898983;
+  outline: none !important;
+  outline-offset: 0 !important;
   transition: color 0.18s ease, background 0.18s ease;
 }
 

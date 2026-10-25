@@ -12,6 +12,24 @@ const bancoDeTeste = (() => {
 })();
 const CABECALHOS: Record<string, string> = { "x-niko": "1", "content-type": "application/json", ...(bancoDeTeste ? { "x-niko-banco": bancoDeTeste } : {}) };
 
+function tokenDaSessao(): string | null {
+  try {
+    const token = localStorage.getItem("kyro_token");
+    return token?.trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+function endpointDosDados(): string {
+  return tokenDaSessao() ? "/api/dados" : "/ponte/dados";
+}
+
+function cabecalhosDosDados(): Record<string, string> {
+  const token = tokenDaSessao();
+  return token ? { ...CABECALHOS, Authorization: `Bearer ${token}` } : CABECALHOS;
+}
+
 export function cabecalhoDoBanco(): Record<string, string> {
   return bancoDeTeste ? { "x-niko-banco": bancoDeTeste } : {};
 }
@@ -89,7 +107,7 @@ function receberDeFora(m: unknown) {
 async function recarregarDaPonte() {
   if (modo !== "banco") return;
   try {
-    const r = await fetch("/ponte/dados", { headers: CABECALHOS });
+    const r = await fetch(endpointDosDados(), { headers: cabecalhosDosDados() });
     if (!r.ok) return;
     const resposta: unknown = await r.json();
     if (!objeto(resposta) || !objeto(resposta.dados)) return;
@@ -120,7 +138,7 @@ function enviarPendentes(manterViva = false): Promise<void> {
       const limite = window.setTimeout(() => controle.abort(), 8000);
       try {
         const corpo = JSON.stringify({ itens });
-        const r = await fetch("/ponte/dados", { method: "POST", headers: CABECALHOS, body: corpo, signal: controle.signal, keepalive: manterViva && new TextEncoder().encode(corpo).length < 60000 });
+        const r = await fetch(endpointDosDados(), { method: "POST", headers: cabecalhosDosDados(), body: corpo, signal: controle.signal, keepalive: manterViva && new TextEncoder().encode(corpo).length < 60000 });
         if (!r.ok) throw new Error(`http_${r.status}`);
       } catch (erro) {
         for (const [k, v] of Object.entries(itens)) if (!pendentes.has(k) && (cache.get(k) ?? null) === v) pendentes.set(k, v);
@@ -188,34 +206,54 @@ function chavesLocais(): string[] {
   return localSeguro(() => Object.keys(localStorage).filter((k) => k.startsWith(PREFIXO)), []);
 }
 
+function validarDadosRecebidos(resposta: unknown): Record<string, string> {
+  if (!objeto(resposta) || !objeto(resposta.dados)) throw new Error("dados_invalidos");
+  const dados: Record<string, string> = {};
+  for (const [k, v] of Object.entries(resposta.dados)) {
+    if (!/^niko:[a-z0-9_-]{1,60}$/.test(k) || typeof v !== "string" || v.length > 20_000_000) throw new Error("dados_invalidos");
+    dados[k] = v;
+  }
+  return dados;
+}
+
+async function lerDadosLegadosDaPonte(): Promise<Record<string, string>> {
+  try {
+    const r = await fetch("/ponte/dados", { headers: CABECALHOS, signal: AbortSignal.timeout(4000) });
+    if (!r.ok) return {};
+    return validarDadosRecebidos(await r.json());
+  } catch {
+    return {};
+  }
+}
+
 export async function iniciarArmazenamento(): Promise<ModoArmazenamento> {
   let limite = 0;
   try {
+    const remoto = Boolean(tokenDaSessao());
+    const dadosLegados = remoto ? await lerDadosLegadosDaPonte() : {};
     const controle = new AbortController();
     limite = window.setTimeout(() => controle.abort(), 4000);
-    const r = await fetch("/ponte/dados", { headers: CABECALHOS, signal: controle.signal });
+    const r = await fetch(endpointDosDados(), { headers: cabecalhosDosDados(), signal: controle.signal });
     window.clearTimeout(limite);
     if (!r.ok) throw new Error(`http_${r.status}`);
-    const resposta: unknown = await r.json();
-    if (!objeto(resposta) || !objeto(resposta.dados)) throw new Error("dados_invalidos");
-    const dados = resposta.dados;
-    for (const [k, v] of Object.entries(dados)) {
-      if (!/^niko:[a-z0-9_-]{1,60}$/.test(k) || typeof v !== "string" || v.length > 20_000_000) throw new Error("dados_invalidos");
-    }
-    for (const [k, v] of Object.entries(dados)) cache.set(k, v as string);
+    const dados = validarDadosRecebidos(await r.json());
+    for (const [k, v] of Object.entries(dados)) cache.set(k, v);
     modo = "banco";
     const locais = chavesLocais().filter((k) => k !== `${PREFIXO}migrado`);
-    const jaMigrou = localSeguro(() => localStorage.getItem(`${PREFIXO}migrado`), null);
-    if (Object.keys(dados).length === 0 && locais.length > 0 && !jaMigrou) {
+    if (remoto && Object.keys(dados).length === 0 && (Object.keys(dadosLegados).length > 0 || locais.length > 0)) {
+      const migrados = { ...dadosLegados };
       for (const k of locais) {
         const v = localStorage.getItem(k);
-        if (v != null) {
-          cache.set(k, v);
-          pendentes.set(k, v);
-        }
+        if (v != null) migrados[k] = v;
+      }
+      for (const [k, v] of Object.entries(migrados)) {
+        cache.set(k, v);
+        pendentes.set(k, v);
       }
       await enviarPendentes();
-      if (pendentes.size === 0) localSeguro(() => localStorage.setItem(`${PREFIXO}migrado`, new Date().toISOString()), undefined);
+      if (pendentes.size === 0) for (const k of locais) localSeguro(() => localStorage.removeItem(k), undefined);
+    } else if (remoto && Object.keys(dados).length > 0) {
+      for (const k of locais) localSeguro(() => localStorage.removeItem(k), undefined);
     }
     if (ouvintesIniciados) return modo;
     if (tauriDisponivel()) {
@@ -283,7 +321,8 @@ export async function zerarTudo(apagarChaves: boolean): Promise<void> {
   try {
     if (modo === "banco") {
       await salvarAgora();
-      const r = await fetch("/ponte/dados/zerar", { method: "POST", headers: CABECALHOS, signal: AbortSignal.timeout(8000), body: JSON.stringify({ confirmacao: "APAGAR", chaves: apagarChaves }) });
+      const endpoint = endpointDosDados();
+      const r = await fetch(`${endpoint}?acao=zerar`, { method: "POST", headers: cabecalhosDosDados(), signal: AbortSignal.timeout(8000), body: JSON.stringify({ confirmacao: "APAGAR", chaves: apagarChaves }) });
       if (!r.ok) throw new Error(`http_${r.status}`);
       cache.clear();
     }

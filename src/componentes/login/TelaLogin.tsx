@@ -47,6 +47,7 @@ export function TelaLogin({ aoSucesso }: Props) {
 
       definirUsuario(dados.usuario, dados.token);
       aoSucesso?.();
+      window.location.reload();
     } catch {
       setErro("Não foi possível conectar ao servidor. Verifique sua conexão.");
     } finally {

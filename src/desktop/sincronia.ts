@@ -9,6 +9,9 @@ import { usePomodoro } from "../estado/pomodoro";
 import { useEstudos } from "../estado/estudos";
 import { useOrganizacao } from "../estado/organizacao";
 import { useEscritorioIas } from "../estado/escritorioIas";
+import { useBuscaApps } from "../estado/buscaApps";
+import { useMateriais } from "../estado/materiais";
+import { useHistoricoCodigo } from "../estado/historicoCodigo";
 import { aoMudarDeFora, chave } from "../ponte/armazenamento";
 
 const LOJAS: Record<string, { persist: { rehydrate: () => Promise<void> | void } }> = {
@@ -22,6 +25,9 @@ const LOJAS: Record<string, { persist: { rehydrate: () => Promise<void> | void }
   [chave("estudos")]: useEstudos,
   [chave("organizacao")]: useOrganizacao,
   [chave("escritorio-ias")]: useEscritorioIas,
+  [chave("busca-apps")]: useBuscaApps,
+  [chave("materiais")]: useMateriais,
+  [chave("historico-codigo")]: useHistoricoCodigo,
 };
 
 export function usarSincronia() {
