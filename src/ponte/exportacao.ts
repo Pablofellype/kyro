@@ -28,10 +28,10 @@ export async function exportarArquivo(nome: string, conteudo: string, opcoes: Op
   const avisar = useInterface.getState().avisar;
   try {
     const caminho = await salvarNosDownloads(nome, conteudo, opcoes);
-    if (caminho) avisar(T.geral.salvoEm(caminho));
+    if (caminho) avisar(T.geral.salvoEm(caminho), undefined, "sucesso");
     return true;
   } catch {
-    avisar(T.geral.salvarFalhou);
+    avisar(T.geral.salvarFalhou, undefined, "erro");
     return false;
   }
 }

@@ -3037,6 +3037,107 @@
   color: var(--login-faint);
 }
 
+.kyro-login-esqueci,
+.kyro-login-novo-esqueci {
+  align-self: flex-end;
+  margin-top: -7px;
+  padding: 3px 0;
+  border: 0;
+  color: var(--login-accent);
+  background: transparent;
+  font-family: var(--fonte-mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  transition: color 0.16s ease, opacity 0.16s ease;
+}
+
+.kyro-login-esqueci:hover:not(:disabled),
+.kyro-login-novo-esqueci:hover:not(:disabled) {
+  color: var(--login-text);
+}
+
+.kyro-login-esqueci:disabled,
+.kyro-login-novo-esqueci:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.kyro-login-acesso-formulario {
+  display: flex;
+  width: min(100%, 380px);
+  min-width: 0;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.kyro-login-acesso-intro {
+  display: grid;
+  gap: 7px;
+  margin-bottom: 2px;
+}
+
+.kyro-login-acesso-intro p {
+  max-width: 390px;
+  margin: 0;
+  color: var(--texto-2);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.kyro-login-acesso-kicker {
+  color: var(--login-accent);
+  font-family: var(--fonte-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+}
+
+.kyro-login-acesso-campo {
+  display: grid;
+  gap: 7px;
+  color: var(--texto-2);
+  font-family: var(--fonte-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+}
+
+.kyro-login-acesso-campo .campo {
+  width: 100%;
+  min-height: 44px;
+}
+
+.kyro-login-acesso-mensagem,
+.kyro-login-acesso-erro {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 11px 12px;
+  border-radius: 10px;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.kyro-login-acesso-mensagem {
+  border: 1px solid color-mix(in srgb, var(--sucesso, #3dd68c) 30%, transparent);
+  color: var(--sucesso, #3dd68c);
+  background: color-mix(in srgb, var(--sucesso, #3dd68c) 8%, transparent);
+}
+
+.kyro-login-acesso-erro {
+  border: 1px solid color-mix(in srgb, var(--erro, #f06b6b) 34%, transparent);
+  color: var(--erro, #f06b6b);
+  background: color-mix(in srgb, var(--erro, #f06b6b) 8%, transparent);
+}
+
+.kyro-login-acesso-acoes {
+  display: flex;
+  justify-content: flex-end;
+  gap: 9px;
+  margin-top: 3px;
+}
+
 .kyro-login-ou {
   margin: 18px 0 12px;
   color: var(--login-faint);

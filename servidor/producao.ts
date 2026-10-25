@@ -6,6 +6,7 @@ import { encerrarJanelas } from "./janelas.ts";
 import { encerrarControle } from "./controleRapido.ts";
 import { encerrarSistema } from "./sistema.ts";
 import { encerrarWhatsapp } from "./whatsapp/whatsapp.ts";
+import { instalarSincroniaTempoReal } from "./sincroniaTempoReal.ts";
 
 const porta = Number(process.env.NIKO_PORTA) || 47831;
 const ORIGENS = new Set(["http://tauri.localhost", "https://tauri.localhost", "tauri://localhost"]);
@@ -15,7 +16,7 @@ const servidor = createServer((req, res) => {
   if (origem && ORIGENS.has(origem)) {
     res.setHeader("access-control-allow-origin", origem);
     res.setHeader("vary", "origin");
-    res.setHeader("access-control-allow-headers", "x-niko, x-niko-token, x-niko-banco, content-type, authorization");
+    res.setHeader("access-control-allow-headers", "x-niko, x-niko-token, x-niko-banco, x-niko-cliente, content-type, authorization");
     res.setHeader("access-control-allow-methods", "GET, POST, DELETE, OPTIONS");
     res.setHeader("access-control-max-age", "600");
   }
@@ -28,6 +29,7 @@ const servidor = createServer((req, res) => {
     res.end();
   });
 });
+const removerSincroniaTempoReal = instalarSincroniaTempoReal(servidor);
 
 process.on("uncaughtException", (e) => {
   process.stderr.write(`${new Date().toISOString()} erro: ${e.stack ?? e.message}\n`);
@@ -45,6 +47,7 @@ const encerrar = () => {
   encerrarControle();
   encerrarSistema();
   fecharBanco();
+  removerSincroniaTempoReal();
   servidor.close();
   process.exit(0);
 };

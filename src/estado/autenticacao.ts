@@ -5,6 +5,7 @@ export interface UsuarioAutenticado {
   id: number;
   email: string;
   nome: string;
+  perfil: "dono" | "usuario";
 }
 
 interface EstadoAuth {

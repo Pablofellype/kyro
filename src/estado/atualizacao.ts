@@ -27,6 +27,7 @@ interface EstadoAtualizacao {
 }
 
 let pendente: Update | null = null;
+const ATRASO_DA_INSTALACAO_AUTOMATICA_MS = 2500;
 
 const URL_ULTIMA_RELEASE = "https://api.github.com/repos/Pablofellype/kyro/releases/latest";
 
@@ -86,6 +87,14 @@ export const useAtualizacao = create<EstadoAtualizacao>()((set, get) => ({
       }
       if (pendente && get().fase !== "disponivel") void tocarSom("peek", "avisos");
       set({ fase: pendente ? "disponivel" : "nada", verificacao: "disponivel", automatica: Boolean(pendente), versao: pendente?.version ?? dados.versao, notas: pendente?.body ?? dados.notas, ultimaVerificacao });
+      if (pendente && NATIVO && !manual) {
+        const versaoPendente = pendente;
+        window.setTimeout(() => {
+          const atual = get();
+          if (pendente !== versaoPendente || atual.fase !== "disponivel" || atual.verificacao !== "disponivel") return;
+          void atual.instalar();
+        }, ATRASO_DA_INSTALACAO_AUTOMATICA_MS);
+      }
     } catch {
       set({ verificacao: "erro", erro: get().versaoAtual ? T.atualizacao.erroVerificacao : T.atualizacao.versaoFalhou });
     }

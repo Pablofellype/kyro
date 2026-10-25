@@ -295,11 +295,6 @@ function lerConexoes() {
   }
 }
 export function useServicos() {
-  useEffect(() => {
-    const falhou = () => useInterface.getState().avisar(T.configuracoes.salvarFalhou);
-    window.addEventListener("niko:armazenamento-falhou", falhou);
-    return () => window.removeEventListener("niko:armazenamento-falhou", falhou);
-  }, []);
   const inatividade = useConfig((s) => s.agentes.inatividadeMin);
 
   usarPreferenciasDaJanela();

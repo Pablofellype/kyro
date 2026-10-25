@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { emitTo, listen } from "@tauri-apps/api/event";
 import type { Rota, ServicoId } from "../tipos";
 import { iniciarConsultaPeriodica } from "./consultaPeriodica";
+import { definirEndpointTempoReal } from "../ponte/tempoReal";
 
 export type NomeJanela = "sistema" | "ilha" | "dock" | "assistive";
 
@@ -200,6 +201,7 @@ export async function prepararPonte() {
       ]);
       if (!token || typeof porta !== "number" || !Number.isInteger(porta) || porta < 1 || porta > 65535) throw new Error("ponte_indisponivel");
       enviarPelaPonte(`http://127.0.0.1:${porta}`, token);
+      definirEndpointTempoReal(`ws://127.0.0.1:${porta}/api/ws`);
     } finally {
       window.clearTimeout(limite);
     }

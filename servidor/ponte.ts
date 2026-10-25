@@ -1,5 +1,5 @@
-import { loginUsuario, validarSessao, logoutSessao } from "../src/servicos/autenticacao.ts";
-import { gravarDadosUsuario, lerDadosUsuario, validarItensDadosUsuario, zerarDadosUsuario } from "../src/servicos/dadosUsuario.ts";
+import { alterarAtivoUsuario, criarConviteUsuario, loginUsuario, listarUsuarios, redefinirSenhaComToken, solicitarRedefinicaoSenha, urlPublicaDoAmbiente, validarSessao, logoutSessao } from "../src/servicos/autenticacao.ts";
+import { ConflitoDadosUsuario, gravarDadosUsuario, lerBackupsDadosUsuario, lerDadosUsuarioComVersao, lerHistoricoDadosUsuario, restaurarBackupDadosUsuario, validarItensDadosUsuario, zerarDadosUsuario } from "../src/servicos/dadosUsuario.ts";
 import type { Plugin, Connect } from "./tiposVite.ts";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { randomBytes } from "node:crypto";
@@ -24,6 +24,7 @@ import {
 import { ehRotaDeAgente, receberEventoDeAgente, estadoDosAgentes, instalarAgente, previaDoAgente, removerAgente } from "./agentesDeCodigo.ts";
 import { listarArquivos, receberArquivo, enviarConteudo, excluirArquivo, excluirArquivosDaMateria, baixarArquivo, abrirArquivoNoPrograma, exportarParaDownloads } from "./arquivos.ts";
 import { tipoDoComputador, estadoDoSistema, listarRedes, listarBluetooth, lerComputador, conectarRede, esquecerRede, desconectarRede, definirBrilho, definirRadio, abrirConfiguracoesDoSistema } from "./sistema.ts";
+import { instalarSincroniaTempoReal } from "./sincroniaTempoReal.ts";
 
 const LIMITE_CORPO = 24 * 1024 * 1024;
 
@@ -57,6 +58,8 @@ function responder(res: ServerResponse, status: number, dados: unknown) {
   res.statusCode = status;
   res.setHeader("content-type", "application/json; charset=utf-8");
   res.setHeader("cache-control", "no-store");
+  res.setHeader("x-content-type-options", "nosniff");
+  res.setHeader("referrer-policy", "no-referrer");
   res.end(JSON.stringify(dados));
 }
 
@@ -104,6 +107,19 @@ function tokenDaRequisicao(req: IncomingMessage): string {
   return typeof valor === "string" && valor.startsWith("Bearer ") ? valor.slice(7).trim() : "";
 }
 
+function clienteDaRequisicao(req: IncomingMessage): string | null {
+  const valor = req.headers["x-niko-cliente"];
+  return typeof valor === "string" ? valor : null;
+}
+
+function origemDaRequisicao(req: IncomingMessage): string {
+  return req.socket.remoteAddress ?? hostDaRequisicao(req) ?? "local";
+}
+
+function urlPublicaDaPonte(req: IncomingMessage): string {
+  return urlPublicaDoAmbiente() || `http://${hostDaRequisicao(req)}`;
+}
+
 export const rotas: Connect.NextHandleFunction = async (req, res, proximo) => {
   const url = new URL(req.url ?? "/", "http://localhost");
 
@@ -114,9 +130,55 @@ export const rotas: Connect.NextHandleFunction = async (req, res, proximo) => {
       if (req.method === "POST" && acao === "login") {
         const { email, senha } = (await lerCorpo(req)) as { email?: string; senha?: string };
         if (!email || !senha) return responder(res, 400, { sucesso: false, erro: "E-mail e senha são obrigatórios." });
-        const resultado = await loginUsuario(String(email), String(senha));
+        const resultado = await loginUsuario(String(email), String(senha), origemDaRequisicao(req));
         if (!resultado.sucesso) return responder(res, 401, resultado);
         return responder(res, 200, resultado);
+      }
+      if (req.method === "POST" && acao === "recuperar") {
+        const corpo = await lerCorpo(req);
+        try {
+          await solicitarRedefinicaoSenha(typeof corpo.email === "string" ? corpo.email : "", urlPublicaDaPonte(req));
+          return responder(res, 200, { sucesso: true, mensagem: "Se o e-mail estiver autorizado, enviaremos um link para redefinir a senha." });
+        } catch {
+          return responder(res, 503, { sucesso: false, erro: "NÃ£o foi possÃ­vel enviar o e-mail agora." });
+        }
+      }
+      if (req.method === "POST" && acao === "redefinir") {
+        const corpo = await lerCorpo(req);
+        try {
+          return responder(res, 200, await redefinirSenhaComToken(typeof corpo.token === "string" ? corpo.token : "", typeof corpo.senha === "string" ? corpo.senha : ""));
+        } catch (erro) {
+          return responder(res, 400, { sucesso: false, erro: (erro as Error).message });
+        }
+      }
+      const tokenAtual = tokenDaRequisicao(req);
+      const usuarioAtual = tokenAtual ? await validarSessao(tokenAtual) : null;
+      if (req.method === "POST" && acao === "convite") {
+        if (!usuarioAtual || usuarioAtual.perfil !== "dono") return responder(res, 403, { erro: "permissao_negada" });
+        const corpo = await lerCorpo(req);
+        try {
+          await criarConviteUsuario(usuarioAtual, typeof corpo.email === "string" ? corpo.email : "", typeof corpo.nome === "string" ? corpo.nome : "", urlPublicaDaPonte(req));
+          return responder(res, 200, { sucesso: true, mensagem: "Convite enviado." });
+        } catch (erro) {
+          return responder(res, 400, { sucesso: false, erro: (erro as Error).message });
+        }
+      }
+      if (req.method === "GET" && acao === "usuarios") {
+        if (!usuarioAtual || usuarioAtual.perfil !== "dono") return responder(res, 403, { erro: "permissao_negada" });
+        try {
+          return responder(res, 200, { usuarios: await listarUsuarios(usuarioAtual) });
+        } catch (erro) {
+          return responder(res, 400, { erro: (erro as Error).message });
+        }
+      }
+      if (req.method === "POST" && acao === "usuario") {
+        if (!usuarioAtual || usuarioAtual.perfil !== "dono") return responder(res, 403, { erro: "permissao_negada" });
+        const corpo = await lerCorpo(req);
+        try {
+          return responder(res, 200, { sucesso: true, usuario: await alterarAtivoUsuario(usuarioAtual, Number(corpo.id), corpo.ativo === true) });
+        } catch (erro) {
+          return responder(res, 400, { sucesso: false, erro: (erro as Error).message });
+        }
       }
       if (req.method === "GET" && acao === "verificar") {
         const authHeader = req.headers.authorization;
@@ -143,20 +205,43 @@ export const rotas: Connect.NextHandleFunction = async (req, res, proximo) => {
       const token = tokenDaRequisicao(req);
       const usuario = token ? await validarSessao(token) : null;
       if (!usuario) return responder(res, 401, { erro: "nao_autenticado" });
-      if (req.method === "GET") return responder(res, 200, { dados: await lerDadosUsuario(usuario.id) });
+      if (req.method === "GET") {
+        if (url.searchParams.get("acao") === "historico") {
+          const limite = Number(url.searchParams.get("limite") ?? "30");
+          return responder(res, 200, { registros: await lerHistoricoDadosUsuario(usuario.id, limite) });
+        }
+        if (url.searchParams.get("acao") === "backups") {
+          const limite = Number(url.searchParams.get("limite") ?? "30");
+          return responder(res, 200, { backups: await lerBackupsDadosUsuario(usuario.id, limite) });
+        }
+        const atual = await lerDadosUsuarioComVersao(usuario.id);
+        const desde = url.searchParams.get("desde") ?? "";
+        if (desde && desde === atual.versao) return responder(res, 200, { alterado: false, versao: atual.versao });
+        return responder(res, 200, { alterado: true, ...atual });
+      }
       if (req.method === "POST" && url.searchParams.get("acao") === "zerar") {
         const corpo = await lerCorpo(req);
         if (corpo.confirmacao !== "APAGAR") return responder(res, 400, { erro: "confirmacao_invalida" });
-        await zerarDadosUsuario(usuario.id);
-        return responder(res, 200, { ok: true });
+        const versao = typeof corpo.versao === "string" ? corpo.versao : null;
+        const novaVersao = await zerarDadosUsuario(usuario.id, versao, clienteDaRequisicao(req));
+        return responder(res, 200, { ok: true, versao: novaVersao });
+      }
+      if (req.method === "POST" && url.searchParams.get("acao") === "restaurar") {
+        const corpo = await lerCorpo(req);
+        const id = typeof corpo.id === "number" ? corpo.id : Number(corpo.id);
+        const versao = typeof corpo.versao === "string" ? corpo.versao : null;
+        const novaVersao = await restaurarBackupDadosUsuario(usuario.id, id, versao, clienteDaRequisicao(req));
+        return responder(res, 200, { ok: true, versao: novaVersao });
       }
       if (req.method === "POST") {
         const corpo = await lerCorpo(req);
-        await gravarDadosUsuario(usuario.id, validarItensDadosUsuario(corpo.itens));
-        return responder(res, 200, { ok: true });
+        const versao = typeof corpo.versao === "string" ? corpo.versao : null;
+        const novaVersao = await gravarDadosUsuario(usuario.id, validarItensDadosUsuario(corpo.itens), versao, clienteDaRequisicao(req));
+        return responder(res, 200, { ok: true, versao: novaVersao });
       }
       return responder(res, 405, { erro: "metodo_nao_permitido" });
     } catch (e) {
+      if (e instanceof ConflitoDadosUsuario) return responder(res, 409, { erro: "conflito_sincronizacao", versao: e.versao, dados: e.dados });
       return responder(res, 400, { erro: (e as Error).message });
     }
   }
@@ -375,6 +460,7 @@ export function ponteLocal(): Plugin {
     configureServer(servidor) {
       process.env.NIKO_TOKEN ||= randomBytes(32).toString("hex");
       servidor.middlewares.use(rotas);
+      if (servidor.httpServer) instalarSincroniaTempoReal(servidor.httpServer);
     },
     transformIndexHtml: {
       order: "pre",
@@ -382,6 +468,7 @@ export function ponteLocal(): Plugin {
     },
     configurePreviewServer(servidor) {
       servidor.middlewares.use(rotas);
+      if (servidor.httpServer) instalarSincroniaTempoReal(servidor.httpServer);
     },
   };
 }

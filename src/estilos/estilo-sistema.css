@@ -1051,9 +1051,29 @@
   background: var(--superficie-alta);
   color: var(--texto);
   border: 1px solid var(--borda-controle);
+  border-left: 3px solid var(--destaque);
   border-radius: 10px;
   box-shadow: var(--sombra-menu);
+  max-width: min(480px, calc(100vw - 32px));
 }
+
+.estilo-sistema .aviso-rodape-texto {
+  min-width: 0;
+  line-height: 1.4;
+}
+
+.estilo-sistema .aviso-rodape-icone {
+  display: inline-flex;
+  flex: 0 0 auto;
+  color: var(--destaque);
+}
+
+.estilo-sistema .aviso-rodape-sucesso { border-left-color: var(--sucesso); }
+.estilo-sistema .aviso-rodape-sucesso .aviso-rodape-icone { color: var(--sucesso); }
+.estilo-sistema .aviso-rodape-alerta { border-left-color: var(--alerta); }
+.estilo-sistema .aviso-rodape-alerta .aviso-rodape-icone { color: var(--alerta); }
+.estilo-sistema .aviso-rodape-erro { border-left-color: var(--erro); }
+.estilo-sistema .aviso-rodape-erro .aviso-rodape-icone { color: var(--erro); }
 
 .estilo-sistema .aviso-rodape .botao {
   color: var(--texto-2);
@@ -1496,11 +1516,57 @@
 .estilo-sistema .barra-base {
   gap: 8px;
   padding-top: 8px;
-  border-top: 1px solid var(--borda-suave);
+}
+
+.estilo-sistema .barra-sincronia {
+  min-height: 24px;
+  gap: 7px;
+  padding: 0 8px;
+  border-radius: 7px;
+  color: var(--texto-3);
+  font-size: 10.5px;
+  transition: color 0.2s, background 0.2s;
+}
+
+.estilo-sistema .barra-sincronia-icone {
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+
+.estilo-sistema .barra-sincronia-conectado {
+  color: var(--sucesso);
+}
+
+.estilo-sistema .barra-sincronia-sincronizando,
+.estilo-sistema .barra-sincronia-pendente,
+.estilo-sistema .barra-sincronia-conflito {
+  color: var(--alerta);
+}
+
+.estilo-sistema .barra-sincronia-offline {
+  color: var(--erro);
+}
+
+.estilo-sistema .barra-sincronia-local {
+  color: var(--texto-3);
+}
+
+.estilo-sistema .barra-sincronia .sincronia-girando {
+  animation: sincronia-girar 0.9s linear infinite;
+}
+
+@keyframes sincronia-girar {
+  to { transform: rotate(360deg); }
 }
 
 .estilo-sistema .barra-recolhida .barra-base {
   align-items: center;
+}
+
+.estilo-sistema .barra-recolhida .barra-sincronia {
+  justify-content: center;
+  width: 40px;
+  padding: 0;
 }
 
 .estilo-sistema .barra-base-linha {

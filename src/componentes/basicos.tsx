@@ -305,13 +305,17 @@ export function AvisosRodape() {
         {avisos.map((a) => (
           <motion.div
             key={a.id}
-            className="aviso-rodape"
+            className={`aviso-rodape aviso-rodape-${a.tipo ?? "info"}`}
+            role={a.tipo === "erro" ? "alert" : "status"}
             initial={{ opacity: 0, y: 12, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 8, scale: 0.96 }}
             transition={{ type: "spring", visualDuration: 0.3, bounce: 0.2 }}
           >
-            <span>{a.texto}</span>
+            <span className="aviso-rodape-icone" aria-hidden="true">
+              {a.tipo === "sucesso" ? <Check size={15} /> : a.tipo === "alerta" ? <TriangleAlert size={15} /> : a.tipo === "erro" ? <AlertCircle size={15} /> : <Info size={15} />}
+            </span>
+            <span className="aviso-rodape-texto">{a.texto}</span>
             {a.desfazer && (
               <Botao
                 variante="fantasma"

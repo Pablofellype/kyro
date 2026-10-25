@@ -13,6 +13,7 @@ import { tocarSom } from "../../ponte/sons";
 import { NATIVO, ocultarSistemaNativo } from "../../desktop/desktop";
 import { rotaLigada } from "../../utilitarios/funcoes";
 import { LimiteDeErro } from "../../componentes/LimiteDeErro";
+import { NotificacoesSistema } from "../../componentes/NotificacoesSistema";
 
 const MINIMO = { w: 960, h: 600 };
 
@@ -97,6 +98,7 @@ export function JanelaSistema() {
         </main>
       </div>
       <AvisosRodape />
+      <NotificacoesSistema />
       <TourDoNiko />
       <EstilosDaMidia />
     </Janela>

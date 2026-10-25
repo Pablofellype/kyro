@@ -1,7 +1,7 @@
 {
     "name": "kyro",
     "private": true,
-    "version": "0.2.10",
+    "version": "0.2.11",
     "type": "module",
     "license": "SEE LICENSE IN LICENSE.md",
     "scripts": {
@@ -54,6 +54,7 @@
         "simple-icons": "^16.33.0",
         "three": "^0.186.1",
         "ts-fsrs": "^5.4.2",
+        "ws": "^8.22.0",
         "zustand": "^5.0.15"
     },
     "devDependencies": {
@@ -63,6 +64,7 @@
         "@types/react": "^19.3.0",
         "@types/react-dom": "^19.3.0",
         "@types/three": "^0.186.0",
+        "@types/ws": "^8.18.2",
         "@vitejs/plugin-react": "^6.1.1",
         "typescript": "^7.0.2",
         "vite": "^8.3.2"

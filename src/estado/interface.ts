@@ -4,10 +4,13 @@ import { gerarId } from "../utilitarios/basicos";
 import { NATIVO, enviarComando, foraDoSistema, mostrarSistema } from "../desktop/desktop";
 import { rotaLigada } from "../utilitarios/funcoes";
 
+export type TipoAviso = "sucesso" | "info" | "alerta" | "erro";
+
 export interface AvisoRodape {
   id: string;
   texto: string;
   desfazer?: () => void;
+  tipo?: TipoAviso;
 }
 
 export interface Geometria {
@@ -52,7 +55,7 @@ interface EstadoInterface {
   abrirBusca: (aberta: boolean) => void;
   abrirCaptura: (aberta: boolean) => void;
   abrirEstilosDaMidia: (abertos: boolean) => void;
-  avisar: (texto: string, desfazer?: () => void) => void;
+  avisar: (texto: string, desfazer?: () => void, tipo?: TipoAviso) => void;
   dispensarAviso: (id: string) => void;
   definirSistema: (parcial: Partial<Pick<EstadoInterface, "sistemaAberto" | "sistemaMinimizado" | "sistemaMaximizado" | "geometria">>) => void;
 }
@@ -210,9 +213,9 @@ export const useInterface = create<EstadoInterface>()((set, get) => ({
     if (abertos && NATIVO) void mostrarSistema();
     set(abertos ? { estilosDaMidiaAbertos: true, sistemaAberto: true, sistemaMinimizado: false } : { estilosDaMidiaAbertos: false });
   },
-  avisar: (texto, desfazer) => {
+  avisar: (texto, desfazer, tipo = "info") => {
     const id = gerarId();
-    set((s) => ({ avisos: [...s.avisos.slice(-2), { id, texto, desfazer }] }));
+    set((s) => ({ avisos: [...s.avisos.slice(-2), { id, texto, desfazer, tipo }] }));
     temporizadores.set(id, window.setTimeout(() => get().dispensarAviso(id), desfazer ? 6000 : 3200));
   },
   dispensarAviso: (id) => {

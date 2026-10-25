@@ -15,6 +15,7 @@ import { hojeISO } from "../../utilitarios/datas";
 import type { Rota } from "../../tipos";
 import { funcaoLigada, rotaLigada } from "../../utilitarios/funcoes";
 import { mudarTema } from "../area-de-trabalho/mudarTema";
+import { IndicadorSincronia } from "../../componentes/IndicadorSincronia";
 
 function useContadores(): Partial<Record<Rota, { n: number; alerta?: boolean }>> {
   const hoje = hojeISO();
@@ -272,6 +273,7 @@ export function BarraLateral({ recolhida }: { recolhida: boolean }) {
         )}
       </div>
       <div className="barra-base">
+        <IndicadorSincronia recolhida={recolhida} />
         <div className="barra-base-linha">
           <button type="button" className="barra-perfil" title={T.perfil.abrirPerfil} onClick={() => irPara("configuracoes", { secao: "geral" })}>
             <Avatar tamanho={28} />

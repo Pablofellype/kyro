@@ -4,7 +4,7 @@ import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } 
 import { CSS } from "@dnd-kit/utilities";
 import {
   User, Palette, PanelTop, PanelBottom, CircleDot, Timer, Users, Volume2, Gauge, Maximize, Keyboard, EyeOff, Database, Terminal, Info, Code,
-  GripVertical, Download, Upload, RotateCcw, Trash2, DatabaseBackup, Hand, Search, ArrowUpRight, LogOut,
+  GripVertical, Download, Upload, RotateCcw, Trash2, DatabaseBackup, Hand, Search, ArrowUpRight, LogOut, UserCog,
 } from "lucide-react";
 import { CabecalhoAba } from "../../componentes/CabecalhoAba";
 import { Botao, Campo, Modal, Segmentado, AvisoFaixa, LinhaAlternador, Alternador, ConfirmarModal } from "../../componentes/basicos";
@@ -23,7 +23,7 @@ import { NO_LINUX } from "../../desktop/plataforma";
 import { abaLigada, rotaLigada } from "../../utilitarios/funcoes";
 import { hojeISO } from "../../utilitarios/datas";
 import { lerBackup } from "../../utilitarios/backupValido";
-import { listarChaves, lerChave, gravarChave, salvarAgora, modoArmazenamento, zerarTudo, tamanhoGuardado, PREFIXO } from "../../ponte/armazenamento";
+import { listarChaves, lerChave, gravarChave, salvarAgora, modoArmazenamento, zerarTudo, PREFIXO } from "../../ponte/armazenamento";
 import { TODOS_OS_SONS, tocarSom, type CategoriaSom } from "../../ponte/sons";
 import { DESTAQUE_SISTEMA } from "../../janelas/area-de-trabalho/usarTema";
 import { mudarTema } from "../../janelas/area-de-trabalho/mudarTema";
@@ -33,6 +33,10 @@ import { SecaoClaudeCode } from "./SecaoClaudeCode";
 import { MapaDaIa } from "./MapaDaIa";
 import { SecaoAssistive } from "./SecaoAssistive";
 import { EditorDeAtalhos } from "./EditorDeAtalhos";
+import { HistoricoSincronia } from "./HistoricoSincronia";
+import { BackupsSincronia } from "./BackupsSincronia";
+import { DiagnosticoSistema } from "./DiagnosticoSistema";
+import { AdministracaoUsuarios } from "./AdministracaoUsuarios";
 import { AlternadorAjuste, FaixaAjuste, GrupoAjuste, LinhaAjuste, NotaAjuste, Teclas } from "./LinhaAjuste";
 import { NATIVO, usarMonitores } from "../../desktop/desktop";
 import { useTour } from "../../estado/tour";
@@ -59,6 +63,7 @@ const ICONES: Record<Secao, React.ReactNode> = {
   claude: <Terminal size={13} />,
   sobre: <Info size={13} />,
   desenvolvedor: <Code size={13} />,
+  admin: <UserCog size={13} />,
 };
 
 const AMOSTRAS_PALETA: Record<Paleta, { escuro: [string, string]; claro: [string, string] }> = {
@@ -248,6 +253,8 @@ function SecaoDados() {
       <LinhaAjuste rotulo={T.configuracoes.apagarTudo} dica={T.configuracoes.apagarTudoAviso}>
         <Botao variante="perigo" icone={<Trash2 size={13} />} onClick={() => { setConfirmacao(""); setApagar(true); }}>{T.configuracoes.apagarTudo}</Botao>
       </LinhaAjuste>
+      <HistoricoSincronia />
+      <BackupsSincronia />
       <Modal aberto={!!previa} titulo={T.configuracoes.restaurarPrevia} aoFechar={() => setPrevia(null)}>
         {previa && (
           <div className="formulario">
@@ -325,13 +332,14 @@ export default function Configuracoes() {
   const [busca, setBusca] = useState("");
   const secoesVisiveis = useMemo(() => {
     const termo = normalizarTexto(busca.trim());
-    const todas = Object.keys(T.configuracoes.secoes) as Secao[];
+    const todas = (Object.keys(T.configuracoes.secoes) as Secao[]).filter((s) => s !== "admin" || usuario?.perfil === "dono");
     if (!termo) return todas;
     return todas.filter((s) => normalizarTexto(`${T.configuracoes.secoes[s]} ${T.configuracoes.palavrasChave[s]}`).includes(termo));
-  }, [busca]);
+  }, [busca, usuario?.perfil]);
   useEffect(() => {
     if (secoesVisiveis.length > 0 && !secoesVisiveis.includes(secao)) setSecao(secoesVisiveis[0]);
   }, [secoesVisiveis, secao]);
+  const secaoAtual = secao === "admin" && usuario?.perfil !== "dono" ? "geral" : secao;
   const [previaVisual, setPreviaVisual] = useState<ReturnType<typeof validarVisual>>(null);
   const [erroVisual, setErroVisual] = useState("");
   const [novoFato, setNovoFato] = useState("");
@@ -751,6 +759,7 @@ export default function Configuracoes() {
     ),
     dados: <SecaoDados />,
     claude: <SecaoClaudeCode />,
+    admin: <AdministracaoUsuarios />,
     assistive: <SecaoAssistive />,
     sobre: (
       <>
@@ -764,7 +773,7 @@ export default function Configuracoes() {
           <Botao icone={<ArrowUpRight size={13} />} onClick={() => irPara("atualizacao")}>{T.configuracoes.verAtualizacoes}</Botao>
         </LinhaAjuste>
         <LinhaAjuste rotulo={T.configuracoes.licencaRotulo} dica={T.configuracoes.licenca} />
-        <LinhaAjuste rotulo={T.configuracoes.diagnostico} dica={T.configuracoes.itensGuardados(listarChaves().length, (tamanhoGuardado() / 1024).toFixed(0))} />
+        <DiagnosticoSistema />
         <LinhaAjuste rotulo={T.tour.verTour} dica={T.tour.verTourDica}>
           <Botao onClick={() => useTour.getState().abrir()}>{T.tour.verTour}</Botao>
         </LinhaAjuste>
@@ -831,12 +840,12 @@ export default function Configuracoes() {
           </button>
         ))}
       </nav>
-      <section key={secao} className="ajustes-cartao" aria-labelledby="ajustes-cartao-titulo">
+      <section key={secaoAtual} className="ajustes-cartao" aria-labelledby="ajustes-cartao-titulo">
         <header className="ajustes-cartao-cabecalho">
-          <h2 id="ajustes-cartao-titulo" className="ajustes-cartao-titulo">{T.configuracoes.secoes[secao]}</h2>
-          <span className="ajustes-cartao-sub">{T.configuracoes.subtitulosSecoes[secao]}</span>
+          <h2 id="ajustes-cartao-titulo" className="ajustes-cartao-titulo">{T.configuracoes.secoes[secaoAtual]}</h2>
+          <span className="ajustes-cartao-sub">{T.configuracoes.subtitulosSecoes[secaoAtual]}</span>
         </header>
-        <div className="ajustes-corpo">{conteudo[secao]}</div>
+        <div className="ajustes-corpo">{conteudo[secaoAtual]}</div>
       </section>
       <Modal aberto={!!previaVisual} titulo={T.configuracoes.previaVisual} aoFechar={() => setPreviaVisual(null)}>
         {previaVisual && (
