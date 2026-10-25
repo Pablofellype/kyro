@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { emit, listen } from "@tauri-apps/api/event";
 
 export interface UsuarioAutenticado {
   id: number;
@@ -15,6 +16,31 @@ interface EstadoAuth {
   verificar: () => Promise<boolean>;
 }
 
+interface MensagemAutenticacao {
+  usuario: UsuarioAutenticado | null;
+  token: string | null;
+}
+
+const NATIVO = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+const EVENTO_AUTENTICACAO = "niko://autenticacao";
+
+function estadoDaSessao(usuario: UsuarioAutenticado | null, token: string | null) {
+  if (typeof window !== "undefined") {
+    if (token) {
+      localStorage.setItem("kyro_token", token);
+      if (usuario) localStorage.setItem("kyro_usuario", JSON.stringify(usuario));
+    } else {
+      localStorage.removeItem("kyro_token");
+      localStorage.removeItem("kyro_usuario");
+    }
+  }
+  return { usuario, token, carregando: false };
+}
+
+function publicarAutenticacao(usuario: UsuarioAutenticado | null, token: string | null) {
+  if (NATIVO) void emit(EVENTO_AUTENTICACAO, { usuario, token } satisfies MensagemAutenticacao).catch(() => undefined);
+}
+
 export function urlApi(caminho: string): string {
   const baseUrl = import.meta.env.VITE_API_URL || "";
   return `${baseUrl}${caminho}`;
@@ -26,15 +52,9 @@ export const useAuth = create<EstadoAuth>((set, get) => ({
   token: typeof window !== "undefined" ? localStorage.getItem("kyro_token") : null,
 
   definirUsuario: (usuario, token) => {
-    if (token) {
-      localStorage.setItem("kyro_token", token);
-      if (usuario) localStorage.setItem("kyro_usuario", JSON.stringify(usuario));
-      set({ usuario, token, carregando: false });
-    } else {
-      localStorage.removeItem("kyro_token");
-      localStorage.removeItem("kyro_usuario");
-      set({ usuario: null, token: null, carregando: false });
-    }
+    const sessao = estadoDaSessao(usuario, token ?? null);
+    set(sessao);
+    publicarAutenticacao(usuario, token ?? null);
   },
 
   logout: async () => {
@@ -75,3 +95,11 @@ export const useAuth = create<EstadoAuth>((set, get) => ({
     return false;
   },
 }));
+
+if (NATIVO) {
+  void listen<MensagemAutenticacao>(EVENTO_AUTENTICACAO, (evento) => {
+    const mensagem = evento.payload;
+    if (!mensagem || typeof mensagem !== "object") return;
+    useAuth.setState(estadoDaSessao(mensagem.usuario ?? null, mensagem.token ?? null));
+  }).catch(() => undefined);
+}

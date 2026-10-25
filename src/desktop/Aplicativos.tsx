@@ -15,7 +15,7 @@ import { usarTema } from "../janelas/area-de-trabalho/usarTema";
 import { usarAtalhos } from "../janelas/area-de-trabalho/usarAtalhos";
 import { useServicos } from "../servicos/servicos";
 import { usarPreferenciasDaJanela } from "../servicos/usarPreferenciasDaJanela";
-import { definirMonitorDaIlha, janelaAtual, ouvirComandos, ouvirEvento, sincronizarInicioComWindows } from "./desktop";
+import { definirDocks, definirMonitorDaIlha, janelaAtual, NATIVO, ouvirComandos, ouvirEvento, ocultarBarraDoWindows, reservarEspacoDoDock, ROTULO, sincronizarInicioComWindows } from "./desktop";
 import { usarSincronia } from "./sincronia";
 import { usarAtalhosDaIlha, usarAtalhosGlobais } from "./usarAtalhosGlobais";
 import { useAuth } from "../estado/autenticacao";
@@ -89,13 +89,6 @@ export function AppSistema() {
   );
 }
 
-function usarMostrarAoMontar() {
-  useEffect(() => {
-    const t = window.setTimeout(() => void janelaAtual().then((j) => j.show()), 120);
-    return () => window.clearTimeout(t);
-  }, []);
-}
-
 function usarMonitorDaIlha() {
   const monitor = useConfig((s) => s.ilha.monitor);
   useEffect(() => {
@@ -105,12 +98,16 @@ function usarMonitorDaIlha() {
 
 export function AppIlha() {
   const usuario = useAuth((s) => s.usuario);
-  usarMostrarAoMontar();
+  const verificar = useAuth((s) => s.verificar);
   usarMonitorDaIlha();
   usarTema();
   usarSincronia();
   usarAtalhosDaIlha();
   useServicos();
+
+  useEffect(() => {
+    void verificar();
+  }, [verificar]);
 
   useEffect(() => {
     if (!usuario) {
@@ -131,14 +128,23 @@ export function AppIlha() {
 
 export function AppDock() {
   const usuario = useAuth((s) => s.usuario);
-  usarMostrarAoMontar();
+  const verificar = useAuth((s) => s.verificar);
   usarTema();
   usarPreferenciasDaJanela();
   usarSincronia();
 
   useEffect(() => {
+    void verificar();
+  }, [verificar]);
+
+  useEffect(() => {
     if (!usuario) {
       void janelaAtual().then((j) => j.hide()).catch(() => undefined);
+      if (NATIVO && ROTULO === "dock") {
+        void definirDocks(false, "");
+        void ocultarBarraDoWindows(false);
+        void reservarEspacoDoDock(false, 0);
+      }
     } else {
       void janelaAtual().then((j) => j.show()).catch(() => undefined);
     }
@@ -155,9 +161,14 @@ export function AppDock() {
 
 export function AppAssistive() {
   const usuario = useAuth((s) => s.usuario);
+  const verificar = useAuth((s) => s.verificar);
   usarTema();
   usarSincronia();
   const ativo = useConfig((s) => s.assistive.ativo);
+
+  useEffect(() => {
+    void verificar();
+  }, [verificar]);
 
   useEffect(() => {
     let vivo = true;
