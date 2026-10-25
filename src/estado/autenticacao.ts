@@ -46,6 +46,14 @@ export function urlApi(caminho: string): string {
   return `${baseUrl}${caminho}`;
 }
 
+export function cabecalhosNiko(): Record<string, string> {
+  const token = typeof document !== "undefined" ? document.querySelector('meta[name="niko-token"]')?.getAttribute("content") : null;
+  return {
+    "x-niko": "1",
+    ...(token ? { "x-niko-token": token } : {}),
+  };
+}
+
 export const useAuth = create<EstadoAuth>((set, get) => ({
   usuario: null,
   carregando: true,
@@ -63,7 +71,7 @@ export const useAuth = create<EstadoAuth>((set, get) => ({
       try {
         await fetch(urlApi("/api/auth?acao=logout"), {
           method: "POST",
-          headers: { Authorization: `Bearer ${token}` },
+          headers: { ...cabecalhosNiko(), Authorization: `Bearer ${token}` },
         });
       } catch {
         // ignora erro de rede no logout
@@ -80,7 +88,7 @@ export const useAuth = create<EstadoAuth>((set, get) => ({
     }
     try {
       const res = await fetch(urlApi("/api/auth?acao=verificar"), {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { ...cabecalhosNiko(), Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error("erro_rede");
       const dados = await res.json();

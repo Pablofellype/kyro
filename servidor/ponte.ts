@@ -61,13 +61,26 @@ function responder(res: ServerResponse, status: number, dados: unknown) {
 
 const HOSTS_LOCAIS = new Set(["localhost", "127.0.0.1", "[::1]"]);
 
-function hostLocal(req: IncomingMessage): boolean {
+function hostDaRequisicao(req: IncomingMessage): string {
   const host = req.headers.host ?? "";
   try {
-    return HOSTS_LOCAIS.has(new URL(`http://${host}`).hostname);
+    return new URL(`http://${host}`).hostname;
   } catch {
-    return false;
+    return "";
   }
+}
+
+function ipPrivado(hostname: string): boolean {
+  if (hostname === "::1" || hostname === "[::1]" || hostname.startsWith("fc") || hostname.startsWith("fd")) return true;
+  const partes = hostname.split(".").map(Number);
+  if (partes.length !== 4 || partes.some((parte) => !Number.isInteger(parte) || parte < 0 || parte > 255)) return false;
+  const [a, b] = partes;
+  return a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || a === 169 && b === 254;
+}
+
+function hostLocal(req: IncomingMessage): boolean {
+  const hostname = hostDaRequisicao(req);
+  return HOSTS_LOCAIS.has(hostname) || ipPrivado(hostname);
 }
 
 function origemConfiavel(req: IncomingMessage): boolean {
@@ -78,7 +91,8 @@ function origemConfiavel(req: IncomingMessage): boolean {
   if (!origem) return true;
   try {
     const host = new URL(origem).hostname;
-    return host === "localhost" || host === "127.0.0.1" || host === "[::1]" || host === "tauri.localhost";
+    if (host === "localhost" || host === "127.0.0.1" || host === "[::1]" || host === "tauri.localhost") return true;
+    return ipPrivado(host) && host === hostDaRequisicao(req);
   } catch {
     return false;
   }
