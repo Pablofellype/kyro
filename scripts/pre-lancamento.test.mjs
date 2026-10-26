@@ -12,7 +12,7 @@ import vm from "node:vm";
 
 const estabilizar = () => new Promise((r) => setImmediate(r));
 
-function armazenamentoIsolado(nativo = false) {
+function armazenamentoIsolado(nativo = false, sessao = null) {
   const memoria = new Map();
   const timers = new Map();
   let proximo = 0;
@@ -20,8 +20,15 @@ function armazenamentoIsolado(nativo = false) {
     location: { search: "" },
     setTimeout: (fn) => { const id = ++proximo; timers.set(id, fn); return id; },
     clearTimeout: (id) => timers.delete(id),
+    setInterval: (fn) => { const id = ++proximo; timers.set(id, fn); return id; },
+    clearInterval: (id) => timers.delete(id),
   });
   if (nativo) janela.__TAURI_INTERNALS__ = {};
+  if (sessao) {
+    memoria.set("kyro_token", "t".repeat(32));
+    memoria.set("kyro_usuario", JSON.stringify({ id: sessao.id ?? 1 }));
+    if (sessao.fila) memoria.set("niko:sincronia-pendente:1", JSON.stringify(sessao.fila));
+  }
   const ouvintes = new Map();
   const comandos = [];
   const eventos = { listen: async (nome, fn) => { ouvintes.set(nome, fn); return () => ouvintes.delete(nome); } };
@@ -113,6 +120,20 @@ test("salvar rejeita a falha e mantém alterações para uma tentativa posterior
   a.contexto.fetch = async (_url, opcoes) => { recebido = JSON.parse(opcoes.body); return { ok: true }; };
   await a.api.salvarAgora();
   assert.equal(recebido.itens["niko:teste"], "novo");
+});
+
+test("fila persistida é reenviada depois de reabrir o armazenamento remoto", async () => {
+  const a = armazenamentoIsolado(false, { fila: { versao: "0", itens: { "niko:pendente": "retentar" } } });
+  const chamadas = [];
+  a.contexto.fetch = async (url, opcoes = {}) => {
+    chamadas.push({ url, metodo: opcoes.method ?? "GET", corpo: opcoes.body ? JSON.parse(opcoes.body) : null });
+    return { ok: true, json: async () => ({ dados: {}, versao: "0" }) };
+  };
+  await a.api.iniciarArmazenamento();
+  for (const fn of [...a.timers.values()]) fn();
+  await estabilizar();
+  await estabilizar();
+  assert.ok(chamadas.some((chamada) => chamada.metodo === "POST" && chamada.corpo.itens["niko:pendente"] === "retentar"));
 });
 
 function moduloIsolado(caminho, globais, nomes) {

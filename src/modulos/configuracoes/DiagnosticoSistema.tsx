@@ -126,7 +126,7 @@ export function DiagnosticoSistema() {
         <ItemDiagnostico rotulo={T.configuracoes.diagnosticoRede} valor={online ? "Conectada" : "Offline"} detalhe={online ? "Acesso à rede disponível" : "As alterações ficam na fila"} estado={estadoRede} />
         <ItemDiagnostico rotulo={T.configuracoes.diagnosticoArmazenamento} valor={armazenamento === "banco" ? "Banco remoto" : "Local"} detalhe={`${listarChaves().length} coleções / ${(tamanhoGuardado() / 1024).toFixed(0)} KB`} estado={armazenamento === "banco" ? "ok" : "neutro"} />
         <ItemDiagnostico rotulo={T.configuracoes.diagnosticoSincronia} valor={rotuloSincronia(situacao.estado)} detalhe={`${situacao.pendentes} pendência(s) · ${textoData(situacao.ultimaSincronia)}`} estado={estadoSincronia} />
-        <ItemDiagnostico rotulo={T.configuracoes.diagnosticoTempoReal} valor={endpointTempoReal() ? "Ponte local" : "Servidor web"} detalhe={endpointTempoReal() ? "WebSocket do aplicativo disponível" : "WebSocket do ambiente web"} />
+        <ItemDiagnostico rotulo={T.configuracoes.diagnosticoTempoReal} valor={endpointTempoReal() ? "Ponte local" : "HTTP periódico"} detalhe={endpointTempoReal() ? "WebSocket do aplicativo disponível" : "Sincronização periódica pelo servidor web"} />
         <ItemDiagnostico rotulo={T.configuracoes.diagnosticoAmbiente} valor={NATIVO ? "Aplicativo desktop" : "Navegador"} detalhe={`Kyro ${T.app.versao}`} />
       </div>
     </section>

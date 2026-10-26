@@ -283,7 +283,7 @@ async function recarregarDaPonte() {
   try {
     const endpoint = endpointDosDados();
     const desde = token && versaoRemota ? `?desde=${encodeURIComponent(versaoRemota)}` : "";
-    const r = await fetch(`${endpoint}${desde}`, { headers: cabecalhosDosDados() });
+    const r = await fetch(`${endpoint}${desde}`, { headers: cabecalhosDosDados(), signal: AbortSignal.timeout(8000) });
     if (!r.ok) {
       definirSituacaoSincronia(token ? "offline" : "local", pendentes.size);
       return;
@@ -305,14 +305,10 @@ async function recarregarDaPonte() {
 }
 
 function urlDaSincroniaTempoReal(): string | null {
-  const definida = endpointTempoReal();
-  if (definida) return definida;
-  try {
-    const url = new URL(window.location.href);
-    return `${url.protocol === "https:" ? "wss:" : "ws:"}//${url.host}/api/ws`;
-  } catch {
-    return null;
-  }
+  // Funções serverless/web não oferecem upgrade WebSocket de forma confiável.
+  // No navegador, o polling HTTP é o canal oficial; o desktop informa a ponte
+  // local explicitamente quando ela está disponível.
+  return endpointTempoReal();
 }
 
 function agendarReconexaoTempoReal() {
@@ -363,7 +359,8 @@ function conectarTempoReal() {
     socket.addEventListener("close", () => {
       if (websocketSincronia === socket) websocketSincronia = null;
       sincroniaTempoRealAtiva = false;
-      definirSituacaoSincronia("offline", pendentes.size);
+      // A queda do tempo real não significa que o banco ficou offline. O
+      // fallback HTTP confirma a disponibilidade antes de alterar o estado.
       void recarregarDaPonte();
       agendarReconexaoTempoReal();
     });
@@ -674,6 +671,7 @@ export async function iniciarArmazenamento(): Promise<ModoArmazenamento> {
       window.setInterval(() => {
         if (!sincroniaTempoRealAtiva) void recarregarDaPonte();
       }, 2000);
+      if (pendentes.size > 0) agendar(0);
       conectarTempoReal();
     }
   } catch {

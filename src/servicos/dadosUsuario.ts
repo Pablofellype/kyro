@@ -45,6 +45,13 @@ function normalizarClienteId(clienteId: string | null): string | null {
   return clienteId.slice(0, 120);
 }
 
+function auditoriaAindaNaoMigrada(erro: unknown): boolean {
+  if (!erro || typeof erro !== "object") return false;
+  const valor = erro as { code?: unknown; message?: unknown };
+  const mensagem = typeof valor.message === "string" ? valor.message : "";
+  return valor.code === "42P01" && /dados_usuario_(backups|historico)/i.test(mensagem);
+}
+
 export function validarItensDadosUsuario(valor: unknown): ItensDadosUsuario {
   if (!valor || typeof valor !== "object" || Array.isArray(valor)) throw new Error("itens_invalidos");
   const itens: ItensDadosUsuario = {};
@@ -87,12 +94,71 @@ export async function lerDadosUsuarioComVersao(usuarioId: number): Promise<{ dad
   };
 }
 
+async function gravarSemAuditoria(sql: ReturnType<typeof getDb>, usuarioId: number, itens: ItensDadosUsuario, esperado: string): Promise<string> {
+  const resultado = await sql`
+    WITH bumped AS (
+      UPDATE dados_usuario_revisoes
+      SET versao = md5(random()::text || clock_timestamp()::text || usuario_id::text),
+          atualizado_em = CURRENT_TIMESTAMP
+      WHERE usuario_id = ${usuarioId} AND versao = ${esperado}
+      RETURNING usuario_id, versao
+    ),
+    removidos AS (
+      DELETE FROM dados_usuario AS d
+      USING jsonb_each(${JSON.stringify(itens)}::jsonb) AS entrada(chave, valor)
+      JOIN bumped AS b ON b.usuario_id = d.usuario_id
+      WHERE d.chave = entrada.chave
+        AND entrada.valor = 'null'::jsonb
+      RETURNING d.chave
+    ),
+    gravados AS (
+      INSERT INTO dados_usuario (usuario_id, chave, valor, atualizado_em)
+      SELECT b.usuario_id, entrada.chave, entrada.valor #>> '{}', CURRENT_TIMESTAMP
+      FROM jsonb_each(${JSON.stringify(itens)}::jsonb) AS entrada(chave, valor)
+      CROSS JOIN bumped AS b
+      WHERE entrada.valor <> 'null'::jsonb
+      ON CONFLICT (usuario_id, chave)
+      DO UPDATE SET valor = EXCLUDED.valor, atualizado_em = CURRENT_TIMESTAMP
+      RETURNING chave
+    )
+    SELECT (SELECT versao FROM bumped) AS versao
+  `;
+  const novaVersao = String(resultado[0]?.versao ?? "");
+  if (novaVersao) return novaVersao;
+  const atual = await lerDadosUsuarioComVersao(usuarioId);
+  throw new ConflitoDadosUsuario(atual.versao, atual.dados);
+}
+
+async function zerarSemAuditoria(sql: ReturnType<typeof getDb>, usuarioId: number, esperado: string): Promise<string> {
+  const resultado = await sql`
+    WITH bumped AS (
+      UPDATE dados_usuario_revisoes
+      SET versao = md5(random()::text || clock_timestamp()::text || usuario_id::text),
+          atualizado_em = CURRENT_TIMESTAMP
+      WHERE usuario_id = ${usuarioId} AND versao = ${esperado}
+      RETURNING usuario_id, versao
+    ),
+    apagados AS (
+      DELETE FROM dados_usuario AS d
+      USING bumped AS b
+      WHERE d.usuario_id = b.usuario_id
+      RETURNING d.chave
+    )
+    SELECT (SELECT versao FROM bumped) AS versao
+  `;
+  const novaVersao = String(resultado[0]?.versao ?? "");
+  if (novaVersao) return novaVersao;
+  const atual = await lerDadosUsuarioComVersao(usuarioId);
+  throw new ConflitoDadosUsuario(atual.versao, atual.dados);
+}
+
 export async function gravarDadosUsuario(usuarioId: number, bruto: unknown, versaoEsperada: string | null = null, clienteId: string | null = null): Promise<string> {
   const itens = validarItensDadosUsuario(bruto);
   const sql = getDb();
   const esperado = versaoEsperada ?? (await lerDadosUsuarioComVersao(usuarioId)).versao;
   const cliente = normalizarClienteId(clienteId);
-  const resultado = await sql`
+  try {
+    const resultado = await sql`
     WITH bumped AS (
       UPDATE dados_usuario_revisoes
       SET versao = md5(random()::text || clock_timestamp()::text || usuario_id::text),
@@ -148,18 +214,26 @@ export async function gravarDadosUsuario(usuarioId: number, bruto: unknown, vers
       RETURNING antigo.id
     )
     SELECT (SELECT versao FROM bumped) AS versao, (SELECT COUNT(*) FROM historico) AS auditado, (SELECT COUNT(*) FROM backup) AS backup, (SELECT COUNT(*) FROM limpeza) AS limpos
-  `;
-  const novaVersao = String(resultado[0]?.versao ?? "");
-  if (novaVersao) return novaVersao;
-  const atual = await lerDadosUsuarioComVersao(usuarioId);
-  throw new ConflitoDadosUsuario(atual.versao, atual.dados);
+    `;
+    const novaVersao = String(resultado[0]?.versao ?? "");
+    if (novaVersao) return novaVersao;
+    const atual = await lerDadosUsuarioComVersao(usuarioId);
+    throw new ConflitoDadosUsuario(atual.versao, atual.dados);
+  } catch (erro) {
+    // A versão 0.2.11 adicionou auditoria, mas bancos já existentes podem
+    // ainda estar entre as migrações. A sincronização principal não pode
+    // ficar travada só porque o histórico ainda não foi criado.
+    if (auditoriaAindaNaoMigrada(erro)) return gravarSemAuditoria(sql, usuarioId, itens, esperado);
+    throw erro;
+  }
 }
 
 export async function zerarDadosUsuario(usuarioId: number, versaoEsperada: string | null = null, clienteId: string | null = null): Promise<string> {
   const sql = getDb();
   const esperado = versaoEsperada ?? (await lerDadosUsuarioComVersao(usuarioId)).versao;
   const cliente = normalizarClienteId(clienteId);
-  const resultado = await sql`
+  try {
+    const resultado = await sql`
     WITH bumped AS (
       UPDATE dados_usuario_revisoes
       SET versao = md5(random()::text || clock_timestamp()::text || usuario_id::text),
@@ -201,23 +275,33 @@ export async function zerarDadosUsuario(usuarioId: number, versaoEsperada: strin
       RETURNING antigo.id
     )
     SELECT (SELECT versao FROM bumped) AS versao, (SELECT COUNT(*) FROM historico) AS auditado, (SELECT COUNT(*) FROM backup) AS backup, (SELECT COUNT(*) FROM limpeza) AS limpos
-  `;
-  const novaVersao = String(resultado[0]?.versao ?? "");
-  if (novaVersao) return novaVersao;
-  const atual = await lerDadosUsuarioComVersao(usuarioId);
-  throw new ConflitoDadosUsuario(atual.versao, atual.dados);
+    `;
+    const novaVersao = String(resultado[0]?.versao ?? "");
+    if (novaVersao) return novaVersao;
+    const atual = await lerDadosUsuarioComVersao(usuarioId);
+    throw new ConflitoDadosUsuario(atual.versao, atual.dados);
+  } catch (erro) {
+    if (auditoriaAindaNaoMigrada(erro)) return zerarSemAuditoria(sql, usuarioId, esperado);
+    throw erro;
+  }
 }
 
 export async function lerHistoricoDadosUsuario(usuarioId: number, limite = 30): Promise<RegistroHistoricoDadosUsuario[]> {
   const sql = getDb();
   const limiteSeguro = Math.max(1, Math.min(100, Math.floor(Number(limite) || 30)));
-  const linhas = await sql`
-    SELECT versao, operacao, chaves, cliente_id, criado_em
-    FROM dados_usuario_historico
-    WHERE usuario_id = ${usuarioId}
-    ORDER BY criado_em DESC, id DESC
-    LIMIT ${limiteSeguro}
-  `;
+  let linhas;
+  try {
+    linhas = await sql`
+      SELECT versao, operacao, chaves, cliente_id, criado_em
+      FROM dados_usuario_historico
+      WHERE usuario_id = ${usuarioId}
+      ORDER BY criado_em DESC, id DESC
+      LIMIT ${limiteSeguro}
+    `;
+  } catch (erro) {
+    if (auditoriaAindaNaoMigrada(erro)) return [];
+    throw erro;
+  }
   return linhas.map((linha) => ({
     versao: String(linha.versao ?? ""),
     operacao: linha.operacao === "zerar" ? "zerar" : "alteracao",
@@ -230,13 +314,19 @@ export async function lerHistoricoDadosUsuario(usuarioId: number, limite = 30): 
 export async function lerBackupsDadosUsuario(usuarioId: number, limite = LIMITE_BACKUPS): Promise<RegistroBackupDadosUsuario[]> {
   const sql = getDb();
   const limiteSeguro = Math.max(1, Math.min(LIMITE_BACKUPS, Math.floor(Number(limite) || LIMITE_BACKUPS)));
-  const linhas = await sql`
-    SELECT id, versao, motivo, jsonb_object_length(dados) AS itens, criado_em
-    FROM dados_usuario_backups
-    WHERE usuario_id = ${usuarioId}
-    ORDER BY criado_em DESC, id DESC
-    LIMIT ${limiteSeguro}
-  `;
+  let linhas;
+  try {
+    linhas = await sql`
+      SELECT id, versao, motivo, jsonb_object_length(dados) AS itens, criado_em
+      FROM dados_usuario_backups
+      WHERE usuario_id = ${usuarioId}
+      ORDER BY criado_em DESC, id DESC
+      LIMIT ${limiteSeguro}
+    `;
+  } catch (erro) {
+    if (auditoriaAindaNaoMigrada(erro)) return [];
+    throw erro;
+  }
   return linhas.map((linha) => ({
     id: Number(linha.id),
     versao: String(linha.versao ?? ""),

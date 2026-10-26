@@ -1,7 +1,7 @@
 {
     "name": "kyro",
     "private": true,
-    "version": "0.2.11",
+    "version": "0.2.12",
     "type": "module",
     "license": "SEE LICENSE IN LICENSE.md",
     "scripts": {
@@ -14,6 +14,8 @@
         "ponte:build": "node scripts/construir-ponte.mjs",
         "tauri": "tauri",
         "app": "tauri build",
+        "db:migrar": "node scripts/migrar-dados.mjs",
+        "versao:sincronizar": "node scripts/sincronizar-versao.mjs",
         "lancar": "node scripts/lancar-versao.mjs",
         "lancar:verificar": "node scripts/lancar-versao.mjs --verificar",
         "lancar:testar": "node --test scripts/versao-release.test.mjs",
