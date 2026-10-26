@@ -41,7 +41,7 @@ jobs:
           node-version: 24
           cache: pnpm
 
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile --prod=false
 
       - name: Tipos
         run: pnpm verificar
