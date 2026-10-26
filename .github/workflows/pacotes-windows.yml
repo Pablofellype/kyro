@@ -2,8 +2,8 @@ name: Pacotes Windows
 
 on:
   push:
-    branches: [main]
-  workflow_dispatch:
+    tags:
+      - "v*"
 
 permissions:
   contents: write
@@ -32,6 +32,9 @@ jobs:
         shell: pwsh
         run: |
           $versao = node -p "require('./package.json').version"
+          if ($env:GITHUB_REF_TYPE -eq "tag" -and $env:GITHUB_REF_NAME -ne "v$versao") {
+            throw "A tag $env:GITHUB_REF_NAME não corresponde à versão $versao do projeto."
+          }
           "KYRO_VERSION=$versao" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           pnpm run lancar:verificar
 
@@ -50,7 +53,7 @@ jobs:
           if ([string]::IsNullOrWhiteSpace($env:TAURI_SIGNING_PRIVATE_KEY)) {
             throw "Configure o segredo TAURI_SIGNING_PRIVATE_KEY no repositorio."
           }
-          pnpm lancar $env:KYRO_VERSION --recompilar "Kyro $env:KYRO_VERSION"
+          pnpm lancar $env:KYRO_VERSION "Kyro $env:KYRO_VERSION"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -71,7 +74,7 @@ jobs:
           $tag = "v$env:KYRO_VERSION"
           gh release view $tag --repo "${{ github.repository }}" *> $null
           if ($LASTEXITCODE -ne 0) {
-            gh release create $tag --repo "${{ github.repository }}" --title "Kyro $env:KYRO_VERSION" --notes "Versao oficial do Kyro Desktop ($tag)." --latest
+            gh release create $tag --repo "${{ github.repository }}" --verify-tag --title "Kyro $env:KYRO_VERSION" --notes "Versao oficial do Kyro Desktop ($tag)." --latest
           }
           $arquivos = @(
             "src-tauri/target/release/bundle/nsis/Kyro_$($env:KYRO_VERSION)_x64-setup.exe",
