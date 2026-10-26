@@ -131,6 +131,34 @@ class ClienteCdp {
   }
 }
 
+async function aguardarProcesso(processo: ChildProcess, limiteMs = 4000) {
+  if (processo.exitCode !== null || processo.signalCode !== null) return;
+  await new Promise<void>((resolver) => {
+    let concluido = false;
+    const terminar = () => {
+      if (concluido) return;
+      concluido = true;
+      clearTimeout(relogio);
+      resolver();
+    };
+    const relogio = setTimeout(() => {
+      try { processo.kill("SIGKILL"); } catch { /* o processo já encerrou */ }
+      terminar();
+    }, limiteMs);
+    relogio.unref();
+    processo.once("exit", terminar);
+    processo.once("error", terminar);
+  });
+}
+
+function removerPastaTemporaria(caminho: string) {
+  try {
+    rmSync(caminho, { recursive: true, force: true, maxRetries: 8, retryDelay: 200 });
+  } catch {
+    // O Windows pode liberar o perfil alguns instantes depois; a pasta é descartável.
+  }
+}
+
 async function iniciarNavegador(): Promise<{ processo: ChildProcess; cliente: ClienteCdp; pasta: string }> {
   const executavel = caminhoDoNavegador();
   if (!executavel) throw new Error("navegador_nao_encontrado");
@@ -148,15 +176,17 @@ async function iniciarNavegador(): Promise<{ processo: ChildProcess; cliente: Cl
     return { processo, cliente, pasta };
   } catch (erro) {
     processo.kill();
-    rmSync(pasta, { recursive: true, force: true });
+    await aguardarProcesso(processo);
+    removerPastaTemporaria(pasta);
     throw erro;
   }
 }
 
-function fecharNavegador(navegador: { processo: ChildProcess; cliente: ClienteCdp; pasta: string }) {
+async function fecharNavegador(navegador: { processo: ChildProcess; cliente: ClienteCdp; pasta: string }) {
   navegador.cliente.fechar();
-  navegador.processo.kill();
-  rmSync(navegador.pasta, { recursive: true, force: true });
+  try { navegador.processo.kill(); } catch { /* o processo já encerrou */ }
+  await aguardarProcesso(navegador.processo);
+  removerPastaTemporaria(navegador.pasta);
 }
 
 function idDaPlanilha(url: string): string {
@@ -239,7 +269,7 @@ async function capturar(planilha: PlanilhaAderencia): Promise<CapturaAderencia> 
     if (!bytes.length || bytes.length > LIMITE_IMAGEM) throw new Error("print_invalido");
     return { bytes, celulas: Array.isArray(dados.celulas) ? dados.celulas : [] };
   } finally {
-    fecharNavegador(navegador);
+    await fecharNavegador(navegador);
   }
 }
 
