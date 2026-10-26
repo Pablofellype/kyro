@@ -63,12 +63,21 @@ async function esperar(ms: number) {
   await new Promise((resolver) => setTimeout(resolver, ms));
 }
 
+interface PaginaDoDebugger {
+  type?: string;
+  webSocketDebuggerUrl?: string;
+}
+
 async function abrirDebugger(porta: number): Promise<{ webSocketDebuggerUrl?: string }> {
   const limite = Date.now() + 10000;
   while (Date.now() < limite) {
     try {
-      const resposta = await fetch(`http://127.0.0.1:${porta}/json/version`);
-      if (resposta.ok) return await resposta.json() as { webSocketDebuggerUrl?: string };
+      const resposta = await fetch(`http://127.0.0.1:${porta}/json/list`);
+      if (resposta.ok) {
+        const paginas = await resposta.json() as PaginaDoDebugger[];
+        const pagina = paginas.find((item) => item.type === "page" && item.webSocketDebuggerUrl);
+        if (pagina?.webSocketDebuggerUrl) return { webSocketDebuggerUrl: pagina.webSocketDebuggerUrl };
+      }
     } catch {
       // O Chromium ainda está iniciando.
     }
