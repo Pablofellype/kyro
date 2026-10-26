@@ -1,4 +1,5 @@
 import { createJSONStorage, type StateStorage } from "zustand/middleware";
+import { urlApi } from "../estado/autenticacao";
 import { objeto } from "../utilitarios/validacoes";
 import { endpointTempoReal } from "./tempoReal";
 
@@ -24,7 +25,7 @@ function tokenDaSessao(): string | null {
 }
 
 function endpointDosDados(): string {
-  return tokenDaSessao() ? "/api/dados" : "/ponte/dados";
+  return tokenDaSessao() ? urlApi("/api/dados") : "/ponte/dados";
 }
 
 function clienteDaInstalacao(): string | null {

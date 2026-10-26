@@ -4,6 +4,8 @@ import type { Rota, ServicoId } from "../tipos";
 import { iniciarConsultaPeriodica } from "./consultaPeriodica";
 import { definirEndpointTempoReal } from "../ponte/tempoReal";
 
+const API_REMOTA_CONFIGURADA = Boolean(import.meta.env.VITE_API_URL);
+
 export type NomeJanela = "sistema" | "ilha" | "dock" | "assistive";
 
 interface InternosTauri {
@@ -177,7 +179,8 @@ export async function ouvirEvento(nome: string, fn: () => void, soDestaJanela = 
 function enviarPelaPonte(base: string, token: string | null) {
   const original = window.fetch.bind(window);
   window.fetch = (entrada: RequestInfo | URL, opcoes?: RequestInit) => {
-    if (typeof entrada === "string" && (entrada.startsWith("/ponte") || entrada.startsWith("/api"))) {
+    const deveIrParaPonte = typeof entrada === "string" && (entrada.startsWith("/ponte") || (!API_REMOTA_CONFIGURADA && entrada.startsWith("/api")));
+    if (deveIrParaPonte) {
       const cabecalhos = new Headers(opcoes?.headers);
       cabecalhos.set("x-niko", "1");
       if (token) cabecalhos.set("x-niko-token", token);
@@ -201,7 +204,7 @@ export async function prepararPonte() {
       ]);
       if (!token || typeof porta !== "number" || !Number.isInteger(porta) || porta < 1 || porta > 65535) throw new Error("ponte_indisponivel");
       enviarPelaPonte(`http://127.0.0.1:${porta}`, token);
-      definirEndpointTempoReal(`ws://127.0.0.1:${porta}/api/ws`);
+      if (!API_REMOTA_CONFIGURADA) definirEndpointTempoReal(`ws://127.0.0.1:${porta}/api/ws`);
     } finally {
       window.clearTimeout(limite);
     }

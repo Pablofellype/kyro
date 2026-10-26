@@ -43,7 +43,7 @@ function publicarAutenticacao(usuario: UsuarioAutenticado | null, token: string 
 }
 
 export function urlApi(caminho: string): string {
-  const baseUrl = import.meta.env.VITE_API_URL || "";
+  const baseUrl = (import.meta.env.VITE_API_URL || "").replace(/\/+$/, "");
   return `${baseUrl}${caminho}`;
 }
 

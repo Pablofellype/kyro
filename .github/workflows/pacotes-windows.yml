@@ -49,9 +49,13 @@ jobs:
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          VITE_API_URL: ${{ secrets.KYRO_API_URL }}
         run: |
           if ([string]::IsNullOrWhiteSpace($env:TAURI_SIGNING_PRIVATE_KEY)) {
             throw "Configure o segredo TAURI_SIGNING_PRIVATE_KEY no repositorio."
+          }
+          if ([string]::IsNullOrWhiteSpace($env:VITE_API_URL)) {
+            throw "Configure a URL publica da API para a build do desktop."
           }
           pnpm lancar $env:KYRO_VERSION "Kyro $env:KYRO_VERSION"
 
