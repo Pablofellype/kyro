@@ -212,6 +212,18 @@ export const T = {
           ["correcao", "A atualização confere a versão de novo antes de baixar e, se falhar, diz em que etapa parou."],
           ["correcao", "As notas de uma versão nova aparecem sem símbolos de markdown."],
         ],
+      },
+      {
+        versao: "0.2.2",
+        data: "2026-10-20",
+        mudancas: [
+          ["novo", "Guarda-roupa com 27 acessórios, um por vez, cor personalizável, prévias e filtros de dia a dia, Halloween, Natal e novidades."],
+          ["novo", "Escritório de IAs com personagens pixelados, salas por projeto, atividade ao vivo, detalhes das sessões e análises locais."],
+          ["melhoria", "Tarefas de fundo no Rust reutilizam o runtime assíncrono do Tauri/Tokio, com tratamento de encerramento e limites de concorrência."],
+          ["melhoria", "Google Workspace fica desativado, em testes, inclusive nas ferramentas do chat. Configurações antigas não reativam a conexão."],
+          ["correcao", "Posicionamento do dock fixo ajustado para a faixa preta relatada na issue #5, e botão Iniciar do Windows adicionado ao dock."],
+          ["novo", "Agradecimento a @gustavowalkersgroup e @landreussi pelos testes e contribuições da versão."],
+        ],
       }
     ] satisfies { versao: string; data?: string; mudancas: ["novo" | "melhoria" | "correcao", string][] }[],
   },

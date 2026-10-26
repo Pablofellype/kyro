@@ -610,6 +610,13 @@ export async function iniciarArmazenamento(): Promise<ModoArmazenamento> {
       }
       persistirFilaSincronia();
       definirSituacaoSincronia("pendente", pendentes.size);
+      if (pendentes.size > 0) {
+        try {
+          await enviarPendentes();
+        } catch {
+          // A fila permanece persistida e o agendamento normal tenta de novo.
+        }
+      }
     }
     const locais = chavesLocais().filter((k) => k !== `${PREFIXO}migrado`);
     if (remoto && Object.keys(dados).length === 0 && (Object.keys(dadosLegados).length > 0 || locais.length > 0)) {

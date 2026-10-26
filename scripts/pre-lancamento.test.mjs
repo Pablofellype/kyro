@@ -34,7 +34,7 @@ function armazenamentoIsolado(nativo = false, sessao = null) {
   const eventos = { listen: async (nome, fn) => { ouvintes.set(nome, fn); return () => ouvintes.delete(nome); } };
   const contexto = vm.createContext({
     window: janela, document: Object.assign(new EventTarget(), { body: { inert: false } }), URLSearchParams, AbortController, AbortSignal, CustomEvent, TextEncoder,
-    eventos, nativo: { invoke: async (nome, dados) => { comandos.push({ nome, dados }); } },
+    eventos, nativo: { invoke: async (nome, dados) => { comandos.push({ nome, dados }); } }, urlApi: (caminho) => caminho,
     BroadcastChannel: undefined, createJSONStorage: (fn) => fn(), objeto: (v) => v !== null && typeof v === "object" && !Array.isArray(v),
     localStorage: { getItem: (k) => memoria.get(k) ?? null, setItem: (k, v) => memoria.set(k, v), removeItem: (k) => memoria.delete(k) },
     fetch: async () => ({ ok: true, json: async () => ({ dados: {} }) }),
