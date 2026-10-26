@@ -105,9 +105,9 @@ async function gravarSemAuditoria(sql: ReturnType<typeof getDb>, usuarioId: numb
     ),
     removidos AS (
       DELETE FROM dados_usuario AS d
-      USING jsonb_each(${JSON.stringify(itens)}::jsonb) AS entrada(chave, valor)
-      JOIN bumped AS b ON b.usuario_id = d.usuario_id
-      WHERE d.chave = entrada.chave
+      USING jsonb_each(${JSON.stringify(itens)}::jsonb) AS entrada(chave, valor), bumped AS b
+      WHERE d.usuario_id = b.usuario_id
+        AND d.chave = entrada.chave
         AND entrada.valor = 'null'::jsonb
       RETURNING d.chave
     ),
@@ -176,9 +176,9 @@ export async function gravarDadosUsuario(usuarioId: number, bruto: unknown, vers
     ),
     removidos AS (
       DELETE FROM dados_usuario AS d
-      USING jsonb_each(${JSON.stringify(itens)}::jsonb) AS entrada(chave, valor)
-      JOIN bumped AS b ON b.usuario_id = d.usuario_id
-      WHERE d.chave = entrada.chave
+      USING jsonb_each(${JSON.stringify(itens)}::jsonb) AS entrada(chave, valor), bumped AS b
+      WHERE d.usuario_id = b.usuario_id
+        AND d.chave = entrada.chave
         AND entrada.valor = 'null'::jsonb
       RETURNING d.chave
     ),
