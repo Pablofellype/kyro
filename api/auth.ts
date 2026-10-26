@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { alterarAtivoUsuario, criarConviteUsuario, loginUsuario, listarUsuarios, redefinirSenhaComToken, solicitarRedefinicaoSenha, urlPublicaDoAmbiente, validarSessao, logoutSessao } from "../src/servicos/autenticacao.js";
+import { configurarCors } from "./cors.js";
 
 function origemDaRequisicao(req: VercelRequest): string {
   const encaminhado = req.headers["x-forwarded-for"];
@@ -26,14 +27,11 @@ function definirCookieSessao(res: VercelResponse, token: string) {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // CORS
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Niko, X-Niko-Token, X-Niko-Cliente");
+  if (!configurarCors(req, res)) return res.status(403).json({ erro: "origem_nao_permitida" });
   res.setHeader("Cache-Control", "no-store");
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("Referrer-Policy", "no-referrer");
-  if (req.method === "OPTIONS") return res.status(200).end();
+  if (req.method === "OPTIONS") return res.status(204).end();
 
   const acao = (req.query.acao as string) || "verificar";
 

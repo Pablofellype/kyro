@@ -83,6 +83,7 @@ const emEnvio = new Map<string, string | null>();
 let envioEmAndamento: Promise<void> | null = null;
 let ouvintesIniciados = false;
 let temporizador = 0;
+let tentativasSincronia = 0;
 let versaoRemota = "";
 let versaoBaseLocal: string | null = null;
 let websocketSincronia: WebSocket | null = null;
@@ -412,6 +413,7 @@ function enviarPendentes(manterViva = false): Promise<void> {
           versaoRemota = resposta.versao;
           versaoBaseLocal = pendentes.size > 0 ? resposta.versao : null;
         }
+        tentativasSincronia = 0;
         for (const [chave, valor] of Object.entries(itens)) {
           if (valor === null) snapshotRemoto.delete(chave);
           else snapshotRemoto.set(chave, valor);
@@ -421,7 +423,9 @@ function enviarPendentes(manterViva = false): Promise<void> {
         persistirFilaSincronia();
         definirSituacaoSincronia(tokenDaSessao() ? "offline" : "local", pendentes.size);
         window.dispatchEvent(new CustomEvent("niko:armazenamento-falhou"));
-        agendar(4000);
+        const atraso = Math.min(4000 * (2 ** Math.min(tentativasSincronia, 4)), 60000);
+        tentativasSincronia = Math.min(tentativasSincronia + 1, 4);
+        agendar(atraso);
         throw erro;
       } finally {
         window.clearTimeout(limite);
@@ -623,7 +627,10 @@ export async function iniciarArmazenamento(): Promise<ModoArmazenamento> {
     } else if (remoto && Object.keys(dados).length > 0) {
       for (const k of locais) localSeguro(() => localStorage.removeItem(k), undefined);
     }
-    if (ouvintesIniciados) return modo;
+    if (ouvintesIniciados) {
+      if (remoto && pendentes.size > 0) agendar(0);
+      return modo;
+    }
     if (tauriDisponivel()) {
       const { listen } = await import("@tauri-apps/api/event");
       const { invoke } = await import("@tauri-apps/api/core");

@@ -221,8 +221,8 @@ function comFalha(props = {}) {
 test("falha geral apresenta recuperação sem expor detalhes do erro nem recarregar automaticamente", () => {
   const html = renderToStaticMarkup(comFalha().render());
   assert.match(html, /role="alert"/);
-  assert.match(html, /Não foi possível exibir o Niko/);
-  assert.match(html, /Recarregar o Niko/);
+  assert.match(html, /Não foi possível exibir o Kyro/);
+  assert.match(html, /Recarregar o Kyro/);
   assert.match(html, /ainda não salvas podem ser perdidas/);
   assert.doesNotMatch(html, /dados privados|Conteúdo que falhou|Voltar ao início/);
 });

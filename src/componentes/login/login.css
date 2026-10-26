@@ -2382,6 +2382,29 @@
   line-height: 1.4;
 }
 
+.kyro-login-diagnostico-botao {
+  align-self: flex-start;
+  margin: -4px 0 0;
+  border: 0;
+  background: transparent;
+  color: var(--login-accent, #d84b4b);
+  cursor: pointer;
+  font: 600 11px var(--fonte-mono, monospace);
+  text-decoration: underline;
+}
+
+.kyro-login-diagnostico-botao:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.kyro-login-diagnostico {
+  margin: -2px 0 0;
+  color: var(--login-muted, #71717a);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
 .kyro-login-novo-instalar {
   display: flex;
   min-height: 50px;

@@ -38,6 +38,18 @@ jobs:
           "KYRO_VERSION=$versao" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           pnpm run lancar:verificar
 
+      - name: Conferir API e CSP do desktop
+        shell: pwsh
+        env:
+          VITE_API_URL: ${{ secrets.KYRO_API_URL }}
+        run: |
+          $config = Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json
+          $api = $env:VITE_API_URL.TrimEnd('/')
+          if ([string]::IsNullOrWhiteSpace($api)) { throw "Configure o segredo KYRO_API_URL." }
+          if ($config.app.security.csp -notlike "*$api*") {
+            throw "A API $api não está liberada no connect-src do CSP do Tauri."
+          }
+
       - uses: dtolnay/rust-toolchain@stable
 
       - uses: Swatinem/rust-cache@v2

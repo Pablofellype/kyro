@@ -98,6 +98,7 @@ export default function Atualizacao() {
           </span>
           {disponivel && <span className="atualizacao-estado-dica">{atualizacao.automatica ? T.atualizacao.instalacaoDica : NATIVO ? T.atualizacao.baixarManual : T.atualizacao.baixarNavegador}</span>}
           {atualizacao.erro && <AvisoFaixa tipo="erro">{atualizacao.erro}</AvisoFaixa>}
+          {atualizacao.recuperacao && <AvisoFaixa tipo="alerta">{atualizacao.recuperacao} <button type="button" onClick={atualizacao.limparRecuperacao}>Entendi</button></AvisoFaixa>}
           {(atualizacao.fase === "baixando" || atualizacao.fase === "instalando") && <Progresso valor={atualizacao.progresso} rotulo={tituloEstado} />}
           <div className="atualizacao-acoes">
             {disponivel && (atualizacao.automatica ? (

@@ -4,13 +4,14 @@ import { ponteLocal } from "./servidor/ponte.ts";
 import { readFileSync } from "node:fs";
 
 const POLITICA_SEGURANCA: string = JSON.parse(readFileSync(new URL("./src-tauri/tauri.conf.json", import.meta.url), "utf8")).app.security.csp;
+const API_PUBLICA = (process.env.VITE_API_URL || "").trim().replace(/["<>]/g, "");
 
 function politicaDeSeguranca(): Plugin {
   return {
     name: "niko-politica-seguranca",
     apply: "build",
     transformIndexHtml: (html) =>
-      html.replace("<head>", `<head>\n    <meta http-equiv="Content-Security-Policy" content="${POLITICA_SEGURANCA}" />\n    <meta name="referrer" content="no-referrer" />`),
+      html.replace("<head>", `<head>\n    <meta http-equiv="Content-Security-Policy" content="${POLITICA_SEGURANCA}" />\n    <meta name="referrer" content="no-referrer" />\n    <meta name="kyro-api-url" content="${API_PUBLICA}" />`),
   };
 }
 
@@ -24,7 +25,7 @@ export default defineConfig({
       "@tauri-apps/plugin-autostart", "@tauri-apps/plugin-notification", "@tauri-apps/plugin-process", "@tauri-apps/plugin-updater",
     ],
   },
-  server: { port: 5420, strictPort: false, host: "0.0.0.0" },
+  server: { port: 5420, strictPort: false, host: "localhost" },
   preview: { port: 5421, host: "localhost" },
   build: { chunkSizeWarningLimit: 1500 },
 });

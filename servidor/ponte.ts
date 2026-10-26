@@ -1,4 +1,4 @@
-import { alterarAtivoUsuario, criarConviteUsuario, loginUsuario, listarUsuarios, redefinirSenhaComToken, solicitarRedefinicaoSenha, urlPublicaDoAmbiente, validarSessao, logoutSessao } from "../src/servicos/autenticacao.ts";
+import { alterarAtivoUsuario, criarConviteUsuario, getDb, loginUsuario, listarUsuarios, redefinirSenhaComToken, solicitarRedefinicaoSenha, urlPublicaDoAmbiente, validarSessao, logoutSessao } from "../src/servicos/autenticacao.ts";
 import { ConflitoDadosUsuario, gravarDadosUsuario, lerBackupsDadosUsuario, lerDadosUsuarioComVersao, lerHistoricoDadosUsuario, restaurarBackupDadosUsuario, validarItensDadosUsuario, zerarDadosUsuario } from "../src/servicos/dadosUsuario.ts";
 import type { Plugin, Connect } from "./tiposVite.ts";
 import type { IncomingMessage, ServerResponse } from "node:http";
@@ -122,6 +122,19 @@ function urlPublicaDaPonte(req: IncomingMessage): string {
 
 export const rotas: Connect.NextHandleFunction = async (req, res, proximo) => {
   const url = new URL(req.url ?? "/", "http://localhost");
+
+  if (url.pathname === "/api/health") {
+    if (!hostLocal(req) || !origemConfiavel(req)) return responder(res, 403, { ok: false, erro: "origem_nao_permitida" });
+    if (req.method === "OPTIONS") return responder(res, 204, {});
+    if (req.method !== "GET") return responder(res, 405, { ok: false, erro: "metodo_nao_permitido" });
+    try {
+      const sql = getDb();
+      await sql`SELECT 1 AS ok`;
+      return responder(res, 200, { ok: true, api: "ok", banco: "ok", data: new Date().toISOString() });
+    } catch {
+      return responder(res, 503, { ok: false, api: "ok", banco: "indisponivel", erro: "banco_indisponivel" });
+    }
+  }
 
   if (url.pathname === "/api/auth") {
     if (!hostLocal(req) || !origemConfiavel(req)) return responder(res, 403, { erro: "origem_nao_permitida" });

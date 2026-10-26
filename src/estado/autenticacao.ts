@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { emit, listen } from "@tauri-apps/api/event";
+import { mensagemDeErroApi } from "../utilitarios/erroApi";
 
 export interface UsuarioAutenticado {
   id: number;
@@ -12,6 +13,7 @@ interface EstadoAuth {
   usuario: UsuarioAutenticado | null;
   carregando: boolean;
   token: string | null;
+  erroVerificacao: string | null;
   definirUsuario: (u: UsuarioAutenticado | null, token?: string | null) => void;
   logout: () => Promise<void>;
   verificar: () => Promise<boolean>;
@@ -59,10 +61,11 @@ export const useAuth = create<EstadoAuth>((set, get) => ({
   usuario: null,
   carregando: true,
   token: typeof window !== "undefined" ? localStorage.getItem("kyro_token") : null,
+  erroVerificacao: null,
 
   definirUsuario: (usuario, token) => {
     const sessao = estadoDaSessao(usuario, token ?? null);
-    set(sessao);
+    set({ ...sessao, erroVerificacao: null });
     publicarAutenticacao(usuario, token ?? null);
   },
 
@@ -84,24 +87,30 @@ export const useAuth = create<EstadoAuth>((set, get) => ({
   verificar: async () => {
     const token = get().token;
     if (!token) {
-      set({ carregando: false, usuario: null });
+      set({ carregando: false, usuario: null, erroVerificacao: null });
       return false;
     }
     try {
       const res = await fetch(urlApi("/api/auth?acao=verificar"), {
         headers: { ...cabecalhosNiko(), Authorization: `Bearer ${token}` },
       });
-      if (!res.ok) throw new Error("erro_rede");
+      if (!res.ok) {
+        set({ carregando: false, erroVerificacao: mensagemDeErroApi(undefined, res.status) });
+        return Boolean(get().usuario);
+      }
       const dados = await res.json();
       if (dados.autenticado && dados.usuario) {
-        set({ usuario: dados.usuario, carregando: false });
+        set({ usuario: dados.usuario, carregando: false, erroVerificacao: null });
         return true;
       }
+      set({ usuario: null, carregando: false, erroVerificacao: null });
+      get().definirUsuario(null);
+      return false;
     } catch {
-      // Se falhar verificacao, desloga
+      // Uma queda temporária não pode apagar a sessão local nem expulsar o usuário.
+      set({ carregando: false, erroVerificacao: mensagemDeErroApi(new TypeError("rede")) });
+      return Boolean(get().usuario);
     }
-    get().definirUsuario(null);
-    return false;
   },
 }));
 

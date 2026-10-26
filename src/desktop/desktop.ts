@@ -4,7 +4,9 @@ import type { Rota, ServicoId } from "../tipos";
 import { iniciarConsultaPeriodica } from "./consultaPeriodica";
 import { definirEndpointTempoReal } from "../ponte/tempoReal";
 
-const API_REMOTA_CONFIGURADA = Boolean(import.meta.env.VITE_API_URL);
+function apiRemotaConfigurada(): boolean {
+  return typeof document !== "undefined" && Boolean(document.querySelector('meta[name="kyro-api-url"]')?.getAttribute("content")?.trim());
+}
 
 export type NomeJanela = "sistema" | "ilha" | "dock" | "assistive";
 
@@ -65,13 +67,14 @@ export function ouvirComandos(fn: (c: Comando) => void): () => void {
 }
 
 const INTERVALO_SINAL_DE_VIDA_MS = 2000;
+let temporizadorSinalDeVida = 0;
 
 // O Rust recarrega, ao reabrir o Niko, a janela que parou de mandar este sinal.
 export function iniciarSinalDeVida() {
-  if (!NATIVO) return;
+  if (!NATIVO || temporizadorSinalDeVida) return;
   const enviar = () => void invocar("sinal_de_vida");
   enviar();
-  window.setInterval(enviar, INTERVALO_SINAL_DE_VIDA_MS);
+  temporizadorSinalDeVida = window.setInterval(enviar, INTERVALO_SINAL_DE_VIDA_MS);
 }
 
 export function foraDoSistema(): boolean {
@@ -179,7 +182,7 @@ export async function ouvirEvento(nome: string, fn: () => void, soDestaJanela = 
 function enviarPelaPonte(base: string, token: string | null) {
   const original = window.fetch.bind(window);
   window.fetch = (entrada: RequestInfo | URL, opcoes?: RequestInit) => {
-    const deveIrParaPonte = typeof entrada === "string" && (entrada.startsWith("/ponte") || (!API_REMOTA_CONFIGURADA && entrada.startsWith("/api")));
+    const deveIrParaPonte = typeof entrada === "string" && (entrada.startsWith("/ponte") || (!apiRemotaConfigurada() && entrada.startsWith("/api")));
     if (deveIrParaPonte) {
       const cabecalhos = new Headers(opcoes?.headers);
       cabecalhos.set("x-niko", "1");
@@ -204,7 +207,7 @@ export async function prepararPonte() {
       ]);
       if (!token || typeof porta !== "number" || !Number.isInteger(porta) || porta < 1 || porta > 65535) throw new Error("ponte_indisponivel");
       enviarPelaPonte(`http://127.0.0.1:${porta}`, token);
-      if (!API_REMOTA_CONFIGURADA) definirEndpointTempoReal(`ws://127.0.0.1:${porta}/api/ws`);
+      if (!apiRemotaConfigurada() && typeof definirEndpointTempoReal === "function") definirEndpointTempoReal(`ws://127.0.0.1:${porta}/api/ws`);
     } finally {
       window.clearTimeout(limite);
     }

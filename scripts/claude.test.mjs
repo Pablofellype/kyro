@@ -112,7 +112,7 @@ test("modo desconhecido ou data inválida não inventa confirmação", () => {
 const pastaClaude = join(raizTemporaria, ".claude");
 const settings = join(pastaClaude, "settings.json");
 const lerSettings = () => JSON.parse(readFileSync(settings, "utf8"));
-const pastaDeDados = join(process.platform === "win32" ? process.env.APPDATA : process.env.XDG_DATA_HOME, "com.niko.desktop");
+const pastaDeDados = join(process.platform === "win32" ? process.env.APPDATA : process.env.XDG_DATA_HOME, "com.niko.empresa");
 const segredo = () => JSON.parse(readFileSync(join(pastaDeDados, "gancho-claude.json"), "utf8")).segredo;
 
 let servidor;

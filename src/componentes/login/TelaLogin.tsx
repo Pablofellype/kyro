@@ -5,6 +5,7 @@ import { Botao, Modal } from "../../componentes/basicos";
 import { LogoNiko } from "../LogoNiko";
 import { ModalInstalacao } from "./ModalInstalacao";
 import manifesto from "../../../package.json";
+import { jsonSeguro, mensagemDeErroApi } from "../../utilitarios/erroApi";
 import "./login.css";
 
 interface Props {
@@ -17,6 +18,8 @@ export function TelaLogin({ aoSucesso }: Props) {
   const [mostrarSenha, setMostrarSenha] = useState(false);
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const [diagnostico, setDiagnostico] = useState("");
+  const [testandoConexao, setTestandoConexao] = useState(false);
   const [modalInstalacaoAberto, setModalInstalacaoAberto] = useState(false);
   const parametrosAcesso = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : new URLSearchParams();
   const [fluxoAcesso, setFluxoAcesso] = useState<"recuperar" | "redefinir" | "convite" | null>(() => parametrosAcesso.get("convite") ? "convite" : parametrosAcesso.get("recuperar") ? "redefinir" : null);
@@ -29,6 +32,27 @@ export function TelaLogin({ aoSucesso }: Props) {
   const [carregandoAcesso, setCarregandoAcesso] = useState(false);
 
   const definirUsuario = useAuth((s) => s.definirUsuario);
+
+  const testarConexao = async () => {
+    setTestandoConexao(true);
+    setDiagnostico("");
+    try {
+      const res = await fetch(urlApi("/api/health"), {
+        headers: cabecalhosNiko(),
+        signal: AbortSignal.timeout(8000),
+      });
+      const dados = await jsonSeguro<{ banco?: string }>(res);
+      setDiagnostico(res.ok
+        ? "API e banco alcançáveis. Se o login continuar falhando, confira o e-mail e a senha."
+        : dados?.banco === "indisponivel"
+          ? "A API está acessível, mas o banco de dados não respondeu. Tente novamente em alguns segundos."
+          : mensagemDeErroApi(undefined, res.status));
+    } catch (e) {
+      setDiagnostico(mensagemDeErroApi(e));
+    } finally {
+      setTestandoConexao(false);
+    }
+  };
 
   const abrirRecuperacao = () => {
     setEmailAcesso(email.trim());
@@ -109,18 +133,18 @@ export function TelaLogin({ aoSucesso }: Props) {
         body: JSON.stringify({ email: emailLimpo, senha }),
       });
 
-      const dados = await res.json();
-      if (!res.ok || !dados.sucesso) {
-        setErro(dados.erro || "Falha ao realizar login.");
+      const dados = await jsonSeguro<{ sucesso?: boolean; erro?: string; usuario?: unknown; token?: string }>(res);
+      if (!res.ok || !dados?.sucesso) {
+        setErro(dados?.erro || mensagemDeErroApi(undefined, res.status));
         setCarregando(false);
         return;
       }
 
-      definirUsuario(dados.usuario, dados.token);
+      definirUsuario(dados.usuario as Parameters<typeof definirUsuario>[0], dados.token);
       aoSucesso?.();
       window.location.reload();
-    } catch {
-      setErro("Não foi possível conectar ao servidor. Verifique sua conexão.");
+    } catch (e) {
+      setErro(mensagemDeErroApi(e));
     } finally {
       setCarregando(false);
     }
@@ -182,6 +206,8 @@ export function TelaLogin({ aoSucesso }: Props) {
                     <span>{erro}</span>
                   </div>
                 )}
+                {erro && <button type="button" className="kyro-login-diagnostico-botao" onClick={() => void testarConexao()} disabled={testandoConexao}>{testandoConexao ? "Testando API..." : "Testar conexão"}</button>}
+                {diagnostico && <p className="kyro-login-diagnostico" role="status">{diagnostico}</p>}
 
                 <label className="kyro-login-novo-campo" htmlFor="login-novo-email">
                   <span>E-MAIL DE ACESSO</span>
@@ -343,6 +369,8 @@ export function TelaLogin({ aoSucesso }: Props) {
                   <span>{erro}</span>
                 </div>
               )}
+                {erro && <button type="button" className="kyro-login-diagnostico-botao" onClick={() => void testarConexao()} disabled={testandoConexao}>{testandoConexao ? "Testando API..." : "Testar conexão"}</button>}
+                {diagnostico && <p className="kyro-login-diagnostico" role="status">{diagnostico}</p>}
 
               <div className="kyro-login-campo">
                 <label htmlFor="login-email">E-MAIL</label>

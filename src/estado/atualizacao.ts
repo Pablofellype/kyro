@@ -20,14 +20,17 @@ interface EstadoAtualizacao {
   notas: string;
   progresso: number;
   erro: string;
+  recuperacao: string;
   carregarVersao: () => Promise<void>;
   verificar: (manual?: boolean) => Promise<void>;
   instalar: () => Promise<void>;
   dispensar: () => void;
+  limparRecuperacao: () => void;
 }
 
 let pendente: Update | null = null;
 const ATRASO_DA_INSTALACAO_AUTOMATICA_MS = 2500;
+const CHAVE_ATUALIZACAO_EM_ANDAMENTO = "kyro:atualizacao-em-andamento";
 
 const URL_ULTIMA_RELEASE = "https://api.github.com/repos/Pablofellype/kyro/releases/latest";
 
@@ -53,11 +56,24 @@ export const useAtualizacao = create<EstadoAtualizacao>()((set, get) => ({
   notas: "",
   progresso: 0,
   erro: "",
+  recuperacao: "",
   carregarVersao: async () => {
     if (!NATIVO) return;
     try {
       const { getVersion } = await import("@tauri-apps/api/app");
-      set({ versaoAtual: await getVersion() });
+      const versaoAtual = await getVersion();
+      let recuperacao = "";
+      try {
+        const alvo = localStorage.getItem(CHAVE_ATUALIZACAO_EM_ANDAMENTO);
+        if (alvo && alvo !== versaoAtual) {
+          recuperacao = `A atualização para a versão ${alvo} não foi confirmada. Você ainda pode usar esta versão e baixar o instalador manualmente.`;
+        } else if (alvo === versaoAtual) {
+          localStorage.removeItem(CHAVE_ATUALIZACAO_EM_ANDAMENTO);
+        }
+      } catch {
+        recuperacao = "Não foi possível confirmar o resultado da última atualização.";
+      }
+      set({ versaoAtual, recuperacao });
     } catch {
       set({ versaoAtual: "", erro: T.atualizacao.versaoFalhou });
     }
@@ -128,6 +144,7 @@ export const useAtualizacao = create<EstadoAtualizacao>()((set, get) => ({
       await prepararAtualizacao();
       ponteParada = true;
       etapa = "instalacao";
+      try { localStorage.setItem(CHAVE_ATUALIZACAO_EM_ANDAMENTO, recente.version); } catch { /* diagnóstico opcional */ }
       await pendente.install();
       const { relaunch } = await import("@tauri-apps/plugin-process");
       await relaunch();
@@ -143,4 +160,8 @@ export const useAtualizacao = create<EstadoAtualizacao>()((set, get) => ({
     }
   },
   dispensar: () => set({ fase: "nada" }),
+  limparRecuperacao: () => {
+    try { localStorage.removeItem(CHAVE_ATUALIZACAO_EM_ANDAMENTO); } catch { /* armazenamento opcional */ }
+    set({ recuperacao: "" });
+  },
 }));
