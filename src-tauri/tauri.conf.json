@@ -54,7 +54,7 @@
                },
     "plugins":  {
                     "updater":  {
-                                    "pubkey":  "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDQ4NDg1ODRGQ0IyMThBOTgKUldTWWlpSExUMWhJU04zK0l4TUsxT0Z1aHkxQzVtOCtXZWZRd3pUZ3dYKzdOckhBay96OUFRczMK",
+                                    "pubkey":  "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDFBRDlEODYxQ0FGODVFMzQKUldRMFh2aktZZGpaR2dFZWVEYWxKR1p0RFMxbXp4cnc5VWxXdFE0NjduVnRESkhTZ29sTzRtUjIK",
                                     "endpoints":  [
                                                       "https://github.com/Pablofellype/kyro/releases/latest/download/latest.json"
                                                   ],
