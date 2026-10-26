@@ -1,5 +1,5 @@
 import { Component, lazy, Suspense, useState, type ReactNode } from "react";
-import { Box, Building2, LayoutGrid, MessageSquare, SquareTerminal } from "lucide-react";
+import { Box, Building2, FileSpreadsheet, LayoutGrid, MessageSquare, SquareTerminal } from "lucide-react";
 import { useClaudeCode } from "../../estado/claudeCode";
 import { CabecalhoAba } from "../../componentes/CabecalhoAba";
 import { Segmentado, AvisoFaixa } from "../../componentes/basicos";
@@ -13,6 +13,7 @@ import { useComportamento, MESAS, LUGARES, type Acao } from "./comportamento";
 import { Pensamento } from "./Pensamento";
 import type { AgenteId } from "../../tipos";
 import { EscritorioIas } from "./EscritorioIas";
+import { Aderencias } from "./Aderencias";
 
 const Cena3D = lazy(() => import("./Cena3D"));
 
@@ -156,11 +157,11 @@ function EscritorioNiko({ alternador }: { alternador: ReactNode }) {
 }
 
 export default function Escritorio({ tipoInicial = "niko", demonstracaoInicial = false }: { tipoInicial?: "niko" | "ias"; demonstracaoInicial?: boolean } = {}) {
-  const [tipo, setTipo] = useState<"niko" | "ias">(tipoInicial);
+  const [tipo, setTipo] = useState<"niko" | "ias" | "aderencias">(tipoInicial);
   const sessoes = useClaudeCode((s) => s.ordem.length);
   const alternador = (
     <div className="escritorio-troca" role="tablist" aria-label={T.escritorio.tipo}>
-      {([["niko", Building2, T.escritorio.niko, T.escritorio.trocaKyro], ["ias", SquareTerminal, T.escritorio.ias.curto, T.escritorio.trocaIas(sessoes)]] as const).map(([id, Icone, titulo, dica]) => (
+      {([["niko", Building2, T.escritorio.niko, T.escritorio.trocaKyro], ["ias", SquareTerminal, T.escritorio.ias.curto, T.escritorio.trocaIas(sessoes)], ["aderencias", FileSpreadsheet, T.escritorio.aderencias.curto, T.escritorio.aderencias.subtitulo]] as const).map(([id, Icone, titulo, dica]) => (
         <button key={id} type="button" role="tab" aria-selected={tipo === id} className="escritorio-troca-botao" onClick={() => setTipo(id)}>
           <span className="escritorio-troca-icone"><Icone size={18} /></span>
           <span className="escritorio-troca-texto"><b>{titulo}</b><small>{dica}</small></span>
@@ -168,7 +169,9 @@ export default function Escritorio({ tipoInicial = "niko", demonstracaoInicial =
       ))}
     </div>
   );
-  return tipo === "niko" ? <EscritorioNiko alternador={alternador} /> : <>
+  if (tipo === "niko") return <EscritorioNiko alternador={alternador} />;
+  if (tipo === "aderencias") return <>{alternador}<Aderencias /></>;
+  return <>
     <CabecalhoAba titulo={T.escritorio.ias.titulo} subtitulo={T.escritorio.ias.subtitulo} />
     {alternador}
     <EscritorioIas demonstracaoInicial={demonstracaoInicial} />

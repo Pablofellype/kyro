@@ -529,6 +529,37 @@ export async function enviarMensagem(jid: unknown, texto: unknown) {
 
 const TAMANHO_MAXIMO_DO_ENVIO = 16 * 1024 * 1024;
 
+export async function enviarImagemNoWhatsapp(jid: unknown, bytes: Buffer, nome = "imagem.png", legenda = "") {
+  if (typeof jid !== "string") throw new Error("pedido_invalido");
+  const id = jidNormalizado(jid);
+  if (!jid.includes("@") || !caixa.conversas.has(id)) throw new Error("resposta_sem_conversa");
+  if (!Buffer.isBuffer(bytes) || bytes.length === 0) throw new Error("arquivo_vazio");
+  if (bytes.length > TAMANHO_MAXIMO_DO_ENVIO) throw new Error("arquivo_grande_demais");
+  if (!envios.permitir()) throw new Error("resposta_muitas");
+  if (!estado.porta) throw new Error("gateway_parado");
+  if (tipoPelosBytes(bytes, "") !== "image/png" && tipoPelosBytes(bytes, "") !== "image/jpeg") throw new Error("imagem_formato");
+  const arquivo = nome.replace(/[\\/:*?"<>|\u0000-\u001f]/g, "_").slice(0, 120) || "imagem.png";
+  const texto = legenda.trim().slice(0, 1024);
+  const formulario = new FormData();
+  formulario.set("phone", id);
+  if (texto) formulario.set("caption", texto);
+  formulario.set("image", new Blob([new Uint8Array(bytes)]), arquivo);
+  const r = await fetch(`http://127.0.0.1:${estado.porta}/send/image`, {
+    method: "POST",
+    headers: { authorization: `Basic ${Buffer.from(estado.acesso).toString("base64")}`, "x-device-id": estado.dispositivo },
+    body: formulario,
+    signal: AbortSignal.timeout(120_000),
+  });
+  const corpo = (await r.json().catch(() => null)) as Record<string, unknown> | null;
+  if (!r.ok) throw new Error(codigoDeErro(corpo) || `gateway_${r.status}`);
+  const idDaMensagem = (corpo?.results as Record<string, unknown> | undefined)?.message_id;
+  const idFinal = typeof idDaMensagem === "string" ? idDaMensagem : `niko-${randomBytes(6).toString("hex")}`;
+  guardarMidia(`${id}/${idFinal}`, { tipo: tipoPelosBytes(bytes, "") ?? "image/png", bytes });
+  caixa.adicionar({ id: idFinal, conversa: id, remetente: estado.eu ?? id, nomeRemetente: "", texto, midia: "imagem", nomeDoArquivo: arquivo, tamanho: bytes.length, data: new Date().toISOString(), minha: true, mencionaMe: false }, estado.config);
+  const conversa = caixa.conversas.get(id);
+  return conversa ? resumoDaConversa(conversa) : null;
+}
+
 function lerBytes(req: IncomingMessage, limite: number): Promise<Buffer> {
   return new Promise((resolver, rejeitar) => {
     let partes: Buffer[] = [];

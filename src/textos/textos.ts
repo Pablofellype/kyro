@@ -2857,6 +2857,11 @@ export const T = {
     niko: "Escritório Kyro",
     trocaKyro: "Rubi, Nanquim, Sol e Java na rotina do dia",
     trocaIas: (n: number) => (n ? `${n} sess${n === 1 ? "ão" : "ões"} de IA de código` : "Claude Code, Codex e outras ferramentas"),
+    aderencias: {
+      titulo: "Robô de Aderências",
+      curto: "Planilhas e alertas",
+      subtitulo: "Capture planilhas, acompanhe alertas amarelos e vermelhos e envie o resumo pelo WhatsApp.",
+    },
     ias: {
       previa: "Prévia do escritório",
       abrirAplicativo: "Abrir Kyro",

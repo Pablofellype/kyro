@@ -25,6 +25,7 @@ import { ehRotaDeAgente, receberEventoDeAgente, estadoDosAgentes, instalarAgente
 import { listarArquivos, receberArquivo, enviarConteudo, excluirArquivo, excluirArquivosDaMateria, baixarArquivo, abrirArquivoNoPrograma, exportarParaDownloads } from "./arquivos.ts";
 import { tipoDoComputador, estadoDoSistema, listarRedes, listarBluetooth, lerComputador, conectarRede, esquecerRede, desconectarRede, definirBrilho, definirRadio, abrirConfiguracoesDoSistema } from "./sistema.ts";
 import { instalarSincroniaTempoReal } from "./sincroniaTempoReal.ts";
+import { executarAderencias, navegadorDeAderenciasDisponivel, testarAderencia } from "./aderencias.ts";
 
 const LIMITE_CORPO = 24 * 1024 * 1024;
 
@@ -302,6 +303,15 @@ export const rotas: Connect.NextHandleFunction = async (req, res, proximo) => {
     const agente = /^\/agentes\/([a-z]{2,20})\/(instalar|remover)$/.exec(caminho);
     if (agente && req.method === "POST") return responder(res, 200, agente[2] === "instalar" ? instalarAgente(agente[1], await lerCorpo(req)) : removerAgente(agente[1], await lerCorpo(req)));
     if (caminho === "/ocr" && req.method === "POST") return responder(res, 200, await ocrDaRequisicao(req));
+    if (caminho.startsWith("/aderencias/")) {
+      const acao = caminho.slice("/aderencias/".length);
+      if (acao === "estado" && req.method === "GET") return responder(res, 200, { disponivel: true, navegador: navegadorDeAderenciasDisponivel() });
+      if (acao === "testar" && req.method === "POST") return responder(res, 200, await testarAderencia((await lerCorpo(req)).planilha));
+      if (acao === "executar" && req.method === "POST") {
+        iniciarWhatsapp();
+        return responder(res, 200, await executarAderencias((await lerCorpo(req)).configuracao));
+      }
+    }
     if (caminho.startsWith("/whatsapp/")) {
       iniciarWhatsapp();
       const acao = caminho.slice("/whatsapp/".length);

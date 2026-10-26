@@ -7,6 +7,7 @@ import { encerrarControle } from "./controleRapido.ts";
 import { encerrarSistema } from "./sistema.ts";
 import { encerrarWhatsapp } from "./whatsapp/whatsapp.ts";
 import { instalarSincroniaTempoReal } from "./sincroniaTempoReal.ts";
+import { iniciarAgendadorAderencias, pararAgendadorAderencias } from "./aderencias.ts";
 
 const porta = Number(process.env.NIKO_PORTA) || 47831;
 const ORIGENS = new Set(["http://tauri.localhost", "https://tauri.localhost", "tauri://localhost"]);
@@ -30,6 +31,7 @@ const servidor = createServer((req, res) => {
   });
 });
 const removerSincroniaTempoReal = instalarSincroniaTempoReal(servidor);
+iniciarAgendadorAderencias();
 
 process.on("uncaughtException", (e) => {
   process.stderr.write(`${new Date().toISOString()} erro: ${e.stack ?? e.message}\n`);
@@ -42,6 +44,7 @@ servidor.listen(porta, "127.0.0.1", () => process.stderr.write(`${new Date().toI
 
 const encerrar = () => {
   encerrarWhatsapp();
+  pararAgendadorAderencias();
   encerrarMidia();
   encerrarJanelas();
   encerrarControle();
