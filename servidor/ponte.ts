@@ -179,7 +179,10 @@ async function atenderWhatsappRemoto(req: IncomingMessage, res: ServerResponse, 
     const leitura = acao === "estado" || acao === "novidades";
     if (req.method !== (leitura ? "GET" : "POST")) return responder(res, 405, { erro: "metodo_nao_permitido" });
     if (acao === "estado") {
-      await iniciarWhatsapp();
+      // O primeiro ciclo também carrega o histórico e pode levar mais tempo
+      // que o limite da API da Vercel. O estado deve responder imediatamente;
+      // a próxima consulta encontrará as conversas já carregadas.
+      void iniciarWhatsapp().catch(() => undefined);
       return responder(res, 200, estadoDoWhatsapp());
     }
     if (acao === "novidades") return responder(res, 200, novidadesDoWhatsapp(desde));
