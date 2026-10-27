@@ -19,6 +19,17 @@ const STATUS_CONECTADO_MS = 60_000;
 const VARREDURA_COM_WEBHOOK_MS = 60_000;
 const VARREDURA_SEM_WEBHOOK_MS = 20_000;
 const MAXIMO_DE_NOVIDADES = 50;
+const GOWA_EXTERNO = (process.env.NIKO_GOWA_URL ?? "").trim().replace(/\/+$/, "");
+
+function usaGowaExterno() {
+  return Boolean(GOWA_EXTERNO);
+}
+
+function urlDoGateway(caminho: string): URL {
+  if (GOWA_EXTERNO) return new URL(`${GOWA_EXTERNO}${caminho}`);
+  if (!estado.porta) throw new Error("gateway_parado");
+  return new URL(`http://127.0.0.1:${estado.porta}${caminho}`);
+}
 
 interface ConfigWhatsapp extends FiltrosWhatsapp {
   ligado: boolean;
@@ -88,8 +99,7 @@ let relogio: ReturnType<typeof setInterval> | null = null;
 let ocupado = false;
 
 async function chamar(metodo: string, caminho: string, opcoes: { query?: Record<string, string>; json?: unknown; tempoMs?: number; binario?: boolean } = {}): Promise<{ status: number; corpo: unknown; bytes?: Buffer }> {
-  if (!estado.porta) throw new Error("gateway_parado");
-  const url = new URL(`http://127.0.0.1:${estado.porta}${caminho}`);
+  const url = urlDoGateway(caminho);
   for (const [k, v] of Object.entries(opcoes.query ?? {})) url.searchParams.set(k, v);
   const r = await fetch(url, {
     method: metodo,
@@ -201,6 +211,13 @@ async function atualizarQr() {
 }
 
 async function prepararGateway() {
+  if (usaGowaExterno()) {
+    estado.porta = 1;
+    estado.acesso ||= process.env.NIKO_GOWA_BASIC_AUTH?.trim() || process.env.APP_BASIC_AUTH?.trim() || "";
+    estado.segredo ||= process.env.NIKO_GOWA_WEBHOOK_SECRET?.trim() || process.env.WHATSAPP_WEBHOOK_SECRET?.trim() || "";
+    if (!estado.acesso || !estado.segredo) throw new Error("gateway_externo_sem_credenciais");
+    return;
+  }
   estado.acesso ||= await segredoGuardado("whatsapp-acesso", () => `niko:${randomBytes(18).toString("hex")}`);
   estado.segredo ||= await segredoGuardado("whatsapp-webhook", () => randomBytes(32).toString("hex"));
   if (!estado.porta || (!gowaRodando() && estado.falhasSeguidas > 2)) estado.porta = await portaLivre();
@@ -212,12 +229,12 @@ async function passo() {
   if (ocupado || !estado.config.ligado) return;
   ocupado = true;
   try {
-    if (!gowaInstalado()) {
+    if (!usaGowaExterno() && !gowaInstalado()) {
       estado.vinculo = "sem_gateway";
       return;
     }
     await prepararGateway();
-    if (estado.vinculo === "conectado" && estado.historicoCarregado && estado.falhasSeguidas === 0 && gowaRodando() && Date.now() - estado.ultimoStatus < STATUS_CONECTADO_MS) {
+    if (estado.vinculo === "conectado" && estado.historicoCarregado && estado.falhasSeguidas === 0 && (usaGowaExterno() || gowaRodando()) && Date.now() - estado.ultimoStatus < STATUS_CONECTADO_MS) {
       if (horaDeVarrer()) await varrerSemWebhook();
       return;
     }
@@ -423,9 +440,9 @@ export function estadoDoWhatsapp() {
   return {
     suportado: alvoDaPlataforma() !== null,
     ligado: estado.config.ligado,
-    instalado: gowaInstalado(),
+    instalado: usaGowaExterno() || gowaInstalado(),
     instalacao: { ...instalacao },
-    rodando: gowaRodando(),
+    rodando: usaGowaExterno() || gowaRodando(),
     vinculo: estado.config.ligado ? estado.vinculo : "desligado",
     eu: estado.eu,
     qr: estado.vinculo === "precisa_qr" ? estado.qr?.png ?? null : null,
@@ -545,7 +562,7 @@ export async function enviarImagemNoWhatsapp(jid: unknown, bytes: Buffer, nome =
   formulario.set("phone", id);
   if (texto) formulario.set("caption", texto);
   formulario.set("image", new Blob([new Uint8Array(bytes)], { type: tipo }), arquivo);
-  const r = await fetch(`http://127.0.0.1:${estado.porta}/send/image`, {
+  const r = await fetch(urlDoGateway("/send/image"), {
     method: "POST",
     headers: { authorization: `Basic ${Buffer.from(estado.acesso).toString("base64")}`, "x-device-id": estado.dispositivo },
     body: formulario,
@@ -598,7 +615,7 @@ export async function enviarArquivoNoWhatsapp(req: IncomingMessage, consulta: UR
   formulario.set("phone", id);
   if (legenda) formulario.set("caption", legenda);
   formulario.set(rota.campo, new Blob([new Uint8Array(bytes)], { type: tipoDoArquivo }), nome);
-  const r = await fetch(`http://127.0.0.1:${estado.porta}${rota.caminho}`, {
+  const r = await fetch(urlDoGateway(rota.caminho), {
     method: "POST",
     headers: { authorization: `Basic ${Buffer.from(estado.acesso).toString("base64")}`, "x-device-id": estado.dispositivo },
     body: formulario,

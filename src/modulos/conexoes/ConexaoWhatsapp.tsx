@@ -4,7 +4,7 @@ import { AvisoFaixa, Botao, ConfirmarModal, LinhaAlternador, Modal } from "../..
 import { Marca, corDaMarca } from "../../marcas/Marca";
 import { T } from "../../textos/textos";
 import { useWhatsapp } from "../../estado/whatsapp";
-import { numeroDoJid, whatsappPonte, type EstadoWhatsapp } from "../../ponte/whatsapp";
+import { numeroDoJid, whatsappPonte, whatsappRemoto, type EstadoWhatsapp } from "../../ponte/whatsapp";
 import { tocarSom } from "../../ponte/sons";
 
 const W = T.whatsapp;
@@ -94,13 +94,16 @@ export function ConfigWhatsapp({ aberto, aoFechar }: { aberto: boolean; aoFechar
             <ol className="guia-conexao-passos">
               {W.passos.map((p) => <li key={p}>{p}</li>)}
             </ol>
-            <div className="linha">
-              <Botao variante={estado?.instalado ? "secundario" : "primario"} icone={instalando ? <LoaderCircle size={14} className="girando" /> : <Download size={14} />} disabled={!estado || instalando || ocupado} onClick={() => void agir(() => whatsappPonte.instalar())}>
-                {estado?.instalado ? W.reinstalar : W.instalar}
-              </Botao>
-              {estado && estado.instalacao.etapa !== "parado" && <span className="campo-dica" role="status">{textoDaEtapa(estado.instalacao)}</span>}
-            </div>
-            <LinhaAlternador rotulo={W.ligar} ligado={Boolean(estado?.ligado)} desativado={!estado?.instalado || ocupado} aoMudar={(v) => void agir(() => whatsappPonte.ligar(v))} />
+            {whatsappRemoto ? <AvisoFaixa><span>O WhatsApp está sendo executado no VPS. Você pode ligar ou desligar a integração aqui; a reinstalação do gateway é feita somente no VPS.</span></AvisoFaixa> : <>
+              <div className="linha">
+                <Botao variante={estado?.instalado ? "secundario" : "primario"} icone={instalando ? <LoaderCircle size={14} className="girando" /> : <Download size={14} />} disabled={!estado || instalando || ocupado} onClick={() => void agir(() => whatsappPonte.instalar())}>
+                  {estado?.instalado ? W.reinstalar : W.instalar}
+                </Botao>
+                {estado && estado.instalacao.etapa !== "parado" && <span className="campo-dica" role="status">{textoDaEtapa(estado.instalacao)}</span>}
+              </div>
+              <LinhaAlternador rotulo={W.ligar} ligado={Boolean(estado?.ligado)} desativado={!estado?.instalado || ocupado} aoMudar={(v) => void agir(() => whatsappPonte.ligar(v))} />
+            </>}
+            {whatsappRemoto && <LinhaAlternador rotulo={W.ligar} ligado={Boolean(estado?.ligado)} desativado={!estado?.instalado || ocupado} aoMudar={(v) => void agir(() => whatsappPonte.ligar(v))} />}
             {estado?.ligado && (
               <div className="whatsapp-vinculo">
                 {estado.vinculo === "precisa_qr" && estado.qr ? (
@@ -140,7 +143,7 @@ export function ConfigWhatsapp({ aberto, aoFechar }: { aberto: boolean; aoFechar
             {erro && <AvisoFaixa tipo="erro"><span role="alert">{erro}</span></AvisoFaixa>}
             <div className="formulario-acoes">
               {estado?.vinculo === "conectado" && <Botao disabled={ocupado} onClick={() => void agir(() => whatsappPonte.desconectar())}>{W.desconectar}</Botao>}
-              {estado?.instalado && <Botao variante="perigo" disabled={ocupado} onClick={() => setConfirmandoEsquecer(true)}>{W.esquecer}</Botao>}
+              {!whatsappRemoto && estado?.instalado && <Botao variante="perigo" disabled={ocupado} onClick={() => setConfirmandoEsquecer(true)}>{W.esquecer}</Botao>}
               <Botao onClick={aoFechar}>{T.geral.fechar}</Botao>
             </div>
           </>

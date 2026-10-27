@@ -307,8 +307,8 @@ fn abrir_lupa(app: &AppHandle) {
     let _ = dock.emit_to(dock.label(), "niko://lupa", ());
 }
 
-fn criar_sobreposta(app: &AppHandle, rotulo: &str, y: f64, x: f64, largura: f64, altura: f64) -> tauri::Result<WebviewWindow> {
-    WebviewWindowBuilder::new(app, rotulo, WebviewUrl::App("index.html".into()))
+fn criar_sobreposta(app: &AppHandle, dona: &WebviewWindow, rotulo: &str, y: f64, x: f64, largura: f64, altura: f64) -> tauri::Result<WebviewWindow> {
+    let mut construtor = WebviewWindowBuilder::new(app, rotulo, WebviewUrl::App("index.html".into()))
         .title("Niko")
         .transparent(true)
         .decorations(false)
@@ -321,8 +321,21 @@ fn criar_sobreposta(app: &AppHandle, rotulo: &str, y: f64, x: f64, largura: f64,
         .disable_drag_drop_handler()
         .visible(false)
         .position(x, y)
-        .inner_size(largura, altura)
-        .build()
+        .inner_size(largura, altura);
+
+    // As sobrepostas fazem parte do Niko, não são janelas independentes.
+    // Torná-las owned pelo sistema evita que o Windows crie miniaturas extras
+    // no preview da barra de tarefas sem mudar o comportamento visual delas.
+    #[cfg(windows)]
+    {
+        construtor = construtor.owner(dona)?;
+    }
+    #[cfg(not(windows))]
+    {
+        construtor = construtor.parent(dona)?;
+    }
+
+    construtor.build()
 }
 
 fn vigiar_cursor(app: AppHandle) {
@@ -633,9 +646,9 @@ pub fn run() {
             });
 
             if plataforma::sobrepostas_transparentes() {
-                criar_sobreposta(&handle, "ilha", tela_y, tela_x, tela_largura, ALTURA_ILHA)?;
-                criar_sobreposta(&handle, "dock", my + mh - ALTURA_DOCK, mx, mw, ALTURA_DOCK)?;
-                criar_sobreposta(&handle, "assistive", my, mx, mw, mh)?;
+                criar_sobreposta(&handle, &sistema, "ilha", tela_y, tela_x, tela_largura, ALTURA_ILHA)?;
+                criar_sobreposta(&handle, &sistema, "dock", my + mh - ALTURA_DOCK, mx, mw, ALTURA_DOCK)?;
+                criar_sobreposta(&handle, &sistema, "assistive", my, mx, mw, mh)?;
             } else {
                 anotar(&handle, "sem compositor: ilha, dock e AssistiveTouch desligados para não cobrir a janela principal");
             }

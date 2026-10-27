@@ -25,7 +25,7 @@ import { ehRotaDeAgente, receberEventoDeAgente, estadoDosAgentes, instalarAgente
 import { listarArquivos, receberArquivo, enviarConteudo, excluirArquivo, excluirArquivosDaMateria, baixarArquivo, abrirArquivoNoPrograma, exportarParaDownloads } from "./arquivos.ts";
 import { tipoDoComputador, estadoDoSistema, listarRedes, listarBluetooth, lerComputador, conectarRede, esquecerRede, desconectarRede, definirBrilho, definirRadio, abrirConfiguracoesDoSistema } from "./sistema.ts";
 import { instalarSincroniaTempoReal } from "./sincroniaTempoReal.ts";
-import { executarAderencias, navegadorDeAderenciasDisponivel, testarAderencia } from "./aderencias.ts";
+import { configuracaoSalva, executarAderencias, enviarAderencia, navegadorDeAderenciasDisponivel, salvarConfiguracaoAderencias, testarAderencia } from "./aderencias.ts";
 
 const LIMITE_CORPO = 24 * 1024 * 1024;
 
@@ -119,6 +119,97 @@ function origemDaRequisicao(req: IncomingMessage): string {
 
 function urlPublicaDaPonte(req: IncomingMessage): string {
   return urlPublicaDoAmbiente() || `http://${hostDaRequisicao(req)}`;
+}
+
+type AcaoAderencia = "estado" | "testar" | "enviar" | "executar" | "configuracao";
+type AcaoWhatsappRemota = "estado" | "novidades" | "ligar" | "filtros" | "ignorar" | "desconectar";
+
+function acaoAderencia(caminho: string, prefixo: string): AcaoAderencia | null {
+  const acao = caminho.startsWith(prefixo) ? caminho.slice(prefixo.length) : "";
+  return acao === "estado" || acao === "testar" || acao === "enviar" || acao === "executar" || acao === "configuracao" ? acao : null;
+}
+
+async function atenderAderencia(req: IncomingMessage, res: ServerResponse, acao: AcaoAderencia) {
+  if (acao === "estado") return responder(res, 200, { disponivel: true, navegador: navegadorDeAderenciasDisponivel() });
+  if (acao === "configuracao" && req.method === "GET") return responder(res, 200, { configuracao: configuracaoSalva() });
+  if (req.method !== "POST") return responder(res, 405, { erro: "metodo_nao_permitido" });
+  const corpo = await lerCorpo(req);
+  if (acao === "configuracao") return responder(res, 200, { configuracao: salvarConfiguracaoAderencias(corpo.configuracao) });
+  if (acao === "testar") return responder(res, 200, await testarAderencia(corpo.planilha));
+  if (acao === "enviar") return responder(res, 200, await enviarAderencia(corpo.configuracao, corpo.planilha));
+  iniciarWhatsapp();
+  return responder(res, 200, await executarAderencias(corpo.configuracao, typeof corpo.grupoId === "string" ? corpo.grupoId : undefined));
+}
+
+async function encaminharAderenciaRemota(req: IncomingMessage, res: ServerResponse, acao: AcaoAderencia) {
+  const base = (process.env.KYRO_GATEWAY_URL || process.env.VITE_GATEWAY_URL)?.trim().replace(/\/+$/, "");
+  const segredo = process.env.KYRO_GATEWAY_SECRET?.trim();
+  if (!base || !segredo) return responder(res, 503, { erro: "gateway_remoto_nao_configurado" });
+  if (acao === "estado" && req.method !== "GET") return responder(res, 405, { erro: "metodo_nao_permitido" });
+  if (acao !== "estado" && req.method !== "GET" && req.method !== "POST") return responder(res, 405, { erro: "metodo_nao_permitido" });
+  try {
+    const url = new URL(`/gateway/aderencias/${acao}`, base);
+    const enviaCorpo = req.method === "POST";
+    const corpo = enviaCorpo ? await lerCorpo(req) : undefined;
+    const resposta = await fetch(url, {
+      method: req.method,
+      headers: {
+        "x-kyro-gateway-secret": segredo,
+        ...(enviaCorpo ? { "content-type": "application/json" } : {}),
+      },
+      body: enviaCorpo ? JSON.stringify(corpo) : undefined,
+      signal: AbortSignal.timeout(55_000),
+    });
+    const texto = await resposta.text();
+    res.statusCode = resposta.status;
+    res.setHeader("content-type", resposta.headers.get("content-type") ?? "application/json; charset=utf-8");
+    return res.end(texto);
+  } catch {
+    return responder(res, 502, { erro: "gateway_remoto_indisponivel" });
+  }
+}
+
+async function atenderWhatsappRemoto(req: IncomingMessage, res: ServerResponse, acao: AcaoWhatsappRemota, desde = 0) {
+  const leitura = acao === "estado" || acao === "novidades";
+  if (req.method !== (leitura ? "GET" : "POST")) return responder(res, 405, { erro: "metodo_nao_permitido" });
+  if (acao === "estado") {
+    iniciarWhatsapp();
+    return responder(res, 200, estadoDoWhatsapp());
+  }
+  if (acao === "novidades") return responder(res, 200, novidadesDoWhatsapp(desde));
+  const corpo = await lerCorpo(req);
+  if (acao === "ligar") return responder(res, 200, ligarWhatsapp(corpo.ligado === true));
+  if (acao === "filtros") return responder(res, 200, definirFiltrosDoWhatsapp(corpo));
+  if (acao === "ignorar") return responder(res, 200, ignorarConversa(corpo.jid, corpo.ignorar));
+  return responder(res, 200, await desconectarWhatsapp());
+}
+
+async function encaminharWhatsappRemoto(req: IncomingMessage, res: ServerResponse, acao: AcaoWhatsappRemota, desde = 0) {
+  const base = process.env.KYRO_GATEWAY_URL?.trim().replace(/\/+$/, "");
+  const segredo = process.env.KYRO_GATEWAY_SECRET?.trim();
+  if (!base || !segredo) return responder(res, 503, { erro: "gateway_remoto_nao_configurado" });
+  const leitura = acao === "estado" || acao === "novidades";
+  if (req.method !== (leitura ? "GET" : "POST")) return responder(res, 405, { erro: "metodo_nao_permitido" });
+  try {
+    const url = new URL(`/gateway/whatsapp/${acao}`, base);
+    if (acao === "novidades") url.searchParams.set("desde", String(Math.max(0, Math.floor(desde))));
+    const corpo = leitura ? undefined : await lerCorpo(req);
+    const resposta = await fetch(url, {
+      method: req.method,
+      headers: {
+        "x-kyro-gateway-secret": segredo,
+        ...(leitura ? {} : { "content-type": "application/json" }),
+      },
+      body: leitura ? undefined : JSON.stringify(corpo),
+      signal: AbortSignal.timeout(30_000),
+    });
+    const texto = await resposta.text();
+    res.statusCode = resposta.status;
+    res.setHeader("content-type", resposta.headers.get("content-type") ?? "application/json; charset=utf-8");
+    return res.end(texto);
+  } catch {
+    return responder(res, 502, { erro: "gateway_remoto_indisponivel" });
+  }
 }
 
 export const rotas: Connect.NextHandleFunction = async (req, res, proximo) => {
@@ -260,6 +351,23 @@ export const rotas: Connect.NextHandleFunction = async (req, res, proximo) => {
     }
   }
 
+  const gatewayAderencia = /^\/gateway\/aderencias\/(estado|testar|enviar|executar|configuracao)$/.exec(url.pathname);
+  if (gatewayAderencia) {
+    const esperado = process.env.NIKO_GATEWAY_SECRET?.trim();
+    const recebido = typeof req.headers["x-kyro-gateway-secret"] === "string" ? req.headers["x-kyro-gateway-secret"] : "";
+    if (!esperado) return responder(res, 503, { erro: "gateway_remoto_nao_configurado" });
+    if (!recebido || recebido !== esperado) return responder(res, 401, { erro: "gateway_nao_autorizado" });
+    return await atenderAderencia(req, res, gatewayAderencia[1] as AcaoAderencia);
+  }
+  const gatewayWhatsapp = /^\/gateway\/whatsapp\/(estado|novidades|ligar|filtros|ignorar|desconectar)$/.exec(url.pathname);
+  if (gatewayWhatsapp) {
+    const esperado = process.env.NIKO_GATEWAY_SECRET?.trim();
+    const recebido = typeof req.headers["x-kyro-gateway-secret"] === "string" ? req.headers["x-kyro-gateway-secret"] : "";
+    if (!esperado) return responder(res, 503, { erro: "gateway_remoto_nao_configurado" });
+    if (!recebido || recebido !== esperado) return responder(res, 401, { erro: "gateway_nao_autorizado" });
+    return await atenderWhatsappRemoto(req, res, gatewayWhatsapp[1] as AcaoWhatsappRemota, Number(url.searchParams.get("desde")) || 0);
+  }
+
   if (!url.pathname.startsWith("/ponte/")) return proximo();
   if (!hostLocal(req)) return responder(res, 403, { erro: "host_nao_permitido" });
   if (ehRotaDoGancho(url.pathname) && req.method === "POST") return receberEventoDoGancho(req, res);
@@ -270,6 +378,16 @@ export const rotas: Connect.NextHandleFunction = async (req, res, proximo) => {
   const caminho = url.pathname.slice("/ponte".length);
 
   try {
+    const aderenciaRemota = /^\/aderencias-remota\/(estado|testar|enviar|executar|configuracao)$/.exec(caminho);
+    if (aderenciaRemota) {
+      if (!origemConfiavel(req)) return responder(res, 403, { erro: "origem_nao_permitida" });
+      return await encaminharAderenciaRemota(req, res, aderenciaRemota[1] as AcaoAderencia);
+    }
+    const whatsappRemoto = /^\/whatsapp-remota\/(estado|novidades|ligar|filtros|ignorar|desconectar)$/.exec(caminho);
+    if (whatsappRemoto) {
+      if (!origemConfiavel(req)) return responder(res, 403, { erro: "origem_nao_permitida" });
+      return await encaminharWhatsappRemoto(req, res, whatsappRemoto[1] as AcaoWhatsappRemota, Number(url.searchParams.get("desde")) || 0);
+    }
     if (caminho === "/atualizacao" && req.method === "GET") return responder(res, 200, await lerUltimaVersao());
     if (caminho === "/estado" && req.method === "GET") {
       return responder(res, 200, { disponivel: true, plataforma: process.platform, provedores: listarProvedores() });
@@ -304,13 +422,8 @@ export const rotas: Connect.NextHandleFunction = async (req, res, proximo) => {
     if (agente && req.method === "POST") return responder(res, 200, agente[2] === "instalar" ? instalarAgente(agente[1], await lerCorpo(req)) : removerAgente(agente[1], await lerCorpo(req)));
     if (caminho === "/ocr" && req.method === "POST") return responder(res, 200, await ocrDaRequisicao(req));
     if (caminho.startsWith("/aderencias/")) {
-      const acao = caminho.slice("/aderencias/".length);
-      if (acao === "estado" && req.method === "GET") return responder(res, 200, { disponivel: true, navegador: navegadorDeAderenciasDisponivel() });
-      if (acao === "testar" && req.method === "POST") return responder(res, 200, await testarAderencia((await lerCorpo(req)).planilha));
-      if (acao === "executar" && req.method === "POST") {
-        iniciarWhatsapp();
-        return responder(res, 200, await executarAderencias((await lerCorpo(req)).configuracao));
-      }
+      const acao = acaoAderencia(caminho, "/aderencias/");
+      if (acao) return await atenderAderencia(req, res, acao);
     }
     if (caminho.startsWith("/whatsapp/")) {
       iniciarWhatsapp();

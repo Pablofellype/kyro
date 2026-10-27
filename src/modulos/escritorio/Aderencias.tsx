@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, CheckCircle2, Clock3, FileImage, FileSpreadsheet, Image, LoaderCircle, Play, Plus, Send, Settings2, Trash2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Clock3, Eye, FileImage, FileSpreadsheet, Image, LoaderCircle, Play, Plus, Send, Settings2, Trash2 } from "lucide-react";
 import { AvisoFaixa, Botao, Cartao, Campo, LinhaAlternador, Modal } from "../../componentes/basicos";
 import { CabecalhoAba } from "../../componentes/CabecalhoAba";
 import { useWhatsapp } from "../../estado/whatsapp";
 import { aderenciasPonte, type PreviaAderencia } from "../../ponte/aderencias";
 import { novaPlanilhaAderencia, useAderencias } from "../../estado/aderencias";
-import type { PlanilhaAderencia } from "./aderenciasTipos";
+import type { GrupoAderencia, PlanilhaAderencia } from "./aderenciasTipos";
 import "./aderencias.css";
 
 const DIAS = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
+const EXECUCAO_REMOTA = import.meta.env.VITE_ADERENCIAS_REMOTA === "1";
 
 function nomeDoDestino(nome: string, grupo: boolean) {
   return `${grupo ? "Grupo" : "Contato"} · ${nome || "sem nome"}`;
@@ -60,76 +61,138 @@ export function Aderencias() {
   const config = useAderencias((s) => s);
   const whatsapp = useWhatsapp((s) => s.estado);
   const carregarWhatsapp = useWhatsapp((s) => s.carregar);
-  const [editando, setEditando] = useState<PlanilhaAderencia | null>(null);
+  const [grupoId, setGrupoId] = useState("");
+  const [editando, setEditando] = useState<{ grupoId: string; planilha: PlanilhaAderencia } | null>(null);
   const [previas, setPrevias] = useState<PreviaAderencia[]>([]);
   const [processando, setProcessando] = useState<string | null>(null);
   const [erro, setErro] = useState("");
+  const [remotoPronto, setRemotoPronto] = useState(!EXECUCAO_REMOTA);
 
   useEffect(() => { if (!whatsapp) void carregarWhatsapp(); }, [whatsapp, carregarWhatsapp]);
+  useEffect(() => {
+    if (!EXECUCAO_REMOTA) return;
+    let ativo = true;
+    void aderenciasPonte.configuracao()
+      .then(({ configuracao }) => {
+        if (ativo && config.grupos.length === 0 && configuracao.grupos.length > 0) config.definir(configuracao);
+      })
+      .catch(() => undefined)
+      .finally(() => { if (ativo) setRemotoPronto(true); });
+    return () => { ativo = false; };
+  }, []);
+  const chaveDaSincroniaRemota = JSON.stringify({ destinoJid: config.destinoJid, destinoNome: config.destinoNome, grupos: config.grupos });
+  useEffect(() => {
+    if (!EXECUCAO_REMOTA || !remotoPronto) return;
+    const timer = window.setTimeout(() => {
+      void aderenciasPonte.salvarConfiguracao(config).catch((e) => setErro(`Não foi possível sincronizar a rotina com o VPS: ${(e as Error).message}`));
+    }, 700);
+    return () => window.clearTimeout(timer);
+  }, [chaveDaSincroniaRemota, remotoPronto]);
+  useEffect(() => {
+    if (!config.grupos.some((grupo) => grupo.id === grupoId)) setGrupoId(config.grupos[0]?.id ?? "");
+  }, [config.grupos, grupoId]);
 
   const destinos = useMemo(() => whatsapp?.conversas ?? [], [whatsapp]);
   const conectado = whatsapp?.vinculo === "conectado";
+  const grupo = config.grupos.find((item) => item.id === grupoId) ?? null;
+  const totalPlanilhas = config.grupos.reduce((total, item) => total + item.planilhas.length, 0);
+  const ultimoResultado = grupo?.ultimoResultado ?? config.ultimoResultado;
 
   const selecionarDestino = (jid: string) => {
     const conversa = destinos.find((c) => c.id === jid);
     config.definir({ destinoJid: jid, destinoNome: conversa ? nomeDoDestino(conversa.nome, conversa.grupo) : "" });
   };
 
+  const adicionarRotina = () => {
+    const id = config.adicionarGrupo({ nome: `Rotina ${config.grupos.length + 1}` });
+    setGrupoId(id);
+  };
+
+  const removerRotina = () => {
+    if (!grupo) return;
+    const proximo = config.grupos.find((item) => item.id !== grupo.id)?.id ?? "";
+    config.removerGrupo(grupo.id);
+    setGrupoId(proximo);
+  };
+
   const testar = async (planilha: PlanilhaAderencia) => {
     setErro(""); setProcessando(`teste:${planilha.id}`);
     try { setPrevias([await aderenciasPonte.testar(planilha)]); }
-    catch (e) { setErro(`Não foi possível testar a planilha: ${(e as Error).message}`); }
+    catch (e) { setErro(`Não foi possível gerar a prévia: ${(e as Error).message}`); }
+    finally { setProcessando(null); }
+  };
+
+  const enviar = async (planilha: PlanilhaAderencia) => {
+    if (!grupo) return;
+    if (!config.destinoJid) { setErro("Escolha um destino do WhatsApp antes de enviar."); return; }
+    setErro(""); setProcessando(`envio:${planilha.id}`);
+    try {
+      const resposta = await aderenciasPonte.enviar(config, planilha);
+      config.registrarResultado(grupo.id, resposta.resultado);
+      setPrevias([resposta.previa]);
+    } catch (e) { setErro(`Não foi possível enviar esta planilha: ${(e as Error).message}`); }
     finally { setProcessando(null); }
   };
 
   const executar = async () => {
-    if (!config.destinoJid || !config.planilhas.length) { setErro("Escolha um destino e adicione pelo menos uma planilha."); return; }
+    if (!grupo || !config.destinoJid || !grupo.planilhas.length) { setErro("Escolha uma rotina com destino e pelo menos uma planilha."); return; }
     setErro(""); setProcessando("execucao");
     try {
-      const resposta = await aderenciasPonte.executar(config);
-      config.registrarResultado(resposta.resultado);
+      const resposta = await aderenciasPonte.executar(config, grupo.id);
+      config.registrarResultado(grupo.id, resposta.resultado);
       setPrevias(resposta.previas);
       if (resposta.resultado.erros.length) setErro(resposta.resultado.erros.join(" | "));
-    } catch (e) { setErro(`Não foi possível executar o robô: ${(e as Error).message}`); }
+    } catch (e) { setErro(`Não foi possível executar a rotina: ${(e as Error).message}`); }
     finally { setProcessando(null); }
+  };
+
+  const abrirNovaPlanilha = () => {
+    if (grupo) setEditando({ grupoId: grupo.id, planilha: novaPlanilhaAderencia() });
+    else setErro("Crie uma rotina antes de adicionar planilhas.");
   };
 
   return (
     <section className="aderencias" aria-label="Robô de Aderências">
-      <CabecalhoAba titulo="Robô de Aderências" subtitulo="Leia suas planilhas, identifique alertas e envie um print organizado pelo WhatsApp." />
+      <CabecalhoAba titulo="Robô de Aderências" subtitulo="Organize planilhas em rotinas de manhã, tarde ou noite e envie cada grupo no seu horário." />
       {!conectado && <AvisoFaixa tipo="alerta"><span>Conecte o WhatsApp em <strong>Conexões</strong> para testar e enviar os resultados. As configurações podem ser preparadas antes.</span></AvisoFaixa>}
       {erro && <AvisoFaixa tipo="erro"><span role="alert">{erro}</span></AvisoFaixa>}
       <div className="aderencias-resumo">
-        <Cartao titulo="Planilhas configuradas" icone={<FileSpreadsheet size={15} />}><strong>{config.planilhas.length}</strong><span>locais monitorados</span></Cartao>
+        <Cartao titulo="Planilhas configuradas" icone={<FileSpreadsheet size={15} />}><strong>{totalPlanilhas}</strong><span>em {config.grupos.length} rotina(s)</span></Cartao>
         <Cartao titulo="Destino" icone={<Send size={15} />}><strong>{config.destinoNome || "Não escolhido"}</strong><span>{conectado ? "WhatsApp conectado" : "Aguardando conexão"}</span></Cartao>
-        <Cartao titulo="Último resultado" icone={<Clock3 size={15} />}><strong>{config.ultimoResultado ? `${config.ultimoResultado.alertas} alertas` : "Ainda não executado"}</strong><span>{config.ultimoResultado?.executadoEm ? new Date(config.ultimoResultado.executadoEm).toLocaleString("pt-BR") : "Execute um teste ou envio"}</span></Cartao>
+        <Cartao titulo="Último resultado" icone={<Clock3 size={15} />}><strong>{ultimoResultado ? `${ultimoResultado.planilhasEnviadas} enviadas` : "Ainda não executado"}</strong><span>{ultimoResultado?.executadoEm ? new Date(ultimoResultado.executadoEm).toLocaleString("pt-BR") : "Faça uma prévia ou envio"}</span></Cartao>
       </div>
-      <div className="aderencias-colunas">
-        <Cartao titulo="Configuração do robô" icone={<Settings2 size={15} />}>
-          <div className="aderencias-cartao-corpo">
-            <LinhaAlternador rotulo="Ativar agendamento" dica="O envio automático respeita o horário e os dias escolhidos." ligado={config.ativo} aoMudar={(v) => config.definir({ ativo: v })} />
-            <Campo id="aderencia-destino" rotulo="Destino do WhatsApp" dica="Escolha uma conversa já conhecida pelo Kyro.">
-              <select id="aderencia-destino" className="seletor" value={config.destinoJid} onChange={(e) => selecionarDestino(e.target.value)}>
-                <option value="">Selecione um contato ou grupo</option>
-                {destinos.map((c) => <option key={c.id} value={c.id}>{nomeDoDestino(c.nome, c.grupo)}</option>)}
-              </select>
-            </Campo>
-            <div className="aderencias-grade-2">
-              <Campo id="aderencia-frequencia" rotulo="Frequência"><select id="aderencia-frequencia" className="seletor" value={config.frequencia} onChange={(e) => config.definir({ frequencia: e.target.value as "manual" | "diaria" | "semanal" })}><option value="manual">Somente manual</option><option value="diaria">Todos os dias</option><option value="semanal">Semanal</option></select></Campo>
-              <Campo id="aderencia-hora" rotulo="Horário"><input id="aderencia-hora" className="campo" type="time" value={config.hora} onChange={(e) => config.definir({ hora: e.target.value })} /></Campo>
+
+      <Cartao titulo="Rotinas de envio" icone={<Clock3 size={15} />} acoes={<Botao pequeno variante="primario" icone={<Plus size={13} />} onClick={adicionarRotina}>Nova rotina</Botao>}>
+        <div className="aderencias-cartao-corpo">
+          {config.grupos.length === 0 ? <div className="aderencias-vazio"><Clock3 size={22} /><strong>Nenhuma rotina criada</strong><span>Crie uma rotina para separar os envios da manhã, tarde ou noite.</span><Botao pequeno variante="primario" icone={<Plus size={13} />} onClick={adicionarRotina}>Criar primeira rotina</Botao></div> : <>
+            <div className="aderencias-rotinas-tabs" role="tablist" aria-label="Rotinas">
+              {config.grupos.map((item) => <button key={item.id} type="button" role="tab" aria-selected={item.id === grupoId} onClick={() => setGrupoId(item.id)}><strong>{item.nome}</strong><span>{item.planilhas.length} planilha(s) · {item.hora}</span></button>)}
             </div>
-            {config.frequencia === "semanal" && <div className="aderencias-dias" aria-label="Dias da semana">{DIAS.map((dia, i) => <button key={dia} type="button" aria-pressed={config.diasSemana.includes(i)} onClick={() => config.definir({ diasSemana: config.diasSemana.includes(i) ? config.diasSemana.filter((d) => d !== i) : [...config.diasSemana, i].sort() })}>{dia}</button>)}</div>}
-            <div className="aderencias-acoes"><Botao variante="primario" icone={processando === "execucao" ? <LoaderCircle size={14} className="girando" /> : <Play size={14} />} disabled={!conectado || processando !== null} onClick={() => void executar()}>Executar agora</Botao><span className="campo-dica">O envio inclui o print e o resumo dos alertas.</span></div>
-          </div>
-        </Cartao>
-        <Cartao titulo="Planilhas e locais" icone={<FileSpreadsheet size={15} />} acoes={<Botao pequeno icone={<Plus size={13} />} onClick={() => setEditando(novaPlanilhaAderencia())}>Adicionar</Botao>}>
-          <div className="aderencias-cartao-corpo">
-            {config.planilhas.length === 0 ? <div className="aderencias-vazio"><FileSpreadsheet size={22} /><strong>Nenhuma planilha configurada</strong><span>Adicione uma planilha compartilhada para começar.</span></div> : config.planilhas.map((p) => <article key={p.id} className="aderencias-planilha"><div className="aderencias-planilha-icone"><FileImage size={17} /></div><div className="aderencias-planilha-texto"><strong>{p.nome}</strong><span>{p.sheetUrl ? "Planilha Google configurada" : "Link pendente"} · {p.soPrint ? "somente print" : `amarelo ${p.yellowThreshold}d · vermelho ${p.redThreshold}d`}</span></div><div className="aderencias-planilha-acoes"><Botao pequeno soIcone aria-label={`Testar ${p.nome}`} title="Testar planilha" disabled={!conectado || processando !== null} icone={processando === `teste:${p.id}` ? <LoaderCircle size={13} className="girando" /> : <Play size={13} />} onClick={() => void testar(p)} /><Botao pequeno soIcone aria-label={`Editar ${p.nome}`} title="Editar" icone={<Settings2 size={13} />} onClick={() => setEditando(p)} /><Botao pequeno soIcone variante="perigo" aria-label={`Remover ${p.nome}`} title="Remover" icone={<Trash2 size={13} />} onClick={() => config.remover(p.id)} /></div></article>)}
-          </div>
-        </Cartao>
-      </div>
-      {previas.length > 0 && <Cartao titulo="Prévia dos últimos testes" icone={<Image size={15} />} className="aderencias-previa"><div className="aderencias-previas-lista">{previas.map((item, indice) => <div key={`${item.imagem.slice(-24)}-${indice}`} className="aderencias-previa-grid"><div><img src={item.imagem} alt={`Prévia da captura da planilha ${indice + 1}`} /></div><div><pre>{item.texto}</pre><div className="aderencias-contadores"><span className="aderencias-contador amarelo"><AlertTriangle size={13} />{item.alertas} atenção</span><span className="aderencias-contador vermelho"><AlertTriangle size={13} />{item.urgentes} crítico</span></div></div></div>)}</div></Cartao>}
-      <FormularioPlanilha aberto={editando !== null} planilha={editando} aoFechar={() => setEditando(null)} aoSalvar={(p) => { if (config.planilhas.some((x) => x.id === p.id)) config.atualizar(p.id, p); else config.adicionar(p); setEditando(null); }} />
+            {grupo && <div className="aderencias-rotina-config">
+              <Campo id="aderencia-rotina-nome" rotulo="Nome da rotina"><input id="aderencia-rotina-nome" className="campo" value={grupo.nome} onChange={(e) => config.atualizarGrupo(grupo.id, { nome: e.target.value })} placeholder="Ex.: Envio da manhã" /></Campo>
+              <LinhaAlternador rotulo="Ativar esta rotina" dica="O envio automático respeita o horário e os dias escolhidos." ligado={grupo.ativo} aoMudar={(v) => config.atualizarGrupo(grupo.id, { ativo: v })} />
+              <Campo id="aderencia-destino" rotulo="Destino do WhatsApp" dica="O mesmo destino pode ser usado por todas as rotinas.">
+                <select id="aderencia-destino" className="seletor" value={config.destinoJid} onChange={(e) => selecionarDestino(e.target.value)}><option value="">Selecione um contato ou grupo</option>{destinos.map((c) => <option key={c.id} value={c.id}>{nomeDoDestino(c.nome, c.grupo)}</option>)}</select>
+              </Campo>
+              <div className="aderencias-grade-2">
+                <Campo id="aderencia-frequencia" rotulo="Frequência"><select id="aderencia-frequencia" className="seletor" value={grupo.frequencia} onChange={(e) => config.atualizarGrupo(grupo.id, { frequencia: e.target.value as GrupoAderencia["frequencia"] })}><option value="manual">Somente manual</option><option value="diaria">Todos os dias</option><option value="semanal">Semanal</option></select></Campo>
+                <Campo id="aderencia-hora" rotulo="Horário"><input id="aderencia-hora" className="campo" type="time" value={grupo.hora} onChange={(e) => config.atualizarGrupo(grupo.id, { hora: e.target.value })} /></Campo>
+              </div>
+              {grupo.frequencia === "semanal" && <div className="aderencias-dias" aria-label="Dias da semana">{DIAS.map((dia, i) => <button key={dia} type="button" aria-pressed={grupo.diasSemana.includes(i)} onClick={() => config.atualizarGrupo(grupo.id, { diasSemana: grupo.diasSemana.includes(i) ? grupo.diasSemana.filter((d) => d !== i) : [...grupo.diasSemana, i].sort() })}>{dia}</button>)}</div>}
+              <div className="aderencias-acoes"><Botao variante="primario" icone={processando === "execucao" ? <LoaderCircle size={14} className="girando" /> : <Play size={14} />} disabled={!conectado || processando !== null} onClick={() => void executar()}>Executar rotina agora</Botao><Botao variante="perigo" pequeno icone={<Trash2 size={13} />} onClick={removerRotina}>Excluir rotina</Botao><span className="campo-dica">Só as planilhas desta rotina serão enviadas.</span></div>
+            </div>}
+          </>}
+        </div>
+      </Cartao>
+
+      {grupo && <Cartao titulo={`Planilhas · ${grupo.nome}`} icone={<FileSpreadsheet size={15} />} acoes={<Botao pequeno icone={<Plus size={13} />} onClick={abrirNovaPlanilha}>Adicionar</Botao>}>
+        <div className="aderencias-cartao-corpo">
+          {grupo.planilhas.length === 0 ? <div className="aderencias-vazio"><FileSpreadsheet size={22} /><strong>Nenhuma planilha nesta rotina</strong><span>Adicione uma planilha compartilhada para começar.</span></div> : grupo.planilhas.map((p) => <article key={p.id} className="aderencias-planilha"><div className="aderencias-planilha-icone"><FileImage size={17} /></div><div className="aderencias-planilha-texto"><strong>{p.nome}</strong><span>{p.sheetUrl ? "Planilha Google configurada" : "Link pendente"} · {p.soPrint ? "somente print" : `amarelo ${p.yellowThreshold}d · vermelho ${p.redThreshold}d`}</span></div><div className="aderencias-planilha-acoes"><Botao pequeno soIcone aria-label={`Prévia ${p.nome}`} title="Gerar prévia sem enviar" disabled={!conectado || processando !== null} icone={processando === `teste:${p.id}` ? <LoaderCircle size={13} className="girando" /> : <Eye size={13} />} onClick={() => void testar(p)} /><Botao pequeno soIcone variante="primario" aria-label={`Enviar somente ${p.nome}`} title="Enviar somente esta planilha" disabled={!conectado || processando !== null} icone={processando === `envio:${p.id}` ? <LoaderCircle size={13} className="girando" /> : <Send size={13} />} onClick={() => void enviar(p)} /><Botao pequeno soIcone aria-label={`Editar ${p.nome}`} title="Editar" icone={<Settings2 size={13} />} onClick={() => setEditando({ grupoId: grupo.id, planilha: p })} /><Botao pequeno soIcone variante="perigo" aria-label={`Remover ${p.nome}`} title="Remover" icone={<Trash2 size={13} />} onClick={() => config.removerPlanilha(grupo.id, p.id)} /></div></article>)}
+        </div>
+      </Cartao>}
+
+      {previas.length > 0 && <Cartao titulo="Prévia dos últimos testes/envios" icone={<Image size={15} />} className="aderencias-previa"><div className="aderencias-previas-lista">{previas.map((item, indice) => <div key={`${item.imagem.slice(-24)}-${indice}`} className="aderencias-previa-grid"><div><img src={item.imagem} alt={`Prévia da captura da planilha ${indice + 1}`} /></div><div><pre>{item.texto}</pre><div className="aderencias-contadores"><span className="aderencias-contador amarelo"><AlertTriangle size={13} />{item.alertas} atenção</span><span className="aderencias-contador vermelho"><AlertTriangle size={13} />{item.urgentes} crítico</span></div></div></div>)}</div></Cartao>}
+      <FormularioPlanilha aberto={editando !== null} planilha={editando?.planilha ?? null} aoFechar={() => setEditando(null)} aoSalvar={(p) => { if (!editando) return; if (editando.planilha.nome) config.atualizarPlanilha(editando.grupoId, p.id, p); else config.adicionarPlanilha(editando.grupoId, p); setEditando(null); }} />
     </section>
   );
 }

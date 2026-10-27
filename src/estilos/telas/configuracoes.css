@@ -1652,6 +1652,145 @@
   color: var(--texto-3);
 }
 
+.estilo-sistema .admin-custos {
+  display: grid;
+  gap: 15px;
+  margin: 0 22px 22px;
+  padding: 17px;
+  border: 1px solid var(--linha);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--superficie-2) 55%, transparent);
+}
+
+.estilo-sistema .admin-custos-carregando {
+  justify-content: center;
+  color: var(--texto-3);
+  font-size: 12px;
+}
+
+.estilo-sistema .admin-custos-cabecalho,
+.estilo-sistema .admin-custos-titulo,
+.estilo-sistema .admin-custos-nota,
+.estilo-sistema .admin-custos-lista-cabecalho,
+.estilo-sistema .admin-custos-fatura {
+  display: flex;
+  align-items: center;
+}
+
+.estilo-sistema .admin-custos-cabecalho,
+.estilo-sistema .admin-custos-lista-cabecalho {
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.estilo-sistema .admin-custos-titulo {
+  gap: 11px;
+}
+
+.estilo-sistema .admin-custos-icone {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--destaque) 30%, var(--linha));
+  border-radius: 11px;
+  color: var(--destaque);
+  background: color-mix(in srgb, var(--destaque) 8%, transparent);
+}
+
+.estilo-sistema .admin-custos-titulo h3 {
+  margin: 0;
+  color: var(--texto);
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.estilo-sistema .admin-custos-titulo p,
+.estilo-sistema .admin-custos-nota {
+  margin: 3px 0 0;
+  color: var(--texto-3);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.estilo-sistema .admin-custos-metricas {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.estilo-sistema .admin-custos-metrica {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--linha);
+  border-radius: 11px;
+  background: var(--superficie);
+}
+
+.estilo-sistema .admin-custos-metrica span,
+.estilo-sistema .admin-custos-metrica small {
+  color: var(--texto-3);
+  font-size: 10px;
+}
+
+.estilo-sistema .admin-custos-metrica strong {
+  overflow: hidden;
+  color: var(--texto);
+  font-family: var(--fonte-mono);
+  font-size: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.estilo-sistema .admin-custos-metrica small {
+  font-family: var(--fonte-mono);
+}
+
+.estilo-sistema .admin-custos-nota {
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0;
+  font-family: var(--fonte-mono);
+  font-size: 9px;
+}
+
+.estilo-sistema .admin-custos-faturas {
+  display: grid;
+  gap: 7px;
+  padding-top: 2px;
+}
+
+.estilo-sistema .admin-custos-lista-cabecalho {
+  padding: 0 2px 2px;
+  color: var(--texto);
+  font-size: 12px;
+}
+
+.estilo-sistema .admin-custos-lista-cabecalho span {
+  color: var(--texto-3);
+  font-family: var(--fonte-mono);
+  font-size: 10px;
+}
+
+.estilo-sistema .admin-custos-fatura {
+  justify-content: space-between;
+  gap: 16px;
+  padding: 9px 11px;
+  border: 1px solid var(--linha);
+  border-radius: 9px;
+  color: var(--texto-3);
+  font-size: 11px;
+}
+
+.estilo-sistema .admin-custos-fatura strong {
+  color: var(--texto);
+  font-family: var(--fonte-mono);
+  font-size: 11px;
+}
+
 @container conteudo (max-width: 640px) {
   .estilo-sistema .admin-usuarios {
     padding: 16px;
@@ -1678,5 +1817,18 @@
 
   .estilo-sistema .admin-usuarios-item > .botao {
     margin-left: auto;
+  }
+
+  .estilo-sistema .admin-custos {
+    margin: 0 16px 16px;
+  }
+
+  .estilo-sistema .admin-custos-metricas {
+    grid-template-columns: 1fr;
+  }
+
+  .estilo-sistema .admin-custos-nota {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }

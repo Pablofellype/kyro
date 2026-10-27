@@ -37,6 +37,7 @@ import { HistoricoSincronia } from "./HistoricoSincronia";
 import { BackupsSincronia } from "./BackupsSincronia";
 import { DiagnosticoSistema } from "./DiagnosticoSistema";
 import { AdministracaoUsuarios } from "./AdministracaoUsuarios";
+import { CustosDigitalOcean } from "./CustosDigitalOcean";
 import { AlternadorAjuste, FaixaAjuste, GrupoAjuste, LinhaAjuste, NotaAjuste, Teclas } from "./LinhaAjuste";
 import { NATIVO, usarMonitores } from "../../desktop/desktop";
 import { useTour } from "../../estado/tour";
@@ -759,7 +760,7 @@ export default function Configuracoes() {
     ),
     dados: <SecaoDados />,
     claude: <SecaoClaudeCode />,
-    admin: <AdministracaoUsuarios />,
+    admin: <><AdministracaoUsuarios /><CustosDigitalOcean /></>,
     assistive: <SecaoAssistive />,
     sobre: (
       <>

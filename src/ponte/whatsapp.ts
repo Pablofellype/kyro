@@ -1,3 +1,5 @@
+import { cabecalhosNiko, urlApi } from "../estado/autenticacao";
+
 export type MidiaWhatsapp = "nenhuma" | "imagem" | "video" | "audio" | "documento" | "figurinha" | "localizacao" | "contato" | "outra";
 
 export interface MensagemWhatsapp {
@@ -53,10 +55,26 @@ export interface NovidadeWhatsapp {
   grupo: boolean;
 }
 
+export const whatsappRemoto = import.meta.env.VITE_ADERENCIAS_REMOTA === "1";
+
+function cabecalhosDaPonte(): Record<string, string> {
+  if (!whatsappRemoto) return { "x-niko": "1", "content-type": "application/json" };
+  const token = typeof localStorage !== "undefined" ? localStorage.getItem("kyro_token") : null;
+  return { ...cabecalhosNiko(), "content-type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) };
+}
+
+function urlDaPonte(caminho: string): string {
+  if (!whatsappRemoto) return `/ponte/whatsapp/${caminho}`;
+  const [acao, consulta] = caminho.split("?", 2);
+  if (import.meta.env.DEV) return `/ponte/whatsapp-remota/${acao}${consulta ? `?${consulta}` : ""}`;
+  const separador = consulta ? `&${consulta}` : "";
+  return `${urlApi(`/api/whatsapp?acao=${encodeURIComponent(acao)}`)}${separador}`;
+}
+
 async function pedir<T>(caminho: string, corpo?: unknown): Promise<T> {
-  const r = await fetch(`/ponte/whatsapp/${caminho}`, {
+  const r = await fetch(urlDaPonte(caminho), {
     method: corpo === undefined ? "GET" : "POST",
-    headers: { "x-niko": "1", "content-type": "application/json" },
+    headers: cabecalhosDaPonte(),
     body: corpo === undefined ? undefined : JSON.stringify(corpo),
   });
   const json = (await r.json().catch(() => ({}))) as T & { erro?: string };
@@ -65,15 +83,17 @@ async function pedir<T>(caminho: string, corpo?: unknown): Promise<T> {
 }
 
 async function urlDaMidia(jid: string, id: string): Promise<string> {
-  const r = await fetch(`/ponte/whatsapp/midia?${new URLSearchParams({ jid, id })}`, { headers: { "x-niko": "1" } });
+  if (whatsappRemoto) throw new Error("whatsapp_remoto_somente_leitura");
+  const r = await fetch(`/ponte/whatsapp/midia?${new URLSearchParams({ jid, id })}`, { headers: cabecalhosDaPonte() });
   if (!r.ok) throw new Error(`http_${r.status}`);
   return URL.createObjectURL(await r.blob());
 }
 
 async function enviarArquivo(jid: string, arquivo: File, legenda: string): Promise<ConversaWhatsapp | null> {
+  if (whatsappRemoto) throw new Error("whatsapp_remoto_somente_leitura");
   const r = await fetch(`/ponte/whatsapp/enviar-arquivo?${new URLSearchParams({ jid, nome: arquivo.name, legenda })}`, {
     method: "POST",
-    headers: { "x-niko": "1", "content-type": "application/octet-stream" },
+    headers: { ...cabecalhosDaPonte(), "content-type": "application/octet-stream" },
     body: arquivo,
   });
   const json = (await r.json().catch(() => ({}))) as ConversaWhatsapp & { erro?: string };

@@ -28,6 +28,8 @@ interface CdpResposta {
 
 const MAXIMO_PLANILHAS = 30;
 const LIMITE_IMAGEM = 16 * 1024 * 1024;
+// O chatbot antigo usava DPR 3; mantemos a mesma densidade de pixels.
+const ESCALAS_DA_CAPTURA = [1] as const;
 let relogioAgendamento: ReturnType<typeof setInterval> | null = null;
 let execucaoAgendada = false;
 const slotsExecutados = new Set<string>();
@@ -175,13 +177,21 @@ async function iniciarNavegador(): Promise<{ processo: ChildProcess; cliente: Cl
   const pasta = mkdtempSync(join(tmpdir(), "kyro-aderencias-"));
   const processo = spawn(executavel, [
     "--headless=new", "--disable-gpu", "--disable-dev-shm-usage", "--no-sandbox", "--hide-scrollbars",
-    "--force-device-scale-factor=2", "--window-size=2400,1600", "--remote-allow-origins=*", `--remote-debugging-port=${porta}`,
+    "--force-device-scale-factor=3", "--window-size=2400,1600", "--remote-allow-origins=*", `--remote-debugging-port=${porta}`,
     `--user-data-dir=${pasta}`, "about:blank",
   ], { stdio: "ignore", windowsHide: true });
   try {
     const versao = await abrirDebugger(porta);
     if (!versao.webSocketDebuggerUrl) throw new Error("debugger_sem_url");
     const cliente = await ClienteCdp.abrir(versao.webSocketDebuggerUrl);
+    await cliente.comando("Emulation.setDeviceMetricsOverride", {
+      width: 2400,
+      height: 1600,
+      deviceScaleFactor: 3,
+      mobile: false,
+      screenWidth: 2400,
+      screenHeight: 1600,
+    });
     return { processo, cliente, pasta };
   } catch (erro) {
     processo.kill();
@@ -271,12 +281,18 @@ async function capturar(planilha: PlanilhaAderencia): Promise<CapturaAderencia> 
     if (!pronto) throw new Error("planilha_sem_tabela");
     await esperar(1200);
     const dados = await navegador.cliente.avaliar<{ clip: { x: number; y: number; width: number; height: number; scale: number } | null; celulas: CelulaAderencia[] }>(SCRIPT_DA_TABELA(planilha));
-    const parametros = dados.clip ? { format: "png", fromSurface: true, clip: dados.clip } : { format: "png", fromSurface: true };
-    const imagem = await navegador.cliente.comando("Page.captureScreenshot", parametros);
-    const base64 = (imagem.result?.data as string | undefined) ?? "";
-    const bytes = Buffer.from(base64, "base64");
-    if (!bytes.length || bytes.length > LIMITE_IMAGEM) throw new Error("print_invalido");
-    return { bytes, celulas: Array.isArray(dados.celulas) ? dados.celulas : [] };
+    for (const escala of ESCALAS_DA_CAPTURA) {
+      const parametros = dados.clip
+        ? { format: "png", fromSurface: true, captureBeyondViewport: true, clip: { ...dados.clip, scale: escala } }
+        : { format: "png", fromSurface: true, captureBeyondViewport: true };
+      const imagem = await navegador.cliente.comando("Page.captureScreenshot", parametros);
+      const base64 = (imagem.result?.data as string | undefined) ?? "";
+      const bytes = Buffer.from(base64, "base64");
+      if (bytes.length > 0 && bytes.length <= LIMITE_IMAGEM) {
+        return { bytes, celulas: Array.isArray(dados.celulas) ? dados.celulas : [] };
+      }
+    }
+    throw new Error("print_invalido");
   } finally {
     await fecharNavegador(navegador);
   }
@@ -315,19 +331,29 @@ export async function testarAderencia(valor: unknown) {
   return previa(planilha, await capturar(planilha));
 }
 
-export async function executarAderencias(valor: unknown) {
-  const configuracao = configuracaoAderenciasValida(valor);
+export async function enviarAderencia(configuracaoValor: unknown, planilhaValor: unknown) {
+  const configuracao = configuracaoAderenciasValida(configuracaoValor);
   if (!configuracao.destinoJid) throw new Error("destino_do_whatsapp_obrigatorio");
-  if (!configuracao.planilhas.length) throw new Error("nenhuma_planilha_configurada");
+  const planilha = validarPlanilha(planilhaValor);
+  const captura = await capturar(planilha);
+  const resultado = previa(planilha, captura);
+  await enviarImagemNoWhatsapp(configuracao.destinoJid, captura.bytes, `aderencia-${planilha.id}.png`, resultado.texto);
+  return {
+    previa: resultado,
+    resultado: { executadoEm: new Date().toISOString(), planilhasEnviadas: 1, alertas: resultado.alertas, urgentes: resultado.urgentes, erros: [] },
+  };
+}
+
+async function executarLista(destinoJid: string, itens: PlanilhaAderencia[]) {
   const previas: ReturnType<typeof previa>[] = [];
   const erros: string[] = [];
   let alertas = 0; let urgentes = 0; let enviadas = 0;
-  for (const item of configuracao.planilhas.slice(0, MAXIMO_PLANILHAS)) {
+  for (const item of itens.slice(0, MAXIMO_PLANILHAS)) {
     try {
       const planilha = validarPlanilha(item);
       const captura = await capturar(planilha);
       const resultado = previa(planilha, captura);
-      await enviarImagemNoWhatsapp(configuracao.destinoJid, captura.bytes, `aderencia-${planilha.id}.png`, resultado.texto);
+      await enviarImagemNoWhatsapp(destinoJid, captura.bytes, `aderencia-${planilha.id}.png`, resultado.texto);
       previas.push(resultado); alertas += resultado.alertas; urgentes += resultado.urgentes; enviadas++;
     } catch (erro) {
       erros.push(`${item.nome || "Planilha"}: ${(erro as Error).message}`);
@@ -336,13 +362,43 @@ export async function executarAderencias(valor: unknown) {
   return { resultado: { executadoEm: new Date().toISOString(), planilhasEnviadas: enviadas, alertas, urgentes, erros }, previas };
 }
 
-function configuracaoSalva(): ConfiguracaoAderencias {
+export async function executarAderencias(valor: unknown, grupoId?: string) {
+  const configuracao = configuracaoAderenciasValida(valor);
+  if (!configuracao.destinoJid) throw new Error("destino_do_whatsapp_obrigatorio");
+  const grupos = configuracao.grupos.length
+    ? (grupoId ? configuracao.grupos.filter((grupo) => grupo.id === grupoId) : configuracao.grupos)
+    : [{ planilhas: configuracao.planilhas }];
+  const listas = grupos.map((grupo) => grupo.planilhas).filter((planilhas) => planilhas.length > 0);
+  if (!listas.length) throw new Error("nenhuma_planilha_configurada");
+  const resultados = [];
+  for (const lista of listas) {
+    resultados.push(await executarLista(configuracao.destinoJid, lista));
+  }
+  return {
+    resultado: {
+      executadoEm: new Date().toISOString(),
+      planilhasEnviadas: resultados.reduce((total, item) => total + item.resultado.planilhasEnviadas, 0),
+      alertas: resultados.reduce((total, item) => total + item.resultado.alertas, 0),
+      urgentes: resultados.reduce((total, item) => total + item.resultado.urgentes, 0),
+      erros: resultados.flatMap((item) => item.resultado.erros),
+    },
+    previas: resultados.flatMap((item) => item.previas),
+  };
+}
+
+export function configuracaoSalva(): ConfiguracaoAderencias {
   try {
     const bruto = JSON.parse(lerTudo()["niko:aderencias"] ?? "null") as { state?: unknown } | null;
     return configuracaoAderenciasValida(bruto?.state ?? bruto);
   } catch {
     return configuracaoAderenciasValida(null);
   }
+}
+
+export function salvarConfiguracaoAderencias(valor: unknown): ConfiguracaoAderencias {
+  const configuracao = configuracaoAderenciasValida(valor);
+  gravar({ "niko:aderencias": JSON.stringify({ state: configuracao, version: 1 }) });
+  return configuracao;
 }
 
 function atualizarConfiguracaoSalva(parcial: Partial<ConfiguracaoAderencias>) {
@@ -367,16 +423,25 @@ function dataHoraBrasilia() {
 async function verificarAgendamento() {
   if (execucaoAgendada) return;
   const config = configuracaoSalva();
-  if (!config.ativo || config.frequencia === "manual" || !config.destinoJid || !config.planilhas.length) return;
-  if (estadoDoWhatsapp().vinculo !== "conectado") { iniciarWhatsapp(); return; }
   const agora = dataHoraBrasilia();
-  if (config.hora !== agora.hora || (config.frequencia === "semanal" && !config.diasSemana.includes(agora.dia))) return;
-  const slot = `${agora.data}T${agora.hora}:${config.frequencia}`;
-  if (config.ultimoAgendamento === slot || slotsExecutados.has(slot)) return;
-  slotsExecutados.add(slot); execucaoAgendada = true;
+  const grupos = config.grupos.length ? config.grupos : (config.planilhas.length ? [{ id: "grupo-1", ativo: config.ativo, frequencia: config.frequencia, hora: config.hora, diasSemana: config.diasSemana, planilhas: config.planilhas, ultimoAgendamento: config.ultimoAgendamento }] : []);
+  const devidos = grupos.filter((grupo) => grupo.ativo && grupo.frequencia !== "manual" && grupo.planilhas.length > 0 && grupo.hora === agora.hora && (grupo.frequencia !== "semanal" || grupo.diasSemana.includes(agora.dia)));
+  if (!config.destinoJid || !devidos.length) return;
+  if (estadoDoWhatsapp().vinculo !== "conectado") { iniciarWhatsapp(); return; }
+  const devidosNovos = devidos.filter((grupo) => {
+    const slot = `${agora.data}T${agora.hora}:${grupo.id}:${grupo.frequencia}`;
+    return grupo.ultimoAgendamento !== slot && !slotsExecutados.has(slot);
+  });
+  if (!devidosNovos.length) return;
+  for (const grupo of devidosNovos) slotsExecutados.add(`${agora.data}T${agora.hora}:${grupo.id}:${grupo.frequencia}`);
+  execucaoAgendada = true;
   try {
-    const resposta = await executarAderencias(config);
-    atualizarConfiguracaoSalva({ ultimoAgendamento: slot, ultimoResultado: resposta.resultado });
+    for (const grupo of devidosNovos) {
+      const slot = `${agora.data}T${agora.hora}:${grupo.id}:${grupo.frequencia}`;
+      const resposta = await executarAderencias(config, grupo.id);
+      const gruposAtualizados = config.grupos.map((item) => item.id === grupo.id ? { ...item, ultimoAgendamento: slot, ultimoResultado: resposta.resultado } : item);
+      atualizarConfiguracaoSalva({ grupos: gruposAtualizados });
+    }
   } finally {
     execucaoAgendada = false;
     for (const antigo of [...slotsExecutados].filter((s) => !s.startsWith(agora.data))) slotsExecutados.delete(antigo);

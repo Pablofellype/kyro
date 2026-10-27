@@ -21,6 +21,21 @@ test("configuração do robô normaliza planilhas e preserva o agendamento", () 
   assert.equal(resultado.planilhas[0].redThreshold, 3);
 });
 
+test("rotinas independentes preservam horários e planilhas diferentes", () => {
+  const resultado = configuracaoAderenciasValida({
+    destinoJid: "5511999999999@s.whatsapp.net",
+    grupos: [
+      { id: "manha", nome: "Manhã", ativo: true, frequencia: "diaria", hora: "08:00", planilhas: [{ id: "p1", nome: "P1", sheetUrl: "https://docs.google.com/spreadsheets/d/a/edit" }] },
+      { id: "tarde", nome: "Tarde", ativo: true, frequencia: "diaria", hora: "14:00", planilhas: [{ id: "p2", nome: "P2", sheetUrl: "https://docs.google.com/spreadsheets/d/b/edit" }] },
+    ],
+  });
+  assert.equal(resultado.grupos.length, 2);
+  assert.equal(resultado.grupos[0].hora, "08:00");
+  assert.equal(resultado.grupos[1].hora, "14:00");
+  assert.equal(resultado.grupos[0].planilhas[0].id, "p1");
+  assert.equal(resultado.grupos[1].planilhas[0].id, "p2");
+});
+
 test("robô separa alertas amarelos e vermelhos pelos limiares", () => {
   const resultado = construirMensagem(planilha({ redThreshold: 3, yellowThreshold: 1 }), [
     { texto: "1", area: "Sala A", predio: "P1", cor: "amarelo" },

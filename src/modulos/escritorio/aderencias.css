@@ -64,6 +64,50 @@
   flex-wrap: wrap;
 }
 
+.aderencias-rotinas-tabs {
+  display: flex;
+  gap: 7px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.aderencias-rotinas-tabs button {
+  display: flex;
+  min-width: 142px;
+  flex-direction: column;
+  gap: 3px;
+  padding: 9px 11px;
+  border: 1px solid var(--borda);
+  border-radius: 9px;
+  background: var(--superficie);
+  color: var(--texto-2);
+  text-align: left;
+}
+
+.aderencias-rotinas-tabs button[aria-selected="true"] {
+  border-color: var(--destaque);
+  background: var(--destaque-suave);
+  color: var(--texto);
+}
+
+.aderencias-rotinas-tabs strong {
+  overflow: hidden;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.aderencias-rotinas-tabs span {
+  font-size: 10px;
+}
+
+.aderencias-rotina-config {
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+  padding-top: 3px;
+}
+
 .aderencias-dias {
   display: flex;
   gap: 5px;
@@ -290,5 +334,9 @@
 
   .aderencias-grade-2 {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .aderencias-rotinas-tabs button {
+    min-width: 126px;
   }
 }
