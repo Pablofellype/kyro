@@ -173,7 +173,7 @@ async function atenderWhatsappRemoto(req: IncomingMessage, res: ServerResponse, 
   const leitura = acao === "estado" || acao === "novidades";
   if (req.method !== (leitura ? "GET" : "POST")) return responder(res, 405, { erro: "metodo_nao_permitido" });
   if (acao === "estado") {
-    iniciarWhatsapp();
+    await iniciarWhatsapp();
     return responder(res, 200, estadoDoWhatsapp());
   }
   if (acao === "novidades") return responder(res, 200, novidadesDoWhatsapp(desde));

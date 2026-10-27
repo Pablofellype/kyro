@@ -97,6 +97,7 @@ const caixa = new CaixaWhatsapp();
 const envios = new LimiteDeEnvios();
 let relogio: ReturnType<typeof setInterval> | null = null;
 let ocupado = false;
+let primeiraPassada: Promise<void> | null = null;
 
 async function chamar(metodo: string, caminho: string, opcoes: { query?: Record<string, string>; json?: unknown; tempoMs?: number; binario?: boolean } = {}): Promise<{ status: number; corpo: unknown; bytes?: Buffer }> {
   const url = urlDoGateway(caminho);
@@ -276,10 +277,12 @@ async function passo() {
 }
 
 function iniciarRelogio() {
-  if (relogio) return;
+  if (relogio) return primeiraPassada ?? Promise.resolve();
   relogio = setInterval(() => void passo(), TICK_MS);
   relogio.unref?.();
-  void passo();
+  primeiraPassada = passo().finally(() => { primeiraPassada = null; });
+  void primeiraPassada;
+  return primeiraPassada;
 }
 
 function pararTudo(esquecer: boolean) {
@@ -300,7 +303,8 @@ function pararTudo(esquecer: boolean) {
 }
 
 export function iniciarWhatsapp() {
-  if (estado.config.ligado) iniciarRelogio();
+  if (estado.config.ligado) return iniciarRelogio();
+  return Promise.resolve();
 }
 
 export function encerrarWhatsapp() {
