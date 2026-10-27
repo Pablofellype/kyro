@@ -3,14 +3,12 @@ import { AlertTriangle, CheckCircle2, Clock3, Eye, FileImage, FileSpreadsheet, I
 import { AvisoFaixa, Botao, Cartao, Campo, LinhaAlternador, Modal } from "../../componentes/basicos";
 import { CabecalhoAba } from "../../componentes/CabecalhoAba";
 import { useWhatsapp } from "../../estado/whatsapp";
-import { aderenciasPonte, type PreviaAderencia } from "../../ponte/aderencias";
+import { aderenciasPonte, aderenciasRemotas, type PreviaAderencia } from "../../ponte/aderencias";
 import { novaPlanilhaAderencia, useAderencias } from "../../estado/aderencias";
 import type { GrupoAderencia, PlanilhaAderencia } from "./aderenciasTipos";
 import "./aderencias.css";
 
 const DIAS = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
-const NATIVO = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
-const EXECUCAO_REMOTA = !NATIVO && import.meta.env.VITE_ADERENCIAS_REMOTA !== "0";
 
 function nomeDoDestino(nome: string, grupo: boolean) {
   return `${grupo ? "Grupo" : "Contato"} · ${nome || "sem nome"}`;
@@ -59,6 +57,7 @@ function FormularioPlanilha({ aberto, planilha, aoFechar, aoSalvar }: { aberto: 
 }
 
 export function Aderencias() {
+  const EXECUCAO_REMOTA = aderenciasRemotas();
   const config = useAderencias((s) => s);
   const whatsapp = useWhatsapp((s) => s.estado);
   const carregarWhatsapp = useWhatsapp((s) => s.carregar);

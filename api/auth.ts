@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { alterarAtivoUsuario, criarConviteUsuario, loginUsuario, listarUsuarios, redefinirSenhaComToken, solicitarRedefinicaoSenha, urlPublicaDoAmbiente, validarSessao, logoutSessao } from "../src/servicos/autenticacao.js";
+import { alterarAtivoUsuario, alterarPermissaoAderencias, criarConviteUsuario, loginUsuario, listarUsuarios, redefinirSenhaComToken, solicitarRedefinicaoSenha, urlPublicaDoAmbiente, validarSessao, logoutSessao } from "../src/servicos/autenticacao.js";
 import { configurarCors } from "./cors.js";
 
 function origemDaRequisicao(req: VercelRequest): string {
@@ -101,6 +101,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const id = Number(req.body?.id);
     const ativo = req.body?.ativo === true;
     try {
+      if (typeof req.body?.roboAderencias === "boolean") {
+        return res.status(200).json({ sucesso: true, usuario: await alterarPermissaoAderencias(usuarioAtual, id, req.body.roboAderencias === true) });
+      }
       return res.status(200).json({ sucesso: true, usuario: await alterarAtivoUsuario(usuarioAtual, id, ativo) });
     } catch (erro) {
       return res.status(400).json({ sucesso: false, erro: (erro as Error).message });

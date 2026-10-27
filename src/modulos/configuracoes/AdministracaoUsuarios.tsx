@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Check, LoaderCircle, MailPlus, RefreshCw, ShieldCheck, UserCheck, UserCog, UserX } from "lucide-react";
+import { Check, FileSpreadsheet, LoaderCircle, MailPlus, RefreshCw, ShieldCheck, UserCheck, UserCog, UserX } from "lucide-react";
 import { Botao, Campo, AvisoFaixa } from "../../componentes/basicos";
 import { cabecalhosNiko, useAuth, urlApi } from "../../estado/autenticacao";
 
@@ -9,6 +9,7 @@ interface UsuarioAdministrado {
   nome: string;
   ativo: boolean;
   perfil: "dono" | "usuario";
+  robo_aderencias: boolean;
 }
 
 async function respostaJson(res: Response): Promise<Record<string, unknown>> {
@@ -85,6 +86,23 @@ export function AdministracaoUsuarios() {
     }
   };
 
+  const alterarAcessoAderencias = async (alvo: UsuarioAdministrado) => {
+    setErro("");
+    setMensagem("");
+    try {
+      const dados = await respostaJson(await fetch(urlApi("/api/auth?acao=usuario"), {
+        method: "POST",
+        headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify({ id: alvo.id, roboAderencias: !alvo.robo_aderencias }),
+      }));
+      const atualizado = dados.usuario as UsuarioAdministrado;
+      setUsuarios((atuais) => atuais.map((item) => item.id === atualizado.id ? atualizado : item));
+      setMensagem(atualizado.robo_aderencias ? `${atualizado.nome} recebeu acesso ao Robô de Aderências.` : `O acesso de ${atualizado.nome} ao Robô de Aderências foi removido.`);
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : "Não foi possível alterar a permissão do robô.");
+    }
+  };
+
   return (
     <div className="admin-usuarios">
       <div className="admin-usuarios-cabecalho">
@@ -138,11 +156,16 @@ export function AdministracaoUsuarios() {
             </div>
             <span className={`admin-usuarios-status ${item.ativo ? "ativo" : "inativo"}`}><i /> {item.ativo ? "Ativo" : "Desativado"}</span>
             {item.perfil === "dono" ? (
-              <span className="admin-usuarios-proprietario"><ShieldCheck size={13} /> Proprietário</span>
+              <><span className="admin-usuarios-proprietario"><ShieldCheck size={13} /> Proprietário</span><span className="admin-usuarios-proprietario"><FileSpreadsheet size={13} /> Robô liberado</span></>
             ) : (
-              <Botao pequeno variante={item.ativo ? "secundario" : "primario"} icone={item.ativo ? <UserX size={13} /> : <UserCheck size={13} />} onClick={() => void alterarAtivo(item)}>
-                {item.ativo ? "Desativar" : "Reativar"}
-              </Botao>
+              <>
+                <Botao pequeno variante={item.robo_aderencias ? "primario" : "secundario"} icone={<FileSpreadsheet size={13} />} onClick={() => void alterarAcessoAderencias(item)}>
+                  {item.robo_aderencias ? "Robô liberado" : "Liberar robô"}
+                </Botao>
+                <Botao pequeno variante={item.ativo ? "secundario" : "primario"} icone={item.ativo ? <UserX size={13} /> : <UserCheck size={13} />} onClick={() => void alterarAtivo(item)}>
+                  {item.ativo ? "Desativar" : "Reativar"}
+                </Botao>
+              </>
             )}
           </div>
         ))}

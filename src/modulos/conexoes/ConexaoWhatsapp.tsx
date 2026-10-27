@@ -4,7 +4,7 @@ import { AvisoFaixa, Botao, ConfirmarModal, LinhaAlternador, Modal } from "../..
 import { Marca, corDaMarca } from "../../marcas/Marca";
 import { T } from "../../textos/textos";
 import { useWhatsapp } from "../../estado/whatsapp";
-import { numeroDoJid, whatsappPonte, whatsappRemoto, type EstadoWhatsapp } from "../../ponte/whatsapp";
+import { numeroDoJid, whatsappPonte, whatsappRemotoAtivo, type EstadoWhatsapp } from "../../ponte/whatsapp";
 import { tocarSom } from "../../ponte/sons";
 
 const W = T.whatsapp;
@@ -25,11 +25,12 @@ function textoDaEtapa(e: EstadoWhatsapp["instalacao"]): string {
 export function CartaoWhatsapp({ aoConfigurar }: { aoConfigurar: () => void }) {
   const estado = useWhatsapp((s) => s.estado);
   const carregar = useWhatsapp((s) => s.carregar);
+  const remoto = whatsappRemotoAtivo();
   useEffect(() => {
     void carregar();
-    const relogio = window.setInterval(() => void carregar(), whatsappRemoto ? 5000 : 15000);
+    const relogio = window.setInterval(() => void carregar(), remoto ? 5000 : 15000);
     return () => window.clearInterval(relogio);
-  }, [carregar]);
+  }, [carregar, remoto]);
   const ativa = Boolean(estado?.ligado && estado.vinculo === "conectado");
   const vinculo = estado ? (estado.ligado ? estado.vinculo : "desligado") : "desligado";
   return (
@@ -57,6 +58,7 @@ export function ConfigWhatsapp({ aberto, aoFechar }: { aberto: boolean; aoFechar
   const [erro, setErro] = useState("");
   const [ocupado, setOcupado] = useState(false);
   const [confirmandoEsquecer, setConfirmandoEsquecer] = useState(false);
+  const remoto = whatsappRemotoAtivo();
 
   useEffect(() => {
     if (!aberto) return;
@@ -96,7 +98,7 @@ export function ConfigWhatsapp({ aberto, aoFechar }: { aberto: boolean; aoFechar
             <ol className="guia-conexao-passos">
               {W.passos.map((p) => <li key={p}>{p}</li>)}
             </ol>
-            {whatsappRemoto ? <AvisoFaixa><span>O WhatsApp está sendo executado no VPS. Você pode ligar ou desligar a integração aqui; a reinstalação do gateway é feita somente no VPS.</span></AvisoFaixa> : <>
+            {remoto ? <AvisoFaixa><span>O WhatsApp está sendo executado no VPS. Você pode ligar ou desligar a integração aqui; a reinstalação do gateway é feita somente no VPS.</span></AvisoFaixa> : <>
               <div className="linha">
                 <Botao variante={estado?.instalado ? "secundario" : "primario"} icone={instalando ? <LoaderCircle size={14} className="girando" /> : <Download size={14} />} disabled={!estado || instalando || ocupado} onClick={() => void agir(() => whatsappPonte.instalar())}>
                   {estado?.instalado ? W.reinstalar : W.instalar}
@@ -105,7 +107,7 @@ export function ConfigWhatsapp({ aberto, aoFechar }: { aberto: boolean; aoFechar
               </div>
               <LinhaAlternador rotulo={W.ligar} ligado={Boolean(estado?.ligado)} desativado={!estado?.instalado || ocupado} aoMudar={(v) => void agir(() => whatsappPonte.ligar(v))} />
             </>}
-            {whatsappRemoto && <LinhaAlternador rotulo={W.ligar} ligado={Boolean(estado?.ligado)} desativado={!estado?.instalado || ocupado} aoMudar={(v) => void agir(() => whatsappPonte.ligar(v))} />}
+            {remoto && <LinhaAlternador rotulo={W.ligar} ligado={Boolean(estado?.ligado)} desativado={!estado?.instalado || ocupado} aoMudar={(v) => void agir(() => whatsappPonte.ligar(v))} />}
             {estado?.ligado && (
               <div className="whatsapp-vinculo">
                 {estado.vinculo === "precisa_qr" && estado.qr ? (
@@ -145,7 +147,7 @@ export function ConfigWhatsapp({ aberto, aoFechar }: { aberto: boolean; aoFechar
             {erro && <AvisoFaixa tipo="erro"><span role="alert">{erro}</span></AvisoFaixa>}
             <div className="formulario-acoes">
               {estado?.vinculo === "conectado" && <Botao disabled={ocupado} onClick={() => void agir(() => whatsappPonte.desconectar())}>{W.desconectar}</Botao>}
-              {!whatsappRemoto && estado?.instalado && <Botao variante="perigo" disabled={ocupado} onClick={() => setConfirmandoEsquecer(true)}>{W.esquecer}</Botao>}
+              {!remoto && estado?.instalado && <Botao variante="perigo" disabled={ocupado} onClick={() => setConfirmandoEsquecer(true)}>{W.esquecer}</Botao>}
               <Botao onClick={aoFechar}>{T.geral.fechar}</Botao>
             </div>
           </>

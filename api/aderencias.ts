@@ -43,7 +43,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const token = tokenDaRequisicao(req);
   const usuario = token ? await validarSessao(token) : null;
   if (!usuario) return res.status(401).json({ erro: "nao_autenticado" });
-  if (usuario.perfil !== "dono") return res.status(403).json({ erro: "permissao_negada" });
+  if (usuario.perfil !== "dono" && !usuario.roboAderencias) return res.status(403).json({ erro: "permissao_negada" });
 
   const gateway = urlDoGateway();
   const segredo = process.env.KYRO_GATEWAY_SECRET?.trim();
@@ -54,6 +54,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       method: req.method,
       headers: {
         "x-kyro-gateway-secret": segredo,
+        "x-kyro-user-id": String(usuario.id),
         ...(req.method === "POST" ? { "content-type": "application/json" } : {}),
       },
       body: req.method === "POST" ? JSON.stringify(req.body && typeof req.body === "object" ? req.body : {}) : undefined,

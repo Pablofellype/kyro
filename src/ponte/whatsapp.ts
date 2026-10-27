@@ -1,4 +1,4 @@
-import { cabecalhosNiko, urlApi } from "../estado/autenticacao";
+import { cabecalhosNiko, urlApi, useAuth } from "../estado/autenticacao";
 
 export type MidiaWhatsapp = "nenhuma" | "imagem" | "video" | "audio" | "documento" | "figurinha" | "localizacao" | "contato" | "outra";
 
@@ -58,16 +58,22 @@ export interface NovidadeWhatsapp {
 const NATIVO = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 // No navegador, o WhatsApp sempre pertence ao VPS. O gateway local só existe no app nativo.
 // VITE_ADERENCIAS_REMOTA=0 continua disponível para testes locais deliberadamente isolados.
+export function whatsappRemotoAtivo(): boolean {
+  const usuario = useAuth.getState().usuario;
+  return import.meta.env.VITE_ADERENCIAS_REMOTA !== "0" && (!NATIVO || usuario?.perfil === "dono" || usuario?.roboAderencias === true);
+}
+
 export const whatsappRemoto = !NATIVO && import.meta.env.VITE_ADERENCIAS_REMOTA !== "0";
 
 function cabecalhosDaPonte(): Record<string, string> {
-  if (!whatsappRemoto) return { "x-niko": "1", "content-type": "application/json" };
+  if (!whatsappRemotoAtivo()) return { "x-niko": "1", "content-type": "application/json" };
   const token = typeof localStorage !== "undefined" ? localStorage.getItem("kyro_token") : null;
-  return { ...cabecalhosNiko(), "content-type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) };
+  const usuario = useAuth.getState().usuario;
+  return { ...cabecalhosNiko(), "content-type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(usuario ? { "x-kyro-user-id": String(usuario.id) } : {}) };
 }
 
 function urlDaPonte(caminho: string): string {
-  if (!whatsappRemoto) return `/ponte/whatsapp/${caminho}`;
+  if (!whatsappRemotoAtivo()) return `/ponte/whatsapp/${caminho}`;
   const [acao, consulta] = caminho.split("?", 2);
   if (import.meta.env.DEV) return `/ponte/whatsapp-remota/${acao}${consulta ? `?${consulta}` : ""}`;
   const separador = consulta ? `&${consulta}` : "";
@@ -86,14 +92,14 @@ async function pedir<T>(caminho: string, corpo?: unknown): Promise<T> {
 }
 
 async function urlDaMidia(jid: string, id: string): Promise<string> {
-  if (whatsappRemoto) throw new Error("whatsapp_remoto_somente_leitura");
+  if (whatsappRemotoAtivo()) throw new Error("whatsapp_remoto_somente_leitura");
   const r = await fetch(`/ponte/whatsapp/midia?${new URLSearchParams({ jid, id })}`, { headers: cabecalhosDaPonte() });
   if (!r.ok) throw new Error(`http_${r.status}`);
   return URL.createObjectURL(await r.blob());
 }
 
 async function enviarArquivo(jid: string, arquivo: File, legenda: string): Promise<ConversaWhatsapp | null> {
-  if (whatsappRemoto) throw new Error("whatsapp_remoto_somente_leitura");
+  if (whatsappRemotoAtivo()) throw new Error("whatsapp_remoto_somente_leitura");
   const r = await fetch(`/ponte/whatsapp/enviar-arquivo?${new URLSearchParams({ jid, nome: arquivo.name, legenda })}`, {
     method: "POST",
     headers: { ...cabecalhosDaPonte(), "content-type": "application/octet-stream" },

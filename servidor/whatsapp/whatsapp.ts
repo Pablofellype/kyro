@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
+import { AsyncLocalStorage } from "node:async_hooks";
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
-import { extname, join, resolve, sep } from "node:path";
+import { dirname, extname, join, resolve, sep } from "node:path";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { pastaDados } from "../ia.ts";
 import { lerSegredo, gravarSegredo, apagarSegredo } from "../segredos.ts";
@@ -12,7 +13,6 @@ import {
 import { aguardarGowaParar, alvoDaPlataforma, gowaInstalado, gowaRodando, iniciarGowa, instalacao, instalarGowa, pararGowa, pastaDoWhatsapp, portaLivre } from "./gowa.ts";
 
 export const CAMINHO_DO_WEBHOOK = "/ponte/whatsapp/webhook";
-const DISPOSITIVO = "niko";
 const TICK_MS = 5000;
 const SILENCIO_DO_WEBHOOK_MS = 90_000;
 const STATUS_CONECTADO_MS = 60_000;
@@ -20,6 +20,49 @@ const VARREDURA_COM_WEBHOOK_MS = 60_000;
 const VARREDURA_SEM_WEBHOOK_MS = 20_000;
 const MAXIMO_DE_NOVIDADES = 50;
 const GOWA_EXTERNO = (process.env.NIKO_GOWA_URL ?? "").trim().replace(/\/+$/, "");
+
+type EstadoWhatsappInterno = {
+  config: ConfigWhatsapp;
+  porta: number;
+  dispositivo: string;
+  acesso: string;
+  segredo: string;
+  vinculo: SituacaoDoVinculo | "desligado" | "sem_gateway" | "iniciando";
+  eu: string | null;
+  qr: { png: string; expira: number } | null;
+  erro: string;
+  falhasSeguidas: number;
+  historicoCarregado: boolean;
+  ultimoWebhook: number;
+  ultimaVarredura: number;
+  ultimoStatus: number;
+  conversaAberta: string | null;
+  nomesPedidos: Set<string>;
+  novidades: { seq: number; jid: string; nome: string; grupo: boolean }[];
+  seq: number;
+};
+
+const contextoWhatsapp = new AsyncLocalStorage<string>();
+const idDaSessaoAtual = () => contextoWhatsapp.getStore() ?? (usaGowaExterno() ? "1" : "local");
+const idSeguro = (valor: string) => valor.replace(/[^a-zA-Z0-9_-]/g, "-").slice(0, 80) || "local";
+const dispositivoDaSessao = (id: string) => id === "local" || id === "1" ? "niko" : `niko-user-${idSeguro(id)}`;
+const pastaDosUsuarios = () => join(pastaDados(), "usuarios");
+
+export function comWhatsappUsuario<T>(usuarioId: number | string | undefined, trabalho: () => T): T {
+  return contextoWhatsapp.run(usuarioId === undefined || usuarioId === null ? (usaGowaExterno() ? "1" : "local") : String(usuarioId), trabalho);
+}
+
+export function usuarioDaSessaoWhatsapp(dispositivo: unknown): string | null {
+  if (typeof dispositivo !== "string") return null;
+  if (dispositivo === "niko") return usaGowaExterno() ? "1" : "local";
+  const encontrado = /^niko-user-([a-zA-Z0-9_-]+)$/.exec(dispositivo);
+  if (encontrado?.[1]) return encontrado[1];
+  const jid = jidNormalizado(dispositivo);
+  for (const [id, atual] of estados) {
+    if (atual.eu && jidNormalizado(atual.eu) === jid) return id;
+  }
+  return null;
+}
 
 function usaGowaExterno() {
   return Boolean(GOWA_EXTERNO);
@@ -38,7 +81,10 @@ interface ConfigWhatsapp extends FiltrosWhatsapp {
 }
 
 const PADRAO: ConfigWhatsapp = { ligado: false, silenciarGrupos: true, ignoradas: [], lerAoAbrir: true, esconderArquivadas: true, esconderGrupos: false, mostrarFotos: true };
-const arquivoDeConfig = () => join(pastaDados(), "whatsapp.json");
+const arquivoDeConfig = () => {
+  const id = idDaSessaoAtual();
+  return GOWA_EXTERNO && id !== "local" && id !== "1" ? join(pastaDosUsuarios(), idSeguro(id), "whatsapp.json") : join(pastaDados(), "whatsapp.json");
+};
 
 function lerConfig(): ConfigWhatsapp {
   try {
@@ -59,7 +105,7 @@ function lerConfig(): ConfigWhatsapp {
 }
 
 function salvarConfig(c: ConfigWhatsapp) {
-  mkdirSync(pastaDados(), { recursive: true });
+  mkdirSync(dirname(arquivoDeConfig()), { recursive: true });
   const temporario = `${arquivoDeConfig()}.${process.pid}.tmp`;
   writeFileSync(temporario, JSON.stringify(c, null, 2), "utf8");
   renameSync(temporario, arquivoDeConfig());
@@ -73,31 +119,71 @@ async function segredoGuardado(id: string, criar: () => string): Promise<string>
   return novo;
 }
 
-const estado = {
-  config: lerConfig(),
-  porta: 0,
-  dispositivo: DISPOSITIVO,
-  acesso: "",
-  segredo: "",
-  vinculo: "desligado" as SituacaoDoVinculo | "desligado" | "sem_gateway" | "iniciando",
-  eu: null as string | null,
-  qr: null as { png: string; expira: number } | null,
-  erro: "",
-  falhasSeguidas: 0,
-  historicoCarregado: false,
-  ultimoWebhook: 0,
-  ultimaVarredura: 0,
-  ultimoStatus: 0,
-  conversaAberta: null as string | null,
-  nomesPedidos: new Set<string>(),
-  novidades: [] as { seq: number; jid: string; nome: string; grupo: boolean }[],
-  seq: 0,
-};
-const caixa = new CaixaWhatsapp();
-const envios = new LimiteDeEnvios();
-let relogio: ReturnType<typeof setInterval> | null = null;
-let ocupado = false;
-let primeiraPassada: Promise<void> | null = null;
+const estados = new Map<string, EstadoWhatsappInterno>();
+const caixas = new Map<string, CaixaWhatsapp>();
+const limites = new Map<string, LimiteDeEnvios>();
+const relogios = new Map<string, ReturnType<typeof setInterval>>();
+const ocupados = new Set<string>();
+const primeirasPassadas = new Map<string, Promise<void>>();
+
+function novoEstado(id: string): EstadoWhatsappInterno {
+  return {
+    config: lerConfig(), porta: 0, dispositivo: dispositivoDaSessao(id), acesso: "", segredo: "", vinculo: "desligado",
+    eu: null, qr: null, erro: "", falhasSeguidas: 0, historicoCarregado: false, ultimoWebhook: 0, ultimaVarredura: 0,
+    ultimoStatus: 0, conversaAberta: null, nomesPedidos: new Set(), novidades: [], seq: 0,
+  };
+}
+
+function estadoDaSessao() {
+  const id = idDaSessaoAtual();
+  let atual = estados.get(id);
+  if (!atual) { atual = novoEstado(id); estados.set(id, atual); }
+  return atual;
+}
+
+function caixaDaSessao() {
+  const id = idDaSessaoAtual();
+  let atual = caixas.get(id);
+  if (!atual) { atual = new CaixaWhatsapp(); caixas.set(id, atual); }
+  return atual;
+}
+
+function limiteDaSessao() {
+  const id = idDaSessaoAtual();
+  let atual = limites.get(id);
+  if (!atual) { atual = new LimiteDeEnvios(); limites.set(id, atual); }
+  return atual;
+}
+
+const estado = new Proxy({} as EstadoWhatsappInterno, {
+  get: (_alvo, propriedade) => Reflect.get(estadoDaSessao(), propriedade),
+  set: (_alvo, propriedade, valor) => Reflect.set(estadoDaSessao(), propriedade, valor),
+});
+const caixa = new Proxy({} as CaixaWhatsapp, {
+  get: (_alvo, propriedade) => {
+    const atual = caixaDaSessao();
+    const valor = Reflect.get(atual, propriedade);
+    return typeof valor === "function" ? valor.bind(atual) : valor;
+  },
+});
+const envios = new Proxy({} as LimiteDeEnvios, {
+  get: (_alvo, propriedade) => {
+    const atual = limiteDaSessao();
+    const valor = Reflect.get(atual, propriedade);
+    return typeof valor === "function" ? valor.bind(atual) : valor;
+  },
+});
+
+function relogioDaSessao() { return relogios.get(idDaSessaoAtual()) ?? null; }
+function definirRelogio(valor: ReturnType<typeof setInterval> | null) {
+  const id = idDaSessaoAtual();
+  if (valor) relogios.set(id, valor); else relogios.delete(id);
+}
+function ocupadoDaSessao() { return ocupados.has(idDaSessaoAtual()); }
+function definirOcupado(valor: boolean) {
+  const id = idDaSessaoAtual();
+  if (valor) ocupados.add(id); else ocupados.delete(id);
+}
 
 async function chamar(metodo: string, caminho: string, opcoes: { query?: Record<string, string>; json?: unknown; tempoMs?: number; binario?: boolean } = {}): Promise<{ status: number; corpo: unknown; bytes?: Buffer }> {
   const url = urlDoGateway(caminho);
@@ -222,13 +308,13 @@ async function prepararGateway() {
   estado.acesso ||= await segredoGuardado("whatsapp-acesso", () => `niko:${randomBytes(18).toString("hex")}`);
   estado.segredo ||= await segredoGuardado("whatsapp-webhook", () => randomBytes(32).toString("hex"));
   if (!estado.porta || (!gowaRodando() && estado.falhasSeguidas > 2)) estado.porta = await portaLivre();
-  if (!estado.config.ligado || !relogio) throw new Error("gateway_parado");
+  if (!estado.config.ligado || !relogioDaSessao()) throw new Error("gateway_parado");
   iniciarGowa({ porta: estado.porta, acesso: estado.acesso, urlDoWebhook: `http://127.0.0.1:${portaDaPonte()}${CAMINHO_DO_WEBHOOK}`, segredoDoWebhook: estado.segredo });
 }
 
 async function passo() {
-  if (ocupado || !estado.config.ligado) return;
-  ocupado = true;
+  if (ocupadoDaSessao() || !estado.config.ligado) return;
+  definirOcupado(true);
   try {
     if (!usaGowaExterno() && !gowaInstalado()) {
       estado.vinculo = "sem_gateway";
@@ -239,11 +325,11 @@ async function passo() {
       if (horaDeVarrer()) await varrerSemWebhook();
       return;
     }
-    let dispositivo = dispositivoDoGateway(await chamarComSucesso("GET", "/devices"));
+    let dispositivo = dispositivoDoGateway(await chamarComSucesso("GET", "/devices"), estado.dispositivo);
     estado.ultimoStatus = Date.now();
     if (!dispositivo) {
-      await chamarComSucesso("POST", "/devices", { json: { device_id: DISPOSITIVO } });
-      dispositivo = { id: DISPOSITIVO, vinculo: "precisa_qr", eu: null };
+      await chamarComSucesso("POST", "/devices", { json: { device_id: estado.dispositivo } });
+      dispositivo = { id: estado.dispositivo, vinculo: "precisa_qr", eu: null };
     }
     estado.dispositivo = dispositivo.id;
     estado.vinculo = dispositivo.vinculo;
@@ -272,22 +358,28 @@ async function passo() {
       estado.vinculo = "iniciando";
     } else if (estado.vinculo !== "conectado") estado.vinculo = "iniciando";
   } finally {
-    ocupado = false;
+    definirOcupado(false);
   }
 }
 
 function iniciarRelogio() {
-  if (relogio) return primeiraPassada ?? Promise.resolve();
-  relogio = setInterval(() => void passo(), TICK_MS);
+  const id = idDaSessaoAtual();
+  const passada = primeirasPassadas.get(id);
+  if (relogioDaSessao()) return passada ?? Promise.resolve();
+  const relogio = setInterval(() => void contextoWhatsapp.run(id, () => passo()), TICK_MS);
   relogio.unref?.();
-  primeiraPassada = passo().finally(() => { primeiraPassada = null; });
-  void primeiraPassada;
-  return primeiraPassada;
+  definirRelogio(relogio);
+  const primeira = passo().finally(() => { primeirasPassadas.delete(id); });
+  primeirasPassadas.set(id, primeira);
+  void primeira;
+  return primeira;
 }
 
 function pararTudo(esquecer: boolean) {
+  const relogio = relogioDaSessao();
   if (relogio) clearInterval(relogio);
-  relogio = null;
+  definirRelogio(null);
+  primeirasPassadas.delete(idDaSessaoAtual());
   pararGowa();
   estado.vinculo = "desligado";
   estado.qr = null;
@@ -302,6 +394,40 @@ function pararTudo(esquecer: boolean) {
   }
 }
 
+function mapaDaSessao<T>(todas: Map<string, Map<string, T>>): Map<string, T> {
+  const id = idDaSessaoAtual();
+  let mapa = todas.get(id);
+  if (!mapa) { mapa = new Map(); todas.set(id, mapa); }
+  return mapa;
+}
+
+function conjuntoDaSessao(todos: Map<string, Set<string>>): Set<string> {
+  const id = idDaSessaoAtual();
+  let conjunto = todos.get(id);
+  if (!conjunto) { conjunto = new Set(); todos.set(id, conjunto); }
+  return conjunto;
+}
+
+function proxyMapa<T>(todas: Map<string, Map<string, T>>): Map<string, T> {
+  return new Proxy(new Map<string, T>(), {
+    get: (_alvo, propriedade) => {
+      const atual = mapaDaSessao(todas);
+      const valor = Reflect.get(atual, propriedade);
+      return typeof valor === "function" ? valor.bind(atual) : valor;
+    },
+  });
+}
+
+function proxyConjunto(todos: Map<string, Set<string>>): Set<string> {
+  return new Proxy(new Set<string>(), {
+    get: (_alvo, propriedade) => {
+      const atual = conjuntoDaSessao(todos);
+      const valor = Reflect.get(atual, propriedade);
+      return typeof valor === "function" ? valor.bind(atual) : valor;
+    },
+  });
+}
+
 export function iniciarWhatsapp() {
   if (estado.config.ligado) return iniciarRelogio();
   return Promise.resolve();
@@ -314,8 +440,10 @@ export function encerrarWhatsapp() {
 const FOTO_VALIDA_MS = 6 * 3600_000;
 const FOTO_FALHOU_MS = 3600_000;
 const TAMANHO_MAXIMO_DA_FOTO = 300_000;
-const fotos = new Map<string, { imagem: string | null; quando: number }>();
-const fotosPedidas = new Set<string>();
+const fotosPorSessao = new Map<string, Map<string, { imagem: string | null; quando: number }>>();
+const fotosPedidasPorSessao = new Map<string, Set<string>>();
+const fotos = proxyMapa(fotosPorSessao);
+const fotosPedidas = proxyConjunto(fotosPedidasPorSessao);
 
 function fotoDoServidorDoWhatsapp(url: unknown): string | null {
   if (typeof url !== "string") return null;
@@ -379,8 +507,10 @@ export function tipoPelosBytes(b: Buffer, midia: string): string | null {
   return null;
 }
 type MidiaBaixada = { tipo: string; bytes: Buffer };
-const midias = new Map<string, MidiaBaixada>();
-const midiasEmAndamento = new Map<string, Promise<MidiaBaixada>>();
+const midiasPorSessao = new Map<string, Map<string, MidiaBaixada>>();
+const midiasEmAndamentoPorSessao = new Map<string, Map<string, Promise<MidiaBaixada>>>();
+const midias = proxyMapa(midiasPorSessao);
+const midiasEmAndamento = proxyMapa(midiasEmAndamentoPorSessao);
 
 function guardarMidia(chave: string, midia: MidiaBaixada) {
   midias.delete(chave);
@@ -678,21 +808,36 @@ export function receberWebhookDoWhatsapp(req: IncomingMessage, res: ServerRespon
   req.on("end", () => {
     if (recusado) return;
     const corpo = Buffer.concat(partes);
-    if (!estado.config.ligado || !webhookAutentico(corpo, req.headers["x-hub-signature-256"], estado.segredo)) {
-      res.statusCode = 401;
-      return res.end();
-    }
-    res.statusCode = 200;
-    res.end();
     let lido: unknown;
     try {
       lido = JSON.parse(corpo.toString("utf8"));
     } catch {
       return;
     }
-    const mensagem = mensagemDoWebhook(lido, estado.eu);
-    if (!mensagem) return;
-    estado.ultimoWebhook = Date.now();
-    if (estado.historicoCarregado) guardar([mensagem], true);
+    const raizWebhook = lido as Record<string, unknown> | null;
+    // O GOWA envia o JID em device_id e o identificador criado em /devices
+    // em session_id. Para contas remotas, a sessão é a chave de roteamento.
+    const sessaoWebhook = typeof raizWebhook?.session_id === "string" ? raizWebhook.session_id : raizWebhook?.device_id;
+    const usuario = usuarioDaSessaoWhatsapp(sessaoWebhook);
+    if (!usuario) {
+      res.statusCode = 401;
+      return res.end();
+    }
+    let autenticado = false;
+    comWhatsappUsuario(usuario, () => {
+      autenticado = estado.config.ligado && webhookAutentico(corpo, req.headers["x-hub-signature-256"], estado.segredo);
+    });
+    if (!autenticado) {
+      res.statusCode = 401;
+      return res.end();
+    }
+    res.statusCode = 200;
+    res.end();
+    void comWhatsappUsuario(usuario, () => {
+      const mensagem = mensagemDoWebhook(lido, estado.eu);
+      if (!mensagem) return;
+      estado.ultimoWebhook = Date.now();
+      if (estado.historicoCarregado) guardar([mensagem], true);
+    });
   });
 }

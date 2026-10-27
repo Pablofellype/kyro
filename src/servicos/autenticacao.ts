@@ -13,6 +13,7 @@ export interface UsuarioAutenticadoServidor {
   email: string;
   nome: string;
   perfil: PerfilUsuario;
+  roboAderencias: boolean;
 }
 
 export function getDb() {
@@ -143,7 +144,7 @@ async function limparTentativasLogin(sql: ReturnType<typeof getDb>, chave: strin
   }
 }
 
-async function criarSessao(sql: ReturnType<typeof getDb>, usuario: { id: number; email: string; nome: string; perfil?: string | null }) {
+async function criarSessao(sql: ReturnType<typeof getDb>, usuario: { id: number; email: string; nome: string; perfil?: string | null; robo_aderencias?: boolean | null }) {
   const token = tokenSeguro();
   const expiraEm = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
   await sql`
@@ -157,6 +158,7 @@ async function criarSessao(sql: ReturnType<typeof getDb>, usuario: { id: number;
       email: usuario.email,
       nome: usuario.nome,
       perfil: usuario.perfil === "dono" ? "dono" as const : "usuario" as const,
+      roboAderencias: usuario.perfil === "dono" || usuario.robo_aderencias === true,
     },
     token,
   };
@@ -276,7 +278,7 @@ export async function listarUsuarios(dono: UsuarioAutenticadoServidor) {
   if (dono.perfil !== "dono") throw new Error("permissao_negada");
   const sql = getDb();
   return sql`
-    SELECT id, email, nome, ativo, perfil
+    SELECT id, email, nome, ativo, perfil, robo_aderencias
     FROM usuarios
     ORDER BY CASE WHEN perfil = 'dono' THEN 0 ELSE 1 END, nome, email
   `;
@@ -290,10 +292,24 @@ export async function alterarAtivoUsuario(dono: UsuarioAutenticadoServidor, usua
     UPDATE usuarios
     SET ativo = ${ativo}
     WHERE id = ${usuarioId} AND perfil <> 'dono'
-    RETURNING id, email, nome, ativo, perfil
+    RETURNING id, email, nome, ativo, perfil, robo_aderencias
   `;
   if (resultado.length === 0) throw new Error("usuario_nao_encontrado");
   if (!ativo) await sql`DELETE FROM sessoes WHERE usuario_id = ${usuarioId}`;
+  return resultado[0];
+}
+
+export async function alterarPermissaoAderencias(dono: UsuarioAutenticadoServidor, usuarioId: number, permitido: boolean) {
+  if (dono.perfil !== "dono") throw new Error("permissao_negada");
+  if (!Number.isSafeInteger(usuarioId) || usuarioId <= 0 || usuarioId === dono.id) throw new Error("dono_nao_pode_ser_alterado");
+  const sql = getDb();
+  const resultado = await sql`
+    UPDATE usuarios
+    SET robo_aderencias = ${permitido}
+    WHERE id = ${usuarioId} AND perfil <> 'dono'
+    RETURNING id, email, nome, ativo, perfil, robo_aderencias
+  `;
+  if (resultado.length === 0) throw new Error("usuario_nao_encontrado");
   return resultado[0];
 }
 
@@ -305,7 +321,7 @@ export async function loginUsuario(emailRecebido: string, senhaRecebida: string,
   if (minutos > 0) return { sucesso: false, erro: `Muitas tentativas de acesso. Tente novamente em ${minutos} minuto${minutos === 1 ? "" : "s"}.` };
 
   const usuarios = await sql`
-    SELECT id, email, nome, senha_hash, ativo, perfil
+    SELECT id, email, nome, senha_hash, ativo, perfil, robo_aderencias
     FROM usuarios 
     WHERE email = ${emailNorm}
     LIMIT 1;
@@ -339,7 +355,7 @@ export async function validarSessao(token: string) {
   const sql = getDb();
 
   const sessoes = await sql`
-    SELECT s.token, s.expira_em, u.id, u.email, u.nome, u.ativo, u.perfil
+    SELECT s.token, s.expira_em, u.id, u.email, u.nome, u.ativo, u.perfil, u.robo_aderencias
     FROM sessoes s
     JOIN usuarios u ON u.id = s.usuario_id
     WHERE s.token = ${token} AND s.expira_em > CURRENT_TIMESTAMP AND u.ativo = TRUE
@@ -354,6 +370,7 @@ export async function validarSessao(token: string) {
     email: s.email,
     nome: s.nome,
     perfil: s.perfil === "dono" ? "dono" as const : "usuario" as const,
+    roboAderencias: s.perfil === "dono" || s.robo_aderencias === true,
   };
 }
 

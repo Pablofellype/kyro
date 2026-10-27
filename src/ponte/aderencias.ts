@@ -1,5 +1,5 @@
 import type { ConfiguracaoAderencias, PlanilhaAderencia, ResultadoAderencia } from "../modulos/escritorio/aderenciasTipos";
-import { cabecalhosNiko, urlApi } from "../estado/autenticacao";
+import { cabecalhosNiko, urlApi, useAuth } from "../estado/autenticacao";
 
 export interface PreviaAderencia {
   imagem: string;
@@ -17,25 +17,27 @@ const CABECALHOS = { "x-niko": "1", "content-type": "application/json" };
 const NATIVO = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 // No navegador, a execução e o agendamento pertencem ao VPS. O modo local fica
 // restrito ao aplicativo nativo; VITE_ADERENCIAS_REMOTA=0 permite testes locais.
-const EXECUCAO_REMOTA = !NATIVO && import.meta.env.VITE_ADERENCIAS_REMOTA !== "0";
-const PREFIXO = EXECUCAO_REMOTA
-  ? (import.meta.env.DEV ? "/ponte/aderencias-remota" : urlApi("/api/aderencias"))
-  : "/ponte/aderencias";
+export function aderenciasRemotas(): boolean {
+  const usuario = useAuth.getState().usuario;
+  return import.meta.env.VITE_ADERENCIAS_REMOTA !== "0" && (!NATIVO || usuario?.perfil === "dono" || usuario?.roboAderencias === true);
+}
 
 function cabecalhosDaExecucao(): Record<string, string> {
-  if (!EXECUCAO_REMOTA) return CABECALHOS;
+  if (!aderenciasRemotas()) return CABECALHOS;
   const token = typeof localStorage !== "undefined" ? localStorage.getItem("kyro_token") : null;
+  const usuario = useAuth.getState().usuario;
   return {
     ...cabecalhosNiko(),
     "content-type": "application/json",
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(usuario ? { "x-kyro-user-id": String(usuario.id) } : {}),
   };
 }
 
 async function pedir<T>(caminho: string, corpo?: unknown): Promise<T> {
-  const destino = EXECUCAO_REMOTA && !import.meta.env.DEV
-    ? `${PREFIXO}?acao=${encodeURIComponent(caminho)}`
-    : `${PREFIXO}/${caminho}`;
+  const remoto = aderenciasRemotas();
+  const prefixo = remoto ? (import.meta.env.DEV ? "/ponte/aderencias-remota" : urlApi("/api/aderencias")) : "/ponte/aderencias";
+  const destino = remoto && !import.meta.env.DEV ? `${prefixo}?acao=${encodeURIComponent(caminho)}` : `${prefixo}/${caminho}`;
   const resposta = await fetch(destino, {
     method: corpo === undefined ? "GET" : "POST",
     headers: cabecalhosDaExecucao(),

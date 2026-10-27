@@ -1,4 +1,4 @@
-import { alterarAtivoUsuario, criarConviteUsuario, getDb, loginUsuario, listarUsuarios, redefinirSenhaComToken, solicitarRedefinicaoSenha, urlPublicaDoAmbiente, validarSessao, logoutSessao } from "../src/servicos/autenticacao.ts";
+import { alterarAtivoUsuario, alterarPermissaoAderencias, criarConviteUsuario, getDb, loginUsuario, listarUsuarios, redefinirSenhaComToken, solicitarRedefinicaoSenha, urlPublicaDoAmbiente, validarSessao, logoutSessao } from "../src/servicos/autenticacao.ts";
 import { ConflitoDadosUsuario, gravarDadosUsuario, lerBackupsDadosUsuario, lerDadosUsuarioComVersao, lerHistoricoDadosUsuario, restaurarBackupDadosUsuario, validarItensDadosUsuario, zerarDadosUsuario } from "../src/servicos/dadosUsuario.ts";
 import type { Plugin, Connect } from "./tiposVite.ts";
 import type { IncomingMessage, ServerResponse } from "node:http";
@@ -19,7 +19,7 @@ import { receberEventoDoGancho, ehRotaDoGancho, ouvirEventos, decidirPedido, est
 import { buscarNaWeb, lerPagina } from "./web.ts";
 import {
   CAMINHO_DO_WEBHOOK, abrirConversa, definirFiltrosDoWhatsapp, desconectarWhatsapp, enviarMensagem, esquecerWhatsapp, estadoDoWhatsapp, fecharConversa, ignorarConversa,
-  enviarArquivoNoWhatsapp, iniciarWhatsapp, instalarWhatsapp, ligarWhatsapp, midiaDaMensagem, novidadesDoWhatsapp, receberWebhookDoWhatsapp,
+  comWhatsappUsuario, enviarArquivoNoWhatsapp, iniciarWhatsapp, instalarWhatsapp, ligarWhatsapp, midiaDaMensagem, novidadesDoWhatsapp, receberWebhookDoWhatsapp,
 } from "./whatsapp/whatsapp.ts";
 import { ehRotaDeAgente, receberEventoDeAgente, estadoDosAgentes, instalarAgente, previaDoAgente, removerAgente } from "./agentesDeCodigo.ts";
 import { listarArquivos, receberArquivo, enviarConteudo, excluirArquivo, excluirArquivosDaMateria, baixarArquivo, abrirArquivoNoPrograma, exportarParaDownloads } from "./arquivos.ts";
@@ -130,15 +130,18 @@ function acaoAderencia(caminho: string, prefixo: string): AcaoAderencia | null {
 }
 
 async function atenderAderencia(req: IncomingMessage, res: ServerResponse, acao: AcaoAderencia) {
-  if (acao === "estado") return responder(res, 200, { disponivel: true, navegador: navegadorDeAderenciasDisponivel() });
-  if (acao === "configuracao" && req.method === "GET") return responder(res, 200, { configuracao: configuracaoSalva() });
-  if (req.method !== "POST") return responder(res, 405, { erro: "metodo_nao_permitido" });
-  const corpo = await lerCorpo(req);
-  if (acao === "configuracao") return responder(res, 200, { configuracao: salvarConfiguracaoAderencias(corpo.configuracao) });
-  if (acao === "testar") return responder(res, 200, await testarAderencia(corpo.planilha));
-  if (acao === "enviar") return responder(res, 200, await enviarAderencia(corpo.configuracao, corpo.planilha));
-  iniciarWhatsapp();
-  return responder(res, 200, await executarAderencias(corpo.configuracao, typeof corpo.grupoId === "string" ? corpo.grupoId : undefined));
+  const usuarioId = typeof req.headers["x-kyro-user-id"] === "string" ? req.headers["x-kyro-user-id"] : undefined;
+  return await comWhatsappUsuario(usuarioId, async () => {
+    if (acao === "estado") return responder(res, 200, { disponivel: true, navegador: navegadorDeAderenciasDisponivel() });
+    if (acao === "configuracao" && req.method === "GET") return responder(res, 200, { configuracao: configuracaoSalva(usuarioId) });
+    if (req.method !== "POST") return responder(res, 405, { erro: "metodo_nao_permitido" });
+    const corpo = await lerCorpo(req);
+    if (acao === "configuracao") return responder(res, 200, { configuracao: salvarConfiguracaoAderencias(corpo.configuracao, usuarioId) });
+    if (acao === "testar") return responder(res, 200, await testarAderencia(corpo.planilha));
+    if (acao === "enviar") return responder(res, 200, await enviarAderencia(corpo.configuracao, corpo.planilha));
+    await iniciarWhatsapp();
+    return responder(res, 200, await executarAderencias(corpo.configuracao, typeof corpo.grupoId === "string" ? corpo.grupoId : undefined));
+  });
 }
 
 async function encaminharAderenciaRemota(req: IncomingMessage, res: ServerResponse, acao: AcaoAderencia) {
@@ -155,6 +158,7 @@ async function encaminharAderenciaRemota(req: IncomingMessage, res: ServerRespon
       method: req.method,
       headers: {
         "x-kyro-gateway-secret": segredo,
+        ...(typeof req.headers["x-kyro-user-id"] === "string" ? { "x-kyro-user-id": req.headers["x-kyro-user-id"] } : {}),
         ...(enviaCorpo ? { "content-type": "application/json" } : {}),
       },
       body: enviaCorpo ? JSON.stringify(corpo) : undefined,
@@ -170,18 +174,21 @@ async function encaminharAderenciaRemota(req: IncomingMessage, res: ServerRespon
 }
 
 async function atenderWhatsappRemoto(req: IncomingMessage, res: ServerResponse, acao: AcaoWhatsappRemota, desde = 0) {
-  const leitura = acao === "estado" || acao === "novidades";
-  if (req.method !== (leitura ? "GET" : "POST")) return responder(res, 405, { erro: "metodo_nao_permitido" });
-  if (acao === "estado") {
-    await iniciarWhatsapp();
-    return responder(res, 200, estadoDoWhatsapp());
-  }
-  if (acao === "novidades") return responder(res, 200, novidadesDoWhatsapp(desde));
-  const corpo = await lerCorpo(req);
-  if (acao === "ligar") return responder(res, 200, ligarWhatsapp(corpo.ligado === true));
-  if (acao === "filtros") return responder(res, 200, definirFiltrosDoWhatsapp(corpo));
-  if (acao === "ignorar") return responder(res, 200, ignorarConversa(corpo.jid, corpo.ignorar));
-  return responder(res, 200, await desconectarWhatsapp());
+  const usuarioId = typeof req.headers["x-kyro-user-id"] === "string" ? req.headers["x-kyro-user-id"] : undefined;
+  return await comWhatsappUsuario(usuarioId, async () => {
+    const leitura = acao === "estado" || acao === "novidades";
+    if (req.method !== (leitura ? "GET" : "POST")) return responder(res, 405, { erro: "metodo_nao_permitido" });
+    if (acao === "estado") {
+      await iniciarWhatsapp();
+      return responder(res, 200, estadoDoWhatsapp());
+    }
+    if (acao === "novidades") return responder(res, 200, novidadesDoWhatsapp(desde));
+    const corpo = await lerCorpo(req);
+    if (acao === "ligar") return responder(res, 200, ligarWhatsapp(corpo.ligado === true));
+    if (acao === "filtros") return responder(res, 200, definirFiltrosDoWhatsapp(corpo));
+    if (acao === "ignorar") return responder(res, 200, ignorarConversa(corpo.jid, corpo.ignorar));
+    return responder(res, 200, await desconectarWhatsapp());
+  });
 }
 
 async function encaminharWhatsappRemoto(req: IncomingMessage, res: ServerResponse, acao: AcaoWhatsappRemota, desde = 0) {
@@ -198,6 +205,7 @@ async function encaminharWhatsappRemoto(req: IncomingMessage, res: ServerRespons
       method: req.method,
       headers: {
         "x-kyro-gateway-secret": segredo,
+        ...(typeof req.headers["x-kyro-user-id"] === "string" ? { "x-kyro-user-id": req.headers["x-kyro-user-id"] } : {}),
         ...(leitura ? {} : { "content-type": "application/json" }),
       },
       body: leitura ? undefined : JSON.stringify(corpo),
@@ -280,6 +288,7 @@ export const rotas: Connect.NextHandleFunction = async (req, res, proximo) => {
         if (!usuarioAtual || usuarioAtual.perfil !== "dono") return responder(res, 403, { erro: "permissao_negada" });
         const corpo = await lerCorpo(req);
         try {
+          if (typeof corpo.roboAderencias === "boolean") return responder(res, 200, { sucesso: true, usuario: await alterarPermissaoAderencias(usuarioAtual, Number(corpo.id), corpo.roboAderencias === true) });
           return responder(res, 200, { sucesso: true, usuario: await alterarAtivoUsuario(usuarioAtual, Number(corpo.id), corpo.ativo === true) });
         } catch (erro) {
           return responder(res, 400, { sucesso: false, erro: (erro as Error).message });

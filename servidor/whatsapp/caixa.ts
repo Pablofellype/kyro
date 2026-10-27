@@ -309,10 +309,11 @@ export function mensagensDoGateway(corpo: unknown, eu?: string | null): Mensagem
 
 export type SituacaoDoVinculo = "conectado" | "precisa_qr" | "conectando";
 
-export function dispositivoDoGateway(corpo: unknown): { id: string; vinculo: SituacaoDoVinculo; eu: string | null } | null {
+export function dispositivoDoGateway(corpo: unknown, preferido?: string): { id: string; vinculo: SituacaoDoVinculo; eu: string | null } | null {
   const lista = (corpo as Record<string, unknown> | null)?.results;
   if (!Array.isArray(lista) || lista.length === 0) return null;
-  const escolhido = (lista.find((d: Record<string, unknown>) => d?.state === "logged_in") ?? lista[0]) as Record<string, unknown>;
+  const escolhido = (preferido ? lista.find((d: Record<string, unknown>) => d?.id === preferido) : (lista.find((d: Record<string, unknown>) => d?.state === "logged_in") ?? lista[0])) as Record<string, unknown> | undefined;
+  if (!escolhido) return null;
   const id = texto(escolhido?.id);
   if (!id) return null;
   const jid = texto(escolhido.jid) ?? null;

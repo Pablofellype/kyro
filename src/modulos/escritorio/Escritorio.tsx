@@ -1,4 +1,4 @@
-import { Component, lazy, Suspense, useState, type ReactNode } from "react";
+import { Component, lazy, Suspense, useEffect, useState, type ReactNode } from "react";
 import { Box, Building2, FileSpreadsheet, LayoutGrid, MessageSquare, SquareTerminal } from "lucide-react";
 import { useClaudeCode } from "../../estado/claudeCode";
 import { CabecalhoAba } from "../../componentes/CabecalhoAba";
@@ -14,6 +14,7 @@ import { Pensamento } from "./Pensamento";
 import type { AgenteId } from "../../tipos";
 import { EscritorioIas } from "./EscritorioIas";
 import { Aderencias } from "./Aderencias";
+import { useAuth } from "../../estado/autenticacao";
 
 const Cena3D = lazy(() => import("./Cena3D"));
 
@@ -158,10 +159,18 @@ function EscritorioNiko({ alternador }: { alternador: ReactNode }) {
 
 export default function Escritorio({ tipoInicial = "niko", demonstracaoInicial = false }: { tipoInicial?: "niko" | "ias"; demonstracaoInicial?: boolean } = {}) {
   const [tipo, setTipo] = useState<"niko" | "ias" | "aderencias">(tipoInicial);
+  const usuario = useAuth((s) => s.usuario);
+  const podeAderencias = usuario?.perfil === "dono" || usuario?.roboAderencias === true;
+  useEffect(() => { if (!podeAderencias && tipo === "aderencias") setTipo("niko"); }, [podeAderencias, tipo]);
   const sessoes = useClaudeCode((s) => s.ordem.length);
+  const abas = [
+    ["niko", Building2, T.escritorio.niko, T.escritorio.trocaKyro],
+    ["ias", SquareTerminal, T.escritorio.ias.curto, T.escritorio.trocaIas(sessoes)],
+    ...(podeAderencias ? [["aderencias", FileSpreadsheet, T.escritorio.aderencias.curto, T.escritorio.aderencias.subtitulo] as const] : []),
+  ] as const;
   const alternador = (
     <div className="escritorio-troca" role="tablist" aria-label={T.escritorio.tipo}>
-      {([["niko", Building2, T.escritorio.niko, T.escritorio.trocaKyro], ["ias", SquareTerminal, T.escritorio.ias.curto, T.escritorio.trocaIas(sessoes)], ["aderencias", FileSpreadsheet, T.escritorio.aderencias.curto, T.escritorio.aderencias.subtitulo]] as const).map(([id, Icone, titulo, dica]) => (
+      {abas.map(([id, Icone, titulo, dica]) => (
         <button key={id} type="button" role="tab" aria-selected={tipo === id} className="escritorio-troca-botao" onClick={() => setTipo(id)}>
           <span className="escritorio-troca-icone"><Icone size={18} /></span>
           <span className="escritorio-troca-texto"><b>{titulo}</b><small>{dica}</small></span>

@@ -1,11 +1,12 @@
 import { createServer } from "node:net";
 import { spawn, type ChildProcess } from "node:child_process";
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { WebSocket } from "ws";
 import { lerTudo, gravar } from "./banco.ts";
-import { enviarImagemNoWhatsapp, estadoDoWhatsapp, iniciarWhatsapp } from "./whatsapp/whatsapp.ts";
+import { comWhatsappUsuario, enviarImagemNoWhatsapp, estadoDoWhatsapp, iniciarWhatsapp } from "./whatsapp/whatsapp.ts";
+import { pastaDados } from "./ia.ts";
 import { configuracaoAderenciasValida, planilhaAderenciaValida, type ConfiguracaoAderencias, type PlanilhaAderencia } from "../src/modulos/escritorio/aderenciasTipos.ts";
 
 interface CelulaAderencia {
@@ -32,8 +33,36 @@ const LIMITE_IMAGEM = 16 * 1024 * 1024;
 // reduzimos somente se a imagem ultrapassar o limite aceito pelo WhatsApp.
 const ESCALAS_DA_CAPTURA = [3, 2, 1] as const;
 let relogioAgendamento: ReturnType<typeof setInterval> | null = null;
-let execucaoAgendada = false;
 const slotsExecutados = new Set<string>();
+let execucaoAgendada = false;
+
+function idSeguro(valor: string) {
+  return valor.replace(/[^a-zA-Z0-9_-]/g, "-").slice(0, 80) || "local";
+}
+
+function arquivoDeConfiguracao(usuarioId?: number | string) {
+  const id = usuarioId === undefined || usuarioId === null ? "local" : String(usuarioId);
+  if (process.env.NIKO_GOWA_URL?.trim() && id !== "local") return join(pastaDados(), "usuarios", idSeguro(id), "aderencias.json");
+  return "";
+}
+
+function configuracaoDoArquivo(caminho: string): ConfiguracaoAderencias | null {
+  try {
+    const bruto = JSON.parse(readFileSync(caminho, "utf8")) as { state?: unknown } | unknown;
+    return configuracaoAderenciasValida(bruto && typeof bruto === "object" && "state" in bruto ? (bruto as { state?: unknown }).state : bruto);
+  } catch {
+    return null;
+  }
+}
+
+function usuariosComConfiguracao() {
+  if (!process.env.NIKO_GOWA_URL?.trim()) return ["local"];
+  const pasta = join(pastaDados(), "usuarios");
+  if (!existsSync(pasta)) return lerTudo()["niko:aderencias"] ? ["1"] : [];
+  const ids = readdirSync(pasta, { withFileTypes: true }).filter((item) => item.isDirectory() && existsSync(join(pasta, item.name, "aderencias.json"))).map((item) => item.name);
+  if (ids.length > 0) return ids;
+  return lerTudo()["niko:aderencias"] ? ["1"] : [];
+}
 
 function portaLivre(): Promise<number> {
   return new Promise((resolver, rejeitar) => {
@@ -395,7 +424,10 @@ export async function executarAderencias(valor: unknown, grupoId?: string) {
   };
 }
 
-export function configuracaoSalva(): ConfiguracaoAderencias {
+export function configuracaoSalva(usuarioId?: number | string): ConfiguracaoAderencias {
+  const arquivo = arquivoDeConfiguracao(usuarioId);
+  const salvo = arquivo ? configuracaoDoArquivo(arquivo) : null;
+  if (salvo) return salvo;
   try {
     const bruto = JSON.parse(lerTudo()["niko:aderencias"] ?? "null") as { state?: unknown } | null;
     return configuracaoAderenciasValida(bruto?.state ?? bruto);
@@ -404,19 +436,24 @@ export function configuracaoSalva(): ConfiguracaoAderencias {
   }
 }
 
-export function salvarConfiguracaoAderencias(valor: unknown): ConfiguracaoAderencias {
+export function salvarConfiguracaoAderencias(valor: unknown, usuarioId?: number | string): ConfiguracaoAderencias {
   const configuracao = configuracaoAderenciasValida(valor);
-  gravar({ "niko:aderencias": JSON.stringify({ state: configuracao, version: 1 }) });
+  const arquivo = arquivoDeConfiguracao(usuarioId);
+  if (arquivo) {
+    mkdirSync(join(pastaDados(), "usuarios", idSeguro(String(usuarioId))), { recursive: true });
+    const temporario = `${arquivo}.${process.pid}.tmp`;
+    writeFileSync(temporario, JSON.stringify({ state: configuracao, version: 1 }), "utf8");
+    renameSync(temporario, arquivo);
+  } else {
+    gravar({ "niko:aderencias": JSON.stringify({ state: configuracao, version: 1 }) });
+  }
   return configuracao;
 }
 
-function atualizarConfiguracaoSalva(parcial: Partial<ConfiguracaoAderencias>) {
+function atualizarConfiguracaoSalva(parcial: Partial<ConfiguracaoAderencias>, usuarioId?: number | string) {
   try {
-    const todos = lerTudo();
-    const anterior = JSON.parse(todos["niko:aderencias"] ?? "null") as { state?: Record<string, unknown>; version?: number } | null;
-    const atual = configuracaoAderenciasValida(anterior?.state ?? anterior);
-    const novo = { ...atual, ...parcial };
-    gravar({ "niko:aderencias": JSON.stringify({ state: novo, version: anterior?.version ?? 1 }) });
+    const atual = configuracaoSalva(usuarioId);
+    salvarConfiguracaoAderencias({ ...atual, ...parcial }, usuarioId);
   } catch {
     return;
   }
@@ -448,21 +485,22 @@ export function slotAderenciaDevido(grupo: { id: string; ativo: boolean; frequen
   return `${agora.data}T${grupo.hora}:${grupo.id}:${grupo.frequencia}`;
 }
 
-async function verificarAgendamento() {
+async function verificarAgendamento(usuarioId = "local") {
   if (execucaoAgendada) return;
-  const config = configuracaoSalva();
+  return await comWhatsappUsuario(usuarioId, async () => {
+  const config = configuracaoSalva(usuarioId);
   const agora = dataHoraBrasilia();
   const grupos = config.grupos.length ? config.grupos : (config.planilhas.length ? [{ id: "grupo-1", ativo: config.ativo, frequencia: config.frequencia, hora: config.hora, diasSemana: config.diasSemana, planilhas: config.planilhas, ultimoAgendamento: config.ultimoAgendamento }] : []);
   const devidosNovos = grupos
     .map((grupo) => ({ grupo, slot: slotAderenciaDevido(grupo, agora) }))
-    .filter((item) => Boolean(item.slot) && item.grupo.ultimoAgendamento !== item.slot && !slotsExecutados.has(item.slot!))
+    .filter((item) => Boolean(item.slot) && item.grupo.ultimoAgendamento !== item.slot && !slotsExecutados.has(`${usuarioId}:${item.slot!}`))
     .map((item) => ({ grupo: item.grupo, slot: item.slot! }));
   if (!config.destinoJid || !devidosNovos.length) return;
   // Não consome o slot quando o gateway está offline. A próxima varredura tenta
   // novamente dentro da janela de recuperação, assim o horário não é perdido.
   if (estadoDoWhatsapp().vinculo !== "conectado") { iniciarWhatsapp(); return; }
   if (!devidosNovos.length) return;
-  for (const item of devidosNovos) slotsExecutados.add(item.slot);
+  for (const item of devidosNovos) slotsExecutados.add(`${usuarioId}:${item.slot}`);
   execucaoAgendada = true;
   try {
     for (const item of devidosNovos) {
@@ -480,19 +518,24 @@ async function verificarAgendamento() {
           ultimoAgendamento: item.slot,
           ultimoResultado: resposta.resultado,
         }];
-      atualizarConfiguracaoSalva({ grupos: gruposAtualizados, ultimoAgendamento: item.slot, ultimoResultado: resposta.resultado });
+      atualizarConfiguracaoSalva({ grupos: gruposAtualizados, ultimoAgendamento: item.slot, ultimoResultado: resposta.resultado }, usuarioId);
     }
   } finally {
     execucaoAgendada = false;
-    for (const antigo of [...slotsExecutados].filter((s) => !s.startsWith(agora.data))) slotsExecutados.delete(antigo);
+    for (const antigo of [...slotsExecutados].filter((s) => !s.includes(`:${agora.data}T`))) slotsExecutados.delete(antigo);
   }
+  });
+}
+
+async function verificarAgendamentos() {
+  for (const usuarioId of usuariosComConfiguracao()) await verificarAgendamento(usuarioId);
 }
 
 export function iniciarAgendadorAderencias() {
   if (relogioAgendamento) return;
-  relogioAgendamento = setInterval(() => void verificarAgendamento().catch(() => undefined), 30000);
+  relogioAgendamento = setInterval(() => void verificarAgendamentos().catch(() => undefined), 30000);
   relogioAgendamento.unref();
-  void verificarAgendamento().catch((erro) => console.error(`[ADERÊNCIAS] falha no agendador: ${(erro as Error).message}`));
+  void verificarAgendamentos().catch(() => undefined);
 }
 
 export function pararAgendadorAderencias() {

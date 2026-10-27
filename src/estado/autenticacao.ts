@@ -7,6 +7,7 @@ export interface UsuarioAutenticado {
   email: string;
   nome: string;
   perfil: "dono" | "usuario";
+  roboAderencias: boolean;
 }
 
 interface EstadoAuth {
