@@ -174,13 +174,16 @@ pub fn sincronizar(app: &AppHandle) {
         }
         let janela = match app.get_webview_window(&info.rotulo) {
             Some(j) => j,
-            None => match criar_sobreposta(app, &info.rotulo, 0.0, 0.0, 400.0, ALTURA_DOCK) {
-                Ok(j) => {
-                    plataforma::ignorar_cursor(&j, true);
-                    j
+            None => {
+                let Some(sistema) = app.get_webview_window("sistema") else { continue };
+                match criar_sobreposta(app, &sistema, &info.rotulo, 0.0, 0.0, 400.0, ALTURA_DOCK) {
+                    Ok(j) => {
+                        plataforma::ignorar_cursor(&j, true);
+                        j
+                    }
+                    Err(_) => continue,
                 }
-                Err(_) => continue,
-            },
+            }
         };
         posicionar(&janela, monitor);
     }
