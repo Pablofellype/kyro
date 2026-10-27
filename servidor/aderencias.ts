@@ -7,7 +7,7 @@ import { WebSocket } from "ws";
 import { lerTudo, gravar } from "./banco.ts";
 import { comWhatsappUsuario, enviarImagemNoWhatsapp, estadoDoWhatsapp, iniciarWhatsapp } from "./whatsapp/whatsapp.ts";
 import { pastaDados } from "./ia.ts";
-import { configuracaoAderenciasValida, planilhaAderenciaValida, type ConfiguracaoAderencias, type PlanilhaAderencia } from "../src/modulos/escritorio/aderenciasTipos.ts";
+import { configuracaoAderenciasValida, planilhaAderenciaValida, type ConfiguracaoAderencias, type PlanilhaAderencia, type ResultadoAderencia } from "../src/modulos/escritorio/aderenciasTipos.ts";
 
 interface CelulaAderencia {
   texto: string;
@@ -34,7 +34,7 @@ const LIMITE_IMAGEM = 16 * 1024 * 1024;
 const ESCALAS_DA_CAPTURA = [3, 2, 1] as const;
 let relogioAgendamento: ReturnType<typeof setInterval> | null = null;
 const slotsExecutados = new Set<string>();
-let execucaoAgendada = false;
+const execucoesAgendadas = new Set<string>();
 
 function idSeguro(valor: string) {
   return valor.replace(/[^a-zA-Z0-9_-]/g, "-").slice(0, 80) || "local";
@@ -486,7 +486,8 @@ export function slotAderenciaDevido(grupo: { id: string; ativo: boolean; frequen
 }
 
 async function verificarAgendamento(usuarioId = "local") {
-  if (execucaoAgendada) return;
+  const chaveUsuario = String(usuarioId);
+  if (execucoesAgendadas.has(chaveUsuario)) return;
   return await comWhatsappUsuario(usuarioId, async () => {
   const config = configuracaoSalva(usuarioId);
   const agora = dataHoraBrasilia();
@@ -496,32 +497,50 @@ async function verificarAgendamento(usuarioId = "local") {
     .filter((item) => Boolean(item.slot) && item.grupo.ultimoAgendamento !== item.slot && !slotsExecutados.has(`${usuarioId}:${item.slot!}`))
     .map((item) => ({ grupo: item.grupo, slot: item.slot! }));
   if (!config.destinoJid || !devidosNovos.length) return;
+  // Reserva a sessão antes de aguardar a reconexão. O intervalo pode disparar
+  // novamente enquanto o primeiro ciclo ainda está carregando o histórico.
+  execucoesAgendadas.add(chaveUsuario);
+  try {
   // Não consome o slot quando o gateway está offline. A próxima varredura tenta
   // novamente dentro da janela de recuperação, assim o horário não é perdido.
-  if (estadoDoWhatsapp().vinculo !== "conectado") { iniciarWhatsapp(); return; }
+  if (estadoDoWhatsapp().vinculo !== "conectado") {
+    await iniciarWhatsapp();
+    if (estadoDoWhatsapp().vinculo !== "conectado") return;
+  }
   if (!devidosNovos.length) return;
   for (const item of devidosNovos) slotsExecutados.add(`${usuarioId}:${item.slot}`);
-  execucaoAgendada = true;
-  try {
     for (const item of devidosNovos) {
-      const resposta = await executarAderencias(config, item.grupo.id);
-      const gruposAtualizados = config.grupos.length
-        ? config.grupos.map((grupo) => grupo.id === item.grupo.id ? { ...grupo, ultimoAgendamento: item.slot, ultimoResultado: resposta.resultado } : grupo)
-        : [{
-          id: item.grupo.id,
-          nome: "Rotina principal",
-          ativo: item.grupo.ativo,
-          frequencia: item.grupo.frequencia as "manual" | "diaria" | "semanal",
-          hora: item.grupo.hora,
-          diasSemana: item.grupo.diasSemana,
-          planilhas: item.grupo.planilhas,
-          ultimoAgendamento: item.slot,
-          ultimoResultado: resposta.resultado,
-        }];
-      atualizarConfiguracaoSalva({ grupos: gruposAtualizados, ultimoAgendamento: item.slot, ultimoResultado: resposta.resultado }, usuarioId);
+      try {
+        const resposta = await executarAderencias(config, item.grupo.id);
+        if (resposta.resultado.planilhasEnviadas === 0 && resposta.resultado.erros.length > 0) {
+          throw new Error(resposta.resultado.erros.join(" | "));
+        }
+        const gruposAtualizados = config.grupos.length
+          ? config.grupos.map((grupo) => grupo.id === item.grupo.id ? { ...grupo, ultimoAgendamento: item.slot, ultimoResultado: resposta.resultado } : grupo)
+          : [{
+            id: item.grupo.id,
+            nome: "Rotina principal",
+            ativo: item.grupo.ativo,
+            frequencia: item.grupo.frequencia as "manual" | "diaria" | "semanal",
+            hora: item.grupo.hora,
+            diasSemana: item.grupo.diasSemana,
+            planilhas: item.grupo.planilhas,
+            ultimoAgendamento: item.slot,
+            ultimoResultado: resposta.resultado,
+          }];
+        atualizarConfiguracaoSalva({ grupos: gruposAtualizados, ultimoAgendamento: item.slot, ultimoResultado: resposta.resultado }, usuarioId);
+      } catch (erro) {
+        // Uma falha de captura ou envio não pode consumir o horário. A próxima
+        // varredura tenta novamente dentro da janela de recuperação.
+        slotsExecutados.delete(`${usuarioId}:${item.slot}`);
+        const mensagem = (erro as Error).message || "falha_na_execucao";
+        const resultado: ResultadoAderencia = { executadoEm: new Date().toISOString(), planilhasEnviadas: 0, alertas: 0, urgentes: 0, erros: [mensagem] };
+        atualizarConfiguracaoSalva({ ultimoResultado: resultado }, usuarioId);
+        process.stderr.write(`${new Date().toISOString()} falha no agendamento de aderências (${usuarioId}/${item.grupo.id}): ${mensagem}\n`);
+      }
     }
   } finally {
-    execucaoAgendada = false;
+    execucoesAgendadas.delete(chaveUsuario);
     for (const antigo of [...slotsExecutados].filter((s) => !s.includes(`:${agora.data}T`))) slotsExecutados.delete(antigo);
   }
   });
@@ -533,9 +552,9 @@ async function verificarAgendamentos() {
 
 export function iniciarAgendadorAderencias() {
   if (relogioAgendamento) return;
-  relogioAgendamento = setInterval(() => void verificarAgendamentos().catch(() => undefined), 30000);
+  relogioAgendamento = setInterval(() => void verificarAgendamentos().catch((erro) => process.stderr.write(`${new Date().toISOString()} falha no agendador de aderências: ${(erro as Error).message}\n`)), 30000);
   relogioAgendamento.unref();
-  void verificarAgendamentos().catch(() => undefined);
+  void verificarAgendamentos().catch((erro) => process.stderr.write(`${new Date().toISOString()} falha no agendador de aderências: ${(erro as Error).message}\n`));
 }
 
 export function pararAgendadorAderencias() {

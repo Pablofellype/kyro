@@ -1,4 +1,4 @@
-import { cabecalhosNiko, urlApi, useAuth } from "../estado/autenticacao";
+import { cabecalhosNiko, urlApi, useAuth, type UsuarioAutenticado } from "../estado/autenticacao";
 
 export type MidiaWhatsapp = "nenhuma" | "imagem" | "video" | "audio" | "documento" | "figurinha" | "localizacao" | "contato" | "outra";
 
@@ -57,13 +57,14 @@ export interface NovidadeWhatsapp {
 
 const NATIVO = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 // No navegador, o WhatsApp sempre pertence ao VPS. O gateway local só existe no app nativo.
-// VITE_ADERENCIAS_REMOTA=0 continua disponível para testes locais deliberadamente isolados.
-export function whatsappRemotoAtivo(): boolean {
-  const usuario = useAuth.getState().usuario;
-  return import.meta.env.VITE_ADERENCIAS_REMOTA !== "0" && (!NATIVO || usuario?.perfil === "dono" || usuario?.roboAderencias === true);
+// VITE_ADERENCIAS_REMOTA=0 continua disponível para testes locais nativos.
+export function whatsappRemotoAtivo(usuario: Pick<UsuarioAutenticado, "perfil" | "roboAderencias"> | null = useAuth.getState().usuario): boolean {
+  // No navegador o gateway é sempre o serviço remoto. O modo local é uma
+  // escolha exclusiva do aplicativo nativo para usuários sem a permissão.
+  return !NATIVO || (import.meta.env.VITE_ADERENCIAS_REMOTA !== "0" && (usuario?.perfil === "dono" || usuario?.roboAderencias === true));
 }
 
-export const whatsappRemoto = !NATIVO && import.meta.env.VITE_ADERENCIAS_REMOTA !== "0";
+export const whatsappRemoto = !NATIVO;
 
 function cabecalhosDaPonte(): Record<string, string> {
   if (!whatsappRemotoAtivo()) return { "x-niko": "1", "content-type": "application/json" };

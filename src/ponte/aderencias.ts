@@ -1,5 +1,5 @@
 import type { ConfiguracaoAderencias, PlanilhaAderencia, ResultadoAderencia } from "../modulos/escritorio/aderenciasTipos";
-import { cabecalhosNiko, urlApi, useAuth } from "../estado/autenticacao";
+import { cabecalhosNiko, urlApi, useAuth, type UsuarioAutenticado } from "../estado/autenticacao";
 
 export interface PreviaAderencia {
   imagem: string;
@@ -16,16 +16,16 @@ export interface ResultadoEnvioAderencia {
 const CABECALHOS = { "x-niko": "1", "content-type": "application/json" };
 const NATIVO = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 // No navegador, a execução e o agendamento pertencem ao VPS. O modo local fica
-// restrito ao aplicativo nativo; VITE_ADERENCIAS_REMOTA=0 permite testes locais.
-export function aderenciasRemotas(): boolean {
-  const usuario = useAuth.getState().usuario;
-  return import.meta.env.VITE_ADERENCIAS_REMOTA !== "0" && (!NATIVO || usuario?.perfil === "dono" || usuario?.roboAderencias === true);
+// restrito ao aplicativo nativo; VITE_ADERENCIAS_REMOTA=0 permite testes locais nativos.
+export function aderenciasRemotas(usuario: Pick<UsuarioAutenticado, "perfil" | "roboAderencias"> | null = useAuth.getState().usuario): boolean {
+  // O navegador nunca tem a ponte local. O sinal de teste só pode desligar o
+  // VPS no aplicativo nativo, para que um build web não volte a chamar /ponte.
+  return !NATIVO || (import.meta.env.VITE_ADERENCIAS_REMOTA !== "0" && (usuario?.perfil === "dono" || usuario?.roboAderencias === true));
 }
 
-function cabecalhosDaExecucao(): Record<string, string> {
-  if (!aderenciasRemotas()) return CABECALHOS;
+function cabecalhosDaExecucao(usuario = useAuth.getState().usuario): Record<string, string> {
+  if (!aderenciasRemotas(usuario)) return CABECALHOS;
   const token = typeof localStorage !== "undefined" ? localStorage.getItem("kyro_token") : null;
-  const usuario = useAuth.getState().usuario;
   return {
     ...cabecalhosNiko(),
     "content-type": "application/json",
@@ -35,12 +35,13 @@ function cabecalhosDaExecucao(): Record<string, string> {
 }
 
 async function pedir<T>(caminho: string, corpo?: unknown): Promise<T> {
-  const remoto = aderenciasRemotas();
+  const usuario = useAuth.getState().usuario;
+  const remoto = aderenciasRemotas(usuario);
   const prefixo = remoto ? (import.meta.env.DEV ? "/ponte/aderencias-remota" : urlApi("/api/aderencias")) : "/ponte/aderencias";
   const destino = remoto && !import.meta.env.DEV ? `${prefixo}?acao=${encodeURIComponent(caminho)}` : `${prefixo}/${caminho}`;
   const resposta = await fetch(destino, {
     method: corpo === undefined ? "GET" : "POST",
-    headers: cabecalhosDaExecucao(),
+    headers: cabecalhosDaExecucao(usuario),
     body: corpo === undefined ? undefined : JSON.stringify(corpo),
   });
   const json = await resposta.json().catch(() => ({})) as T & { erro?: string };

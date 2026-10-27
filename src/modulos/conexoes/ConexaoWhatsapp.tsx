@@ -4,6 +4,7 @@ import { AvisoFaixa, Botao, ConfirmarModal, LinhaAlternador, Modal } from "../..
 import { Marca, corDaMarca } from "../../marcas/Marca";
 import { T } from "../../textos/textos";
 import { useWhatsapp } from "../../estado/whatsapp";
+import { useAuth } from "../../estado/autenticacao";
 import { numeroDoJid, whatsappPonte, whatsappRemotoAtivo, type EstadoWhatsapp } from "../../ponte/whatsapp";
 import { tocarSom } from "../../ponte/sons";
 
@@ -25,7 +26,8 @@ function textoDaEtapa(e: EstadoWhatsapp["instalacao"]): string {
 export function CartaoWhatsapp({ aoConfigurar }: { aoConfigurar: () => void }) {
   const estado = useWhatsapp((s) => s.estado);
   const carregar = useWhatsapp((s) => s.carregar);
-  const remoto = whatsappRemotoAtivo();
+  const usuario = useAuth((s) => s.usuario);
+  const remoto = whatsappRemotoAtivo(usuario);
   useEffect(() => {
     void carregar();
     const relogio = window.setInterval(() => void carregar(), remoto ? 5000 : 15000);
@@ -58,7 +60,8 @@ export function ConfigWhatsapp({ aberto, aoFechar }: { aberto: boolean; aoFechar
   const [erro, setErro] = useState("");
   const [ocupado, setOcupado] = useState(false);
   const [confirmandoEsquecer, setConfirmandoEsquecer] = useState(false);
-  const remoto = whatsappRemotoAtivo();
+  const usuario = useAuth((s) => s.usuario);
+  const remoto = whatsappRemotoAtivo(usuario);
 
   useEffect(() => {
     if (!aberto) return;
