@@ -10,6 +10,7 @@ import { instalarSincroniaTempoReal } from "./sincroniaTempoReal.ts";
 import { iniciarAgendadorAderencias, pararAgendadorAderencias } from "./aderencias.ts";
 
 const porta = Number(process.env.NIKO_PORTA) || 47831;
+const host = process.env.NIKO_HOST?.trim() || "127.0.0.1";
 const ORIGENS = new Set(["http://tauri.localhost", "https://tauri.localhost", "tauri://localhost"]);
 
 const servidor = createServer((req, res) => {
@@ -40,7 +41,7 @@ servidor.on("error", (e) => {
   process.stderr.write(`${new Date().toISOString()} falha ao abrir a porta ${porta}: ${e.message}\n`);
   process.exit(1);
 });
-servidor.listen(porta, "127.0.0.1", () => process.stderr.write(`${new Date().toISOString()} ponte ouvindo em 127.0.0.1:${porta}\n`));
+servidor.listen(porta, host, () => process.stderr.write(`${new Date().toISOString()} ponte ouvindo em ${host}:${porta}\n`));
 
 const encerrar = () => {
   encerrarWhatsapp();

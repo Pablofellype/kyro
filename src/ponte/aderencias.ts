@@ -14,7 +14,10 @@ export interface ResultadoEnvioAderencia {
 }
 
 const CABECALHOS = { "x-niko": "1", "content-type": "application/json" };
-const EXECUCAO_REMOTA = import.meta.env.VITE_ADERENCIAS_REMOTA === "1";
+const NATIVO = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+// No navegador, a execução e o agendamento pertencem ao VPS. O modo local fica
+// restrito ao aplicativo nativo; VITE_ADERENCIAS_REMOTA=0 permite testes locais.
+const EXECUCAO_REMOTA = !NATIVO && import.meta.env.VITE_ADERENCIAS_REMOTA !== "0";
 const PREFIXO = EXECUCAO_REMOTA
   ? (import.meta.env.DEV ? "/ponte/aderencias-remota" : urlApi("/api/aderencias"))
   : "/ponte/aderencias";

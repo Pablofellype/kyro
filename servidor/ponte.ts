@@ -185,8 +185,8 @@ async function atenderWhatsappRemoto(req: IncomingMessage, res: ServerResponse, 
 }
 
 async function encaminharWhatsappRemoto(req: IncomingMessage, res: ServerResponse, acao: AcaoWhatsappRemota, desde = 0) {
-  const base = process.env.KYRO_GATEWAY_URL?.trim().replace(/\/+$/, "");
-  const segredo = process.env.KYRO_GATEWAY_SECRET?.trim();
+  const base = (process.env.KYRO_GATEWAY_URL || process.env.VITE_GATEWAY_URL)?.trim().replace(/\/+$/, "");
+  const segredo = (process.env.KYRO_GATEWAY_SECRET || process.env.NIKO_GATEWAY_SECRET)?.trim();
   if (!base || !segredo) return responder(res, 503, { erro: "gateway_remoto_nao_configurado" });
   const leitura = acao === "estado" || acao === "novidades";
   if (req.method !== (leitura ? "GET" : "POST")) return responder(res, 405, { erro: "metodo_nao_permitido" });

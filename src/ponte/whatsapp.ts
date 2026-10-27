@@ -55,7 +55,10 @@ export interface NovidadeWhatsapp {
   grupo: boolean;
 }
 
-export const whatsappRemoto = import.meta.env.VITE_ADERENCIAS_REMOTA === "1";
+const NATIVO = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+// No navegador, o WhatsApp sempre pertence ao VPS. O gateway local só existe no app nativo.
+// VITE_ADERENCIAS_REMOTA=0 continua disponível para testes locais deliberadamente isolados.
+export const whatsappRemoto = !NATIVO && import.meta.env.VITE_ADERENCIAS_REMOTA !== "0";
 
 function cabecalhosDaPonte(): Record<string, string> {
   if (!whatsappRemoto) return { "x-niko": "1", "content-type": "application/json" };

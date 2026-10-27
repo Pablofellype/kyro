@@ -2497,6 +2497,9 @@ export const T = {
       checksum_diferente: "O arquivo baixado não bate com a assinatura publicada. Nada foi instalado.",
       sem_checksum: "A versão não publicou a assinatura do arquivo. Nada foi instalado.",
       download_fora_do_github: "O download tentou sair do GitHub e foi bloqueado.",
+      gateway_remoto_nao_configurado: "O site ainda não está ligado ao gateway do VPS. Configure KYRO_GATEWAY_URL e KYRO_GATEWAY_SECRET na Vercel.",
+      gateway_remoto_indisponivel: "O VPS não respondeu. Verifique se o worker e a porta pública do gateway estão ativos.",
+      gateway_nao_autorizado: "O site e o VPS estão com segredos diferentes. Confira KYRO_GATEWAY_SECRET.",
     } as Record<string, string>,
   },
   janelaConexao: {

@@ -25,7 +25,7 @@ function urlDoGateway(): URL | null {
   }
 }
 
-export const config = { maxDuration: 60 };
+export const config = { maxDuration: 300 };
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!configurarCors(req, res)) return res.status(403).json({ erro: "origem_nao_permitida" });
@@ -57,7 +57,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         ...(req.method === "POST" ? { "content-type": "application/json" } : {}),
       },
       body: req.method === "POST" ? JSON.stringify(req.body && typeof req.body === "object" ? req.body : {}) : undefined,
-      signal: AbortSignal.timeout(55_000),
+      signal: AbortSignal.timeout(270_000),
     });
     const texto = await resposta.text();
     res.statusCode = resposta.status;

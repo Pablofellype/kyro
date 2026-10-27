@@ -86,6 +86,20 @@ export type EtapaDaInstalacao = "parado" | "verificando" | "baixando" | "conferi
 
 export const instalacao: { etapa: EtapaDaInstalacao; megabytes: number; versao: string; erro: string } = { etapa: "parado", megabytes: 0, versao: "", erro: "" };
 
+async function substituirComTentativas(origem: string, destino: string) {
+  let ultimo: unknown;
+  for (let tentativa = 0; tentativa < 12; tentativa += 1) {
+    try {
+      renameSync(origem, destino);
+      return;
+    } catch (erro) {
+      ultimo = erro;
+      await new Promise((resolver) => setTimeout(resolver, 250));
+    }
+  }
+  throw ultimo instanceof Error ? ultimo : new Error("gateway_nao_pode_ser_trocado");
+}
+
 export async function instalarGowa(antesDeTrocar: () => Promise<void>): Promise<string> {
   if (["verificando", "baixando", "conferindo", "instalando"].includes(instalacao.etapa)) throw new Error("instalacao_em_andamento");
   Object.assign(instalacao, { etapa: "verificando", megabytes: 0, erro: "" });
@@ -116,7 +130,7 @@ export async function instalarGowa(antesDeTrocar: () => Promise<void>): Promise<
     writeFileSync(temporario, binario);
     if (process.platform !== "win32") chmodSync(temporario, 0o755);
     await antesDeTrocar();
-    renameSync(temporario, caminhoDoGowa());
+    await substituirComTentativas(temporario, caminhoDoGowa());
     Object.assign(instalacao, { etapa: "pronto", versao });
     return versao;
   } catch (e) {

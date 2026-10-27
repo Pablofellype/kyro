@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { construirMensagem } from "../servidor/aderencias.ts";
+import { construirMensagem, slotAderenciaDevido } from "../servidor/aderencias.ts";
 import { configuracaoAderenciasValida, planilhaAderenciaValida } from "../src/modulos/escritorio/aderenciasTipos.ts";
 
 const planilha = (parcial = {}) => planilhaAderenciaValida({ nome: "P1", ...parcial }, "p1");
@@ -19,6 +19,13 @@ test("configuração do robô normaliza planilhas e preserva o agendamento", () 
   assert.equal(resultado.hora, "07:30");
   assert.deepEqual(resultado.diasSemana, [1, 5]);
   assert.equal(resultado.planilhas[0].redThreshold, 3);
+});
+
+test("agendamento recupera o horario perdido enquanto o WhatsApp reconecta", () => {
+  const grupo = { id: "manha", ativo: true, frequencia: "diaria", hora: "08:00", diasSemana: [1, 2, 3, 4, 5], planilhas: [planilha()] };
+  assert.equal(slotAderenciaDevido(grupo, { data: "2026-10-27", hora: "08:00", dia: 2 }), "2026-10-27T08:00:manha:diaria");
+  assert.equal(slotAderenciaDevido(grupo, { data: "2026-10-27", hora: "08:42", dia: 2 }), "2026-10-27T08:00:manha:diaria");
+  assert.equal(slotAderenciaDevido(grupo, { data: "2026-10-27", hora: "09:01", dia: 2 }), null);
 });
 
 test("rotinas independentes preservam horários e planilhas diferentes", () => {

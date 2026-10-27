@@ -28,8 +28,9 @@ interface CdpResposta {
 
 const MAXIMO_PLANILHAS = 30;
 const LIMITE_IMAGEM = 16 * 1024 * 1024;
-// O chatbot antigo usava DPR 3; mantemos a mesma densidade de pixels.
-const ESCALAS_DA_CAPTURA = [1] as const;
+// O chatbot antigo entregava a captura com DPR 3. Tentamos essa escala primeiro e
+// reduzimos somente se a imagem ultrapassar o limite aceito pelo WhatsApp.
+const ESCALAS_DA_CAPTURA = [3, 2, 1] as const;
 let relogioAgendamento: ReturnType<typeof setInterval> | null = null;
 let execucaoAgendada = false;
 const slotsExecutados = new Set<string>();
@@ -279,7 +280,15 @@ async function capturar(planilha: PlanilhaAderencia): Promise<CapturaAderencia> 
       await esperar(500);
     }
     if (!pronto) throw new Error("planilha_sem_tabela");
-    await esperar(1200);
+    await esperar(5000);
+    await navegador.cliente.avaliar<boolean>(`(() => {
+      const style = document.createElement("style");
+      style.dataset.kyroAderencia = "1";
+      style.textContent = "* { -webkit-font-smoothing: antialiased !important; -moz-osx-font-smoothing: grayscale !important; text-rendering: optimizeLegibility !important; } .waffle-embedded-object-overlay { border: none !important; }";
+      document.head.appendChild(style);
+      return true;
+    })()`);
+    await esperar(500);
     const dados = await navegador.cliente.avaliar<{ clip: { x: number; y: number; width: number; height: number; scale: number } | null; celulas: CelulaAderencia[] }>(SCRIPT_DA_TABELA(planilha));
     for (const escala of ESCALAS_DA_CAPTURA) {
       const parametros = dados.clip
@@ -420,27 +429,58 @@ function dataHoraBrasilia() {
   return { data: `${valor("year")}-${valor("month")}-${valor("day")}`, hora: `${valor("hour")}:${valor("minute")}`, dia: mapa[valor("weekday")] ?? -1 };
 }
 
+const JANELA_DE_RECUPERACAO_MINUTOS = Math.max(1, Number(process.env.SCHEDULER_CATCHUP_MINUTES ?? 60) || 60);
+
+function minutosDaHora(hora: string) {
+  const partes = hora.split(":").map(Number);
+  return partes.length === 2 && partes.every(Number.isInteger) && partes[0] >= 0 && partes[0] <= 23 && partes[1] >= 0 && partes[1] <= 59
+    ? partes[0] * 60 + partes[1]
+    : null;
+}
+
+export function slotAderenciaDevido(grupo: { id: string; ativo: boolean; frequencia: string; hora: string; diasSemana: number[]; planilhas: unknown[] }, agora = dataHoraBrasilia()) {
+  if (!grupo.ativo || grupo.frequencia === "manual" || grupo.planilhas.length === 0) return null;
+  if (grupo.frequencia === "semanal" && !grupo.diasSemana.includes(agora.dia)) return null;
+  const programado = minutosDaHora(grupo.hora);
+  if (programado === null) return null;
+  const atual = minutosDaHora(agora.hora);
+  if (atual === null || atual < programado || atual - programado > JANELA_DE_RECUPERACAO_MINUTOS) return null;
+  return `${agora.data}T${grupo.hora}:${grupo.id}:${grupo.frequencia}`;
+}
+
 async function verificarAgendamento() {
   if (execucaoAgendada) return;
   const config = configuracaoSalva();
   const agora = dataHoraBrasilia();
   const grupos = config.grupos.length ? config.grupos : (config.planilhas.length ? [{ id: "grupo-1", ativo: config.ativo, frequencia: config.frequencia, hora: config.hora, diasSemana: config.diasSemana, planilhas: config.planilhas, ultimoAgendamento: config.ultimoAgendamento }] : []);
-  const devidos = grupos.filter((grupo) => grupo.ativo && grupo.frequencia !== "manual" && grupo.planilhas.length > 0 && grupo.hora === agora.hora && (grupo.frequencia !== "semanal" || grupo.diasSemana.includes(agora.dia)));
-  if (!config.destinoJid || !devidos.length) return;
+  const devidosNovos = grupos
+    .map((grupo) => ({ grupo, slot: slotAderenciaDevido(grupo, agora) }))
+    .filter((item) => Boolean(item.slot) && item.grupo.ultimoAgendamento !== item.slot && !slotsExecutados.has(item.slot!))
+    .map((item) => ({ grupo: item.grupo, slot: item.slot! }));
+  if (!config.destinoJid || !devidosNovos.length) return;
+  // Não consome o slot quando o gateway está offline. A próxima varredura tenta
+  // novamente dentro da janela de recuperação, assim o horário não é perdido.
   if (estadoDoWhatsapp().vinculo !== "conectado") { iniciarWhatsapp(); return; }
-  const devidosNovos = devidos.filter((grupo) => {
-    const slot = `${agora.data}T${agora.hora}:${grupo.id}:${grupo.frequencia}`;
-    return grupo.ultimoAgendamento !== slot && !slotsExecutados.has(slot);
-  });
   if (!devidosNovos.length) return;
-  for (const grupo of devidosNovos) slotsExecutados.add(`${agora.data}T${agora.hora}:${grupo.id}:${grupo.frequencia}`);
+  for (const item of devidosNovos) slotsExecutados.add(item.slot);
   execucaoAgendada = true;
   try {
-    for (const grupo of devidosNovos) {
-      const slot = `${agora.data}T${agora.hora}:${grupo.id}:${grupo.frequencia}`;
-      const resposta = await executarAderencias(config, grupo.id);
-      const gruposAtualizados = config.grupos.map((item) => item.id === grupo.id ? { ...item, ultimoAgendamento: slot, ultimoResultado: resposta.resultado } : item);
-      atualizarConfiguracaoSalva({ grupos: gruposAtualizados });
+    for (const item of devidosNovos) {
+      const resposta = await executarAderencias(config, item.grupo.id);
+      const gruposAtualizados = config.grupos.length
+        ? config.grupos.map((grupo) => grupo.id === item.grupo.id ? { ...grupo, ultimoAgendamento: item.slot, ultimoResultado: resposta.resultado } : grupo)
+        : [{
+          id: item.grupo.id,
+          nome: "Rotina principal",
+          ativo: item.grupo.ativo,
+          frequencia: item.grupo.frequencia as "manual" | "diaria" | "semanal",
+          hora: item.grupo.hora,
+          diasSemana: item.grupo.diasSemana,
+          planilhas: item.grupo.planilhas,
+          ultimoAgendamento: item.slot,
+          ultimoResultado: resposta.resultado,
+        }];
+      atualizarConfiguracaoSalva({ grupos: gruposAtualizados, ultimoAgendamento: item.slot, ultimoResultado: resposta.resultado });
     }
   } finally {
     execucaoAgendada = false;
@@ -452,6 +492,7 @@ export function iniciarAgendadorAderencias() {
   if (relogioAgendamento) return;
   relogioAgendamento = setInterval(() => void verificarAgendamento().catch(() => undefined), 30000);
   relogioAgendamento.unref();
+  void verificarAgendamento().catch((erro) => console.error(`[ADERÊNCIAS] falha no agendador: ${(erro as Error).message}`));
 }
 
 export function pararAgendadorAderencias() {

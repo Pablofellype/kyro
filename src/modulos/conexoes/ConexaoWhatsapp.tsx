@@ -27,6 +27,8 @@ export function CartaoWhatsapp({ aoConfigurar }: { aoConfigurar: () => void }) {
   const carregar = useWhatsapp((s) => s.carregar);
   useEffect(() => {
     void carregar();
+    const relogio = window.setInterval(() => void carregar(), whatsappRemoto ? 5000 : 15000);
+    return () => window.clearInterval(relogio);
   }, [carregar]);
   const ativa = Boolean(estado?.ligado && estado.vinculo === "conectado");
   const vinculo = estado ? (estado.ligado ? estado.vinculo : "desligado") : "desligado";

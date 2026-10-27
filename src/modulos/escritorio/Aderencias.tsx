@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, CheckCircle2, Clock3, Eye, FileImage, FileSpreadsheet, Image, LoaderCircle, Play, Plus, Send, Settings2, Trash2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Clock3, Eye, FileImage, FileSpreadsheet, Image, LoaderCircle, Play, Plus, RefreshCw, Save, Send, Settings2, Trash2 } from "lucide-react";
 import { AvisoFaixa, Botao, Cartao, Campo, LinhaAlternador, Modal } from "../../componentes/basicos";
 import { CabecalhoAba } from "../../componentes/CabecalhoAba";
 import { useWhatsapp } from "../../estado/whatsapp";
@@ -9,7 +9,8 @@ import type { GrupoAderencia, PlanilhaAderencia } from "./aderenciasTipos";
 import "./aderencias.css";
 
 const DIAS = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
-const EXECUCAO_REMOTA = import.meta.env.VITE_ADERENCIAS_REMOTA === "1";
+const NATIVO = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+const EXECUCAO_REMOTA = !NATIVO && import.meta.env.VITE_ADERENCIAS_REMOTA !== "0";
 
 function nomeDoDestino(nome: string, grupo: boolean) {
   return `${grupo ? "Grupo" : "Contato"} · ${nome || "sem nome"}`;
@@ -66,17 +67,29 @@ export function Aderencias() {
   const [previas, setPrevias] = useState<PreviaAderencia[]>([]);
   const [processando, setProcessando] = useState<string | null>(null);
   const [erro, setErro] = useState("");
+  const [sincronia, setSincronia] = useState<"carregando" | "salvando" | "salvo" | "erro">(EXECUCAO_REMOTA ? "carregando" : "salvo");
   const [remotoPronto, setRemotoPronto] = useState(!EXECUCAO_REMOTA);
 
-  useEffect(() => { if (!whatsapp) void carregarWhatsapp(); }, [whatsapp, carregarWhatsapp]);
+  useEffect(() => {
+    void carregarWhatsapp();
+    const relogio = window.setInterval(() => void carregarWhatsapp(), EXECUCAO_REMOTA ? 5000 : 15000);
+    return () => window.clearInterval(relogio);
+  }, [carregarWhatsapp]);
   useEffect(() => {
     if (!EXECUCAO_REMOTA) return;
     let ativo = true;
     void aderenciasPonte.configuracao()
       .then(({ configuracao }) => {
-        if (ativo && config.grupos.length === 0 && configuracao.grupos.length > 0) config.definir(configuracao);
+        if (!ativo) return;
+        const remotoTemDados = configuracao.grupos.length > 0 || Boolean(configuracao.destinoJid);
+        if (remotoTemDados) config.definir(configuracao);
       })
-      .catch(() => undefined)
+      .catch((e) => {
+        if (ativo) {
+          setSincronia("erro");
+          setErro(`Não foi possível ler a configuração do VPS: ${(e as Error).message}`);
+        }
+      })
       .finally(() => { if (ativo) setRemotoPronto(true); });
     return () => { ativo = false; };
   }, []);
@@ -84,7 +97,13 @@ export function Aderencias() {
   useEffect(() => {
     if (!EXECUCAO_REMOTA || !remotoPronto) return;
     const timer = window.setTimeout(() => {
-      void aderenciasPonte.salvarConfiguracao(config).catch((e) => setErro(`Não foi possível sincronizar a rotina com o VPS: ${(e as Error).message}`));
+      setSincronia("salvando");
+      void aderenciasPonte.salvarConfiguracao(config)
+        .then(() => setSincronia("salvo"))
+        .catch((e) => {
+          setSincronia("erro");
+          setErro(`Não foi possível sincronizar a rotina com o VPS: ${(e as Error).message}`);
+        });
     }, 700);
     return () => window.clearTimeout(timer);
   }, [chaveDaSincroniaRemota, remotoPronto]);
@@ -97,6 +116,22 @@ export function Aderencias() {
   const grupo = config.grupos.find((item) => item.id === grupoId) ?? null;
   const totalPlanilhas = config.grupos.reduce((total, item) => total + item.planilhas.length, 0);
   const ultimoResultado = grupo?.ultimoResultado ?? config.ultimoResultado;
+
+  const salvarConfiguracaoAgora = async () => {
+    if (!EXECUCAO_REMOTA) {
+      setSincronia("salvo");
+      return;
+    }
+    setSincronia("salvando");
+    setErro("");
+    try {
+      await aderenciasPonte.salvarConfiguracao(config);
+      setSincronia("salvo");
+    } catch (e) {
+      setSincronia("erro");
+      setErro(`Não foi possível salvar no VPS: ${(e as Error).message}`);
+    }
+  };
 
   const selecionarDestino = (jid: string) => {
     const conversa = destinos.find((c) => c.id === jid);
@@ -154,7 +189,9 @@ export function Aderencias() {
   return (
     <section className="aderencias" aria-label="Robô de Aderências">
       <CabecalhoAba titulo="Robô de Aderências" subtitulo="Organize planilhas em rotinas de manhã, tarde ou noite e envie cada grupo no seu horário." />
-      {!conectado && <AvisoFaixa tipo="alerta"><span>Conecte o WhatsApp em <strong>Conexões</strong> para testar e enviar os resultados. As configurações podem ser preparadas antes.</span></AvisoFaixa>}
+      {!conectado
+        ? <AvisoFaixa tipo="alerta"><span>{EXECUCAO_REMOTA ? "O VPS ainda não confirmou o WhatsApp conectado. Deixe o gateway ligado e atualize o estado." : <>Conecte o WhatsApp em <strong>Conexões</strong> para testar e enviar os resultados.</>}</span><Botao pequeno soIcone aria-label="Atualizar estado do WhatsApp" title="Atualizar estado" onClick={() => void carregarWhatsapp()} icone={<RefreshCw size={13} />} /></AvisoFaixa>
+        : <AvisoFaixa><span><strong>WhatsApp conectado.</strong> Esta rotina será executada pelo {EXECUCAO_REMOTA ? "VPS" : "Kyro neste computador"} mesmo que esta tela seja fechada.</span></AvisoFaixa>}
       {erro && <AvisoFaixa tipo="erro"><span role="alert">{erro}</span></AvisoFaixa>}
       <div className="aderencias-resumo">
         <Cartao titulo="Planilhas configuradas" icone={<FileSpreadsheet size={15} />}><strong>{totalPlanilhas}</strong><span>em {config.grupos.length} rotina(s)</span></Cartao>
@@ -179,7 +216,7 @@ export function Aderencias() {
                 <Campo id="aderencia-hora" rotulo="Horário"><input id="aderencia-hora" className="campo" type="time" value={grupo.hora} onChange={(e) => config.atualizarGrupo(grupo.id, { hora: e.target.value })} /></Campo>
               </div>
               {grupo.frequencia === "semanal" && <div className="aderencias-dias" aria-label="Dias da semana">{DIAS.map((dia, i) => <button key={dia} type="button" aria-pressed={grupo.diasSemana.includes(i)} onClick={() => config.atualizarGrupo(grupo.id, { diasSemana: grupo.diasSemana.includes(i) ? grupo.diasSemana.filter((d) => d !== i) : [...grupo.diasSemana, i].sort() })}>{dia}</button>)}</div>}
-              <div className="aderencias-acoes"><Botao variante="primario" icone={processando === "execucao" ? <LoaderCircle size={14} className="girando" /> : <Play size={14} />} disabled={!conectado || processando !== null} onClick={() => void executar()}>Executar rotina agora</Botao><Botao variante="perigo" pequeno icone={<Trash2 size={13} />} onClick={removerRotina}>Excluir rotina</Botao><span className="campo-dica">Só as planilhas desta rotina serão enviadas.</span></div>
+              <div className="aderencias-acoes"><Botao variante="primario" icone={processando === "execucao" ? <LoaderCircle size={14} className="girando" /> : <Play size={14} />} disabled={!conectado || processando !== null} onClick={() => void executar()}>Executar rotina agora</Botao><Botao icone={<Save size={14} />} disabled={sincronia === "salvando"} onClick={() => void salvarConfiguracaoAgora()}>Salvar alterações</Botao><Botao variante="perigo" pequeno icone={<Trash2 size={13} />} onClick={removerRotina}>Excluir rotina</Botao><span className="campo-dica" role="status">{sincronia === "salvando" ? "Salvando no VPS…" : sincronia === "erro" ? "Falha ao salvar" : "Alterações salvas"} · só as planilhas desta rotina serão enviadas.</span></div>
             </div>}
           </>}
         </div>
