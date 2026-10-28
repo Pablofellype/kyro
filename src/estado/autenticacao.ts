@@ -27,6 +27,7 @@ interface MensagemAutenticacao {
 
 const NATIVO = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 const EVENTO_AUTENTICACAO = "niko://autenticacao";
+const API_PADRAO_DESKTOP = "https://kyro-drab.vercel.app";
 
 function estadoDaSessao(usuario: UsuarioAutenticado | null, token: string | null) {
   if (typeof window !== "undefined") {
@@ -46,7 +47,10 @@ function publicarAutenticacao(usuario: UsuarioAutenticado | null, token: string 
 }
 
 export function urlApi(caminho: string): string {
-  const baseUrl = (import.meta.env.VITE_API_URL || "").replace(/\/+$/, "");
+  const configurada = (import.meta.env.VITE_API_URL || "").trim();
+  // Uma build nativa sem VITE_API_URL não possui as rotas /api dentro do Tauri.
+  // No desenvolvimento, a URL relativa continua apontando para a ponte local.
+  const baseUrl = (configurada || (NATIVO && import.meta.env.PROD ? API_PADRAO_DESKTOP : "")).replace(/\/+$/, "");
   return `${baseUrl}${caminho}`;
 }
 
