@@ -52,7 +52,7 @@ O Software é fornecido "no estado em que se encontra", sem garantia de qualquer
 
 ## 8. Autorizações
 
-Pedidos de uso comercial, redistribuição ou qualquer uso não previsto aqui devem ser feitos ao Titular pelo perfil https://github.com/Pablo Fellype.
+Pedidos de uso comercial, redistribuição ou qualquer uso não previsto aqui devem ser feitos ao Titular pelo perfil https://github.com/Pablofellype.
 
 ## 9. Lei aplicável
 
