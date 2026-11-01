@@ -14,8 +14,50 @@ export interface MensagemWhatsapp {
   minha: boolean;
   mencionaMe: boolean;
   visualizacaoUnica?: boolean;
+  unicaAberta?: boolean;
   encaminhada?: boolean;
   tamanho?: number;
+  local?: boolean;
+  apagada?: string;
+  editada?: string;
+  textoOriginal?: string;
+  reacoes?: ReacaoWhatsapp[];
+  entrega?: "entregue" | "lida";
+}
+
+export interface ReacaoWhatsapp {
+  de: string;
+  nome: string;
+  emoji: string;
+  minha: boolean;
+}
+
+export interface RastroWhatsapp {
+  tipo: "apagada" | "editada";
+  id: string;
+  conversa: string;
+  nomeDaConversa: string;
+  grupo: boolean;
+  remetente: string;
+  nomeRemetente: string;
+  texto: string;
+  textoNovo?: string;
+  midia: MidiaWhatsapp;
+  nomeDoArquivo?: string;
+  data: string;
+  quando: string;
+}
+
+export interface AgendadaWhatsapp {
+  id: string;
+  jid: string;
+  nome: string;
+  resumo: string;
+  tipo: string;
+  situacao: string;
+  quando: string;
+  proxima: string | null;
+  erro: string;
 }
 
 export interface ConversaWhatsapp {
@@ -44,8 +86,12 @@ export interface EstadoWhatsapp {
   erro: string;
   filtros: { silenciarGrupos: boolean; lerAoAbrir: boolean; esconderArquivadas: boolean; esconderGrupos: boolean; mostrarFotos: boolean; ignoradas: string[] };
   conversas: ConversaWhatsapp[];
+  abertas?: ConversaWhatsapp[];
   naoLidas: number;
   seq: number;
+  digitando?: Record<string, { nome: string; audio: boolean }>;
+  rastros?: number;
+  ultimoRastro?: string;
 }
 
 export interface NovidadeWhatsapp {
@@ -93,15 +139,13 @@ async function pedir<T>(caminho: string, corpo?: unknown): Promise<T> {
 }
 
 async function urlDaMidia(jid: string, id: string): Promise<string> {
-  if (whatsappRemotoAtivo()) throw new Error("whatsapp_remoto_somente_leitura");
-  const r = await fetch(`/ponte/whatsapp/midia?${new URLSearchParams({ jid, id })}`, { headers: cabecalhosDaPonte() });
+  const r = await fetch(urlDaPonte(`midia?${new URLSearchParams({ jid, id })}`), { headers: cabecalhosDaPonte(), cache: "no-store" });
   if (!r.ok) throw new Error(`http_${r.status}`);
   return URL.createObjectURL(await r.blob());
 }
 
 async function enviarArquivo(jid: string, arquivo: File, legenda: string): Promise<ConversaWhatsapp | null> {
-  if (whatsappRemotoAtivo()) throw new Error("whatsapp_remoto_somente_leitura");
-  const r = await fetch(`/ponte/whatsapp/enviar-arquivo?${new URLSearchParams({ jid, nome: arquivo.name, legenda })}`, {
+  const r = await fetch(urlDaPonte(`enviar-arquivo?${new URLSearchParams({ jid, nome: arquivo.name, legenda })}`), {
     method: "POST",
     headers: { ...cabecalhosDaPonte(), "content-type": "application/octet-stream" },
     body: arquivo,
@@ -111,8 +155,18 @@ async function enviarArquivo(jid: string, arquivo: File, legenda: string): Promi
   return json;
 }
 
+async function urlDaMidiaUnica(jid: string, id: string): Promise<string> {
+  const r = await fetch(urlDaPonte(`midia?${new URLSearchParams({ jid, id })}`), { headers: cabecalhosDaPonte(), cache: "no-store" });
+  if (!r.ok) {
+    const json = (await r.json().catch(() => ({}))) as { erro?: string };
+    throw new Error(json.erro ?? `http_${r.status}`);
+  }
+  return URL.createObjectURL(await r.blob());
+}
+
 export const whatsappPonte = {
   midia: urlDaMidia,
+  midiaUnica: urlDaMidiaUnica,
   enviarArquivo,
   estado: () => pedir<EstadoWhatsapp>("estado"),
   novidades: (desde: number) => pedir<{ seq: number; itens: NovidadeWhatsapp[] }>(`novidades?desde=${desde}`),
@@ -121,10 +175,19 @@ export const whatsappPonte = {
   filtros: (filtros: { silenciarGrupos?: boolean; lerAoAbrir?: boolean; esconderArquivadas?: boolean; esconderGrupos?: boolean; mostrarFotos?: boolean }) => pedir<EstadoWhatsapp>("filtros", filtros),
   ignorar: (jid: string, ignorar: boolean) => pedir<EstadoWhatsapp>("ignorar", { jid, ignorar }),
   abrir: (jid: string) => pedir<ConversaWhatsapp | null>("abrir", { jid }),
-  fechar: () => pedir<{ ok: boolean }>("fechar", {}),
+  fechar: (jid?: string) => pedir<{ ok: boolean }>("fechar", jid ? { jid } : {}),
   enviar: (jid: string, texto: string) => pedir<ConversaWhatsapp | null>("enviar", { jid, texto }),
   desconectar: () => pedir<EstadoWhatsapp>("desconectar", {}),
   esquecer: () => pedir<EstadoWhatsapp>("esquecer", {}),
+  historico: (jid: string, deslocamento: number, busca = "") =>
+    pedir<{ mensagens: MensagemWhatsapp[]; total: number | null; fim: boolean }>(`historico?${new URLSearchParams({ jid, deslocamento: String(deslocamento), busca })}`),
+  editar: (jid: string, id: string, texto: string) => pedir<MensagemWhatsapp | null>("editar", { jid, id, texto }),
+  apagar: (jid: string, id: string) => pedir<MensagemWhatsapp | null>("apagar", { jid, id }),
+  rastros: () => pedir<{ rastros: RastroWhatsapp[] }>("rastros"),
+  limparRastros: () => pedir<{ rastros: RastroWhatsapp[] }>("limpar-rastros", {}),
+  agendadas: () => pedir<{ agendadas: AgendadaWhatsapp[] }>("agendadas"),
+  agendar: (jid: string, texto: string, quando: string) => pedir<{ agendadas: AgendadaWhatsapp[] }>("agendar", { jid, texto, quando }),
+  cancelarAgendada: (id: string) => pedir<{ agendadas: AgendadaWhatsapp[] }>("cancelar-agendada", { id }),
 };
 
 export function numeroDoJid(jid: string | null): string {

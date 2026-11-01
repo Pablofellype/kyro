@@ -19,7 +19,8 @@ import { receberEventoDoGancho, ehRotaDoGancho, ouvirEventos, decidirPedido, est
 import { buscarNaWeb, lerPagina } from "./web.ts";
 import {
   CAMINHO_DO_WEBHOOK, abrirConversa, definirFiltrosDoWhatsapp, desconectarWhatsapp, enviarMensagem, esquecerWhatsapp, estadoDoWhatsapp, fecharConversa, ignorarConversa,
-  comWhatsappUsuario, enviarArquivoNoWhatsapp, iniciarWhatsapp, instalarWhatsapp, ligarWhatsapp, midiaDaMensagem, novidadesDoWhatsapp, receberWebhookDoWhatsapp,
+  agendarMensagem, apagarMensagem, cancelarAgendada, comWhatsappUsuario, editarMensagem, enviarArquivoNoWhatsapp, historicoDaConversa, iniciarWhatsapp, instalarWhatsapp, ligarWhatsapp,
+  limparRastros, listarAgendadas, midiaDaMensagem, novidadesDoWhatsapp, rastrosDoWhatsapp, receberWebhookDoWhatsapp,
 } from "./whatsapp/whatsapp.ts";
 import { ehRotaDeAgente, receberEventoDeAgente, estadoDosAgentes, instalarAgente, previaDoAgente, removerAgente } from "./agentesDeCodigo.ts";
 import { listarArquivos, receberArquivo, enviarConteudo, excluirArquivo, excluirArquivosDaMateria, baixarArquivo, abrirArquivoNoPrograma, exportarParaDownloads } from "./arquivos.ts";
@@ -51,6 +52,20 @@ function lerCorpo(req: IncomingMessage): Promise<Record<string, unknown>> {
         rejeitar(new Error("json_invalido"));
       }
     });
+    req.on("error", rejeitar);
+  });
+}
+
+function lerBytes(req: IncomingMessage): Promise<Buffer> {
+  return new Promise((resolver, rejeitar) => {
+    const partes: Buffer[] = [];
+    let tamanho = 0;
+    req.on("data", (parte: Buffer) => {
+      tamanho += parte.length;
+      if (tamanho <= LIMITE_CORPO) partes.push(parte);
+      else req.destroy();
+    });
+    req.on("end", () => (tamanho > LIMITE_CORPO ? rejeitar(new Error("corpo_grande")) : resolver(Buffer.concat(partes))));
     req.on("error", rejeitar);
   });
 }
@@ -122,7 +137,7 @@ function urlPublicaDaPonte(req: IncomingMessage): string {
 }
 
 type AcaoAderencia = "estado" | "testar" | "enviar" | "executar" | "configuracao";
-type AcaoWhatsappRemota = "estado" | "novidades" | "ligar" | "filtros" | "ignorar" | "desconectar";
+type AcaoWhatsappRemota = "estado" | "novidades" | "midia" | "enviar-arquivo" | "historico" | "abrir" | "fechar" | "enviar" | "editar" | "apagar" | "rastros" | "limpar-rastros" | "agendadas" | "agendar" | "cancelar-agendada" | "ligar" | "filtros" | "ignorar" | "desconectar" | "esquecer";
 
 function acaoAderencia(caminho: string, prefixo: string): AcaoAderencia | null {
   const acao = caminho.startsWith(prefixo) ? caminho.slice(prefixo.length) : "";
@@ -176,7 +191,7 @@ async function encaminharAderenciaRemota(req: IncomingMessage, res: ServerRespon
 async function atenderWhatsappRemoto(req: IncomingMessage, res: ServerResponse, acao: AcaoWhatsappRemota, desde = 0) {
   const usuarioId = typeof req.headers["x-kyro-user-id"] === "string" ? req.headers["x-kyro-user-id"] : undefined;
   return await comWhatsappUsuario(usuarioId, async () => {
-    const leitura = acao === "estado" || acao === "novidades";
+    const leitura = acao === "estado" || acao === "novidades" || acao === "midia" || acao === "historico" || acao === "rastros" || acao === "agendadas";
     if (req.method !== (leitura ? "GET" : "POST")) return responder(res, 405, { erro: "metodo_nao_permitido" });
     if (acao === "estado") {
       // O primeiro ciclo também carrega o histórico e pode levar mais tempo
@@ -186,10 +201,31 @@ async function atenderWhatsappRemoto(req: IncomingMessage, res: ServerResponse, 
       return responder(res, 200, estadoDoWhatsapp());
     }
     if (acao === "novidades") return responder(res, 200, novidadesDoWhatsapp(desde));
+    const url = new URL(req.url ?? "/", "http://localhost");
+    if (acao === "midia") {
+      const midia = await midiaDaMensagem(url.searchParams.get("jid"), url.searchParams.get("id"));
+      res.statusCode = 200;
+      res.setHeader("content-type", midia.tipo);
+      res.setHeader("cache-control", "no-store");
+      return res.end(midia.bytes);
+    }
+    if (acao === "historico") return responder(res, 200, await historicoDaConversa(url.searchParams.get("jid"), url.searchParams.get("deslocamento"), url.searchParams.get("busca")));
+    if (acao === "rastros") return responder(res, 200, rastrosDoWhatsapp());
+    if (acao === "agendadas") return responder(res, 200, await listarAgendadas());
+    if (acao === "enviar-arquivo") return responder(res, 200, await enviarArquivoNoWhatsapp(req, url.searchParams));
     const corpo = await lerCorpo(req);
     if (acao === "ligar") return responder(res, 200, ligarWhatsapp(corpo.ligado === true));
     if (acao === "filtros") return responder(res, 200, definirFiltrosDoWhatsapp(corpo));
     if (acao === "ignorar") return responder(res, 200, ignorarConversa(corpo.jid, corpo.ignorar));
+    if (acao === "abrir") return responder(res, 200, await abrirConversa(corpo.jid));
+    if (acao === "fechar") return responder(res, 200, fecharConversa(corpo.jid));
+    if (acao === "enviar") return responder(res, 200, await enviarMensagem(corpo.jid, corpo.texto));
+    if (acao === "editar") return responder(res, 200, await editarMensagem(corpo.jid, corpo.id, corpo.texto));
+    if (acao === "apagar") return responder(res, 200, await apagarMensagem(corpo.jid, corpo.id));
+    if (acao === "limpar-rastros") return responder(res, 200, limparRastros());
+    if (acao === "agendar") return responder(res, 200, await agendarMensagem(corpo.jid, corpo.texto, corpo.quando));
+    if (acao === "cancelar-agendada") return responder(res, 200, await cancelarAgendada(corpo.id));
+    if (acao === "esquecer") return responder(res, 200, await esquecerWhatsapp());
     return responder(res, 200, await desconectarWhatsapp());
   });
 }
@@ -198,26 +234,29 @@ async function encaminharWhatsappRemoto(req: IncomingMessage, res: ServerRespons
   const base = (process.env.KYRO_GATEWAY_URL || process.env.VITE_GATEWAY_URL)?.trim().replace(/\/+$/, "");
   const segredo = (process.env.KYRO_GATEWAY_SECRET || process.env.NIKO_GATEWAY_SECRET)?.trim();
   if (!base || !segredo) return responder(res, 503, { erro: "gateway_remoto_nao_configurado" });
-  const leitura = acao === "estado" || acao === "novidades";
+  const leitura = acao === "estado" || acao === "novidades" || acao === "midia" || acao === "historico" || acao === "rastros" || acao === "agendadas";
   if (req.method !== (leitura ? "GET" : "POST")) return responder(res, 405, { erro: "metodo_nao_permitido" });
   try {
     const url = new URL(`/gateway/whatsapp/${acao}`, base);
+    const consulta = new URL(req.url ?? "/", "http://localhost");
+    for (const [chave, valor] of consulta.searchParams) if (chave !== "acao") url.searchParams.set(chave, valor);
     if (acao === "novidades") url.searchParams.set("desde", String(Math.max(0, Math.floor(desde))));
-    const corpo = leitura ? undefined : await lerCorpo(req);
+    const binario = acao === "midia" || acao === "enviar-arquivo";
+    const corpo = binario ? await lerBytes(req) : (leitura ? undefined : await lerCorpo(req));
     const resposta = await fetch(url, {
       method: req.method,
       headers: {
         "x-kyro-gateway-secret": segredo,
         ...(typeof req.headers["x-kyro-user-id"] === "string" ? { "x-kyro-user-id": req.headers["x-kyro-user-id"] } : {}),
-        ...(leitura ? {} : { "content-type": "application/json" }),
+        ...(binario ? { "content-type": String(req.headers["content-type"] ?? "application/octet-stream") } : leitura ? {} : { "content-type": "application/json" }),
       },
-      body: leitura ? undefined : JSON.stringify(corpo),
+      body: (binario ? corpo : leitura ? undefined : JSON.stringify(corpo)) as unknown as BodyInit | undefined,
       signal: AbortSignal.timeout(30_000),
     });
-    const texto = await resposta.text();
     res.statusCode = resposta.status;
     res.setHeader("content-type", resposta.headers.get("content-type") ?? "application/json; charset=utf-8");
-    return res.end(texto);
+    if (acao === "midia") return res.end(Buffer.from(await resposta.arrayBuffer()));
+    return res.end(await resposta.text());
   } catch {
     return responder(res, 502, { erro: "gateway_remoto_indisponivel" });
   }
@@ -390,7 +429,7 @@ export const rotas: Connect.NextHandleFunction = async (req, res, proximo) => {
     if (!recebido || recebido !== esperado) return responder(res, 401, { erro: "gateway_nao_autorizado" });
     return await atenderAderencia(req, res, gatewayAderencia[1] as AcaoAderencia);
   }
-  const gatewayWhatsapp = /^\/gateway\/whatsapp\/(estado|novidades|ligar|filtros|ignorar|desconectar)$/.exec(url.pathname);
+  const gatewayWhatsapp = new RegExp(`^/gateway/whatsapp/(${["estado", "novidades", "midia", "enviar-arquivo", "historico", "abrir", "fechar", "enviar", "editar", "apagar", "rastros", "limpar-rastros", "agendadas", "agendar", "cancelar-agendada", "ligar", "filtros", "ignorar", "desconectar", "esquecer"].join("|")})$`).exec(url.pathname);
   if (gatewayWhatsapp) {
     const esperado = process.env.NIKO_GATEWAY_SECRET?.trim();
     const recebido = typeof req.headers["x-kyro-gateway-secret"] === "string" ? req.headers["x-kyro-gateway-secret"] : "";
@@ -414,7 +453,7 @@ export const rotas: Connect.NextHandleFunction = async (req, res, proximo) => {
       if (!origemConfiavel(req)) return responder(res, 403, { erro: "origem_nao_permitida" });
       return await encaminharAderenciaRemota(req, res, aderenciaRemota[1] as AcaoAderencia);
     }
-    const whatsappRemoto = /^\/whatsapp-remota\/(estado|novidades|ligar|filtros|ignorar|desconectar)$/.exec(caminho);
+    const whatsappRemoto = new RegExp(`^/whatsapp-remota/(${["estado", "novidades", "midia", "enviar-arquivo", "historico", "abrir", "fechar", "enviar", "editar", "apagar", "rastros", "limpar-rastros", "agendadas", "agendar", "cancelar-agendada", "ligar", "filtros", "ignorar", "desconectar", "esquecer"].join("|")})$`).exec(caminho);
     if (whatsappRemoto) {
       if (!origemConfiavel(req)) return responder(res, 403, { erro: "origem_nao_permitida" });
       return await encaminharWhatsappRemoto(req, res, whatsappRemoto[1] as AcaoWhatsappRemota, Number(url.searchParams.get("desde")) || 0);
@@ -468,6 +507,9 @@ export const rotas: Connect.NextHandleFunction = async (req, res, proximo) => {
         res.setHeader("cache-control", "no-store");
         return res.end(midia.bytes);
       }
+      if (acao === "historico" && req.method === "GET") return responder(res, 200, await historicoDaConversa(url.searchParams.get("jid"), url.searchParams.get("deslocamento"), url.searchParams.get("busca")));
+      if (acao === "rastros" && req.method === "GET") return responder(res, 200, rastrosDoWhatsapp());
+      if (acao === "agendadas" && req.method === "GET") return responder(res, 200, await listarAgendadas());
       if (acao === "enviar-arquivo" && req.method === "POST") return responder(res, 200, await enviarArquivoNoWhatsapp(req, url.searchParams));
       if (req.method === "POST") {
         const corpo = await lerCorpo(req);
@@ -476,8 +518,13 @@ export const rotas: Connect.NextHandleFunction = async (req, res, proximo) => {
         if (acao === "filtros") return responder(res, 200, definirFiltrosDoWhatsapp(corpo));
         if (acao === "ignorar") return responder(res, 200, ignorarConversa(corpo.jid, corpo.ignorar));
         if (acao === "abrir") return responder(res, 200, await abrirConversa(corpo.jid));
-        if (acao === "fechar") return responder(res, 200, fecharConversa());
+        if (acao === "fechar") return responder(res, 200, fecharConversa(corpo.jid));
         if (acao === "enviar") return responder(res, 200, await enviarMensagem(corpo.jid, corpo.texto));
+        if (acao === "editar") return responder(res, 200, await editarMensagem(corpo.jid, corpo.id, corpo.texto));
+        if (acao === "apagar") return responder(res, 200, await apagarMensagem(corpo.jid, corpo.id));
+        if (acao === "limpar-rastros") return responder(res, 200, limparRastros());
+        if (acao === "agendar") return responder(res, 200, await agendarMensagem(corpo.jid, corpo.texto, corpo.quando));
+        if (acao === "cancelar-agendada") return responder(res, 200, await cancelarAgendada(corpo.id));
         if (acao === "desconectar") return responder(res, 200, await desconectarWhatsapp());
         if (acao === "esquecer") return responder(res, 200, await esquecerWhatsapp());
       }

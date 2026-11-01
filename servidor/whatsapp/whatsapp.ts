@@ -7,8 +7,8 @@ import { pastaDados } from "../ia.ts";
 import { lerSegredo, gravarSegredo, apagarSegredo } from "../segredos.ts";
 import { porta as portaDaPonte } from "../claude.ts";
 import {
-  CaixaWhatsapp, LimiteDeEnvios, caminhoDoQr, conversasDoGateway, dispositivoDoGateway, ehGrupo, jidNormalizado, mensagemDoWebhook,
-  mensagensDoGateway, numeroParaExibir, recusaDaResposta, webhookAutentico, type ConversaWhatsapp, type FiltrosWhatsapp, type MensagemWhatsapp, type SituacaoDoVinculo,
+  CaixaWhatsapp, LimiteDeEnvios, caminhoDoQr, conversasDoGateway, dispositivoDoGateway, ehGrupo, eventoDoWebhook, jidNormalizado,
+  mensagensDoGateway, numeroParaExibir, recusaDaResposta, webhookAutentico, type ConversaWhatsapp, type EventoWhatsapp, type FiltrosWhatsapp, type MensagemWhatsapp, type RastroWhatsapp, type SituacaoDoVinculo,
 } from "./caixa.ts";
 import { aguardarGowaParar, alvoDaPlataforma, gowaInstalado, gowaRodando, iniciarGowa, instalacao, instalarGowa, pararGowa, pastaDoWhatsapp, portaLivre } from "./gowa.ts";
 
@@ -36,7 +36,7 @@ type EstadoWhatsappInterno = {
   ultimoWebhook: number;
   ultimaVarredura: number;
   ultimoStatus: number;
-  conversaAberta: string | null;
+  conversasAbertas: Map<string, number>;
   nomesPedidos: Set<string>;
   novidades: { seq: number; jid: string; nome: string; grupo: boolean }[];
   seq: number;
@@ -125,6 +125,10 @@ const limites = new Map<string, LimiteDeEnvios>();
 const relogios = new Map<string, ReturnType<typeof setInterval>>();
 const ocupados = new Set<string>();
 const primeirasPassadas = new Map<string, Promise<void>>();
+const rastrosPorSessao = new Map<string, RastroWhatsapp[]>();
+const digitandoPorSessao = new Map<string, Map<string, { nome: string; audio: boolean; ate: number }>>();
+const unicasPorSessao = new Map<string, { conhecidas: Set<string>; abertas: Set<string> }>();
+const unicasEmAndamentoPorSessao = new Map<string, Set<string>>();
 type OuvinteWhatsapp = (pacote: PacoteWhatsapp) => void;
 const ouvintesWhatsapp = new Map<string, Set<OuvinteWhatsapp>>();
 const notificacoesWhatsappAgendadas = new Set<string>();
@@ -165,7 +169,7 @@ function novoEstado(id: string): EstadoWhatsappInterno {
   return {
     config: lerConfig(), porta: 0, dispositivo: dispositivoDaSessao(id), acesso: "", segredo: "", vinculo: "desligado",
     eu: null, qr: null, erro: "", falhasSeguidas: 0, historicoCarregado: false, ultimoWebhook: 0, ultimaVarredura: 0,
-    ultimoStatus: 0, conversaAberta: null, nomesPedidos: new Set(), novidades: [], seq: 0,
+    ultimoStatus: 0, conversasAbertas: new Map(), nomesPedidos: new Set(), novidades: [], seq: 0,
   };
 }
 
@@ -190,13 +194,76 @@ function limiteDaSessao() {
   return atual;
 }
 
+function arquivoDeRastros() {
+  const id = idDaSessaoAtual();
+  return GOWA_EXTERNO && id !== "local" && id !== "1" ? join(pastaDosUsuarios(), idSeguro(id), "whatsapp-rastros.json") : join(pastaDados(), "whatsapp-rastros.json");
+}
+
+function rastrosDaSessao(): RastroWhatsapp[] {
+  const id = idDaSessaoAtual();
+  let atual = rastrosPorSessao.get(id);
+  if (atual) return atual;
+  try {
+    const lido = existsSync(arquivoDeRastros()) ? JSON.parse(readFileSync(arquivoDeRastros(), "utf8")) as unknown : [];
+    atual = Array.isArray(lido) ? lido.filter((r): r is RastroWhatsapp => Boolean(r) && typeof r.id === "string" && typeof r.conversa === "string" && (r.tipo === "apagada" || r.tipo === "editada")).slice(0, 300) : [];
+  } catch {
+    atual = [];
+  }
+  rastrosPorSessao.set(id, atual);
+  return atual;
+}
+
+function salvarRastros(lista: RastroWhatsapp[]) {
+  const atual = lista.slice(0, 300);
+  rastrosPorSessao.set(idDaSessaoAtual(), atual);
+  mkdirSync(dirname(arquivoDeRastros()), { recursive: true });
+  const temporario = `${arquivoDeRastros()}.${process.pid}.tmp`;
+  writeFileSync(temporario, JSON.stringify(atual), "utf8");
+  renameSync(temporario, arquivoDeRastros());
+}
+
+function digitandoDaSessao() {
+  const id = idDaSessaoAtual();
+  let atual = digitandoPorSessao.get(id);
+  if (!atual) { atual = new Map(); digitandoPorSessao.set(id, atual); }
+  return atual;
+}
+
+function arquivoDeUnicas() {
+  const id = idDaSessaoAtual();
+  return GOWA_EXTERNO && id !== "local" && id !== "1" ? join(pastaDosUsuarios(), idSeguro(id), "whatsapp-unicas.json") : join(pastaDados(), "whatsapp-unicas.json");
+}
+
+function unicasDaSessao() {
+  const id = idDaSessaoAtual();
+  let atual = unicasPorSessao.get(id);
+  if (atual) return atual;
+  try {
+    const lido = existsSync(arquivoDeUnicas()) ? JSON.parse(readFileSync(arquivoDeUnicas(), "utf8")) as Record<string, unknown> : {};
+    atual = { conhecidas: new Set(Array.isArray(lido.conhecidas) ? lido.conhecidas.filter((v): v is string => typeof v === "string").slice(-2000) : []), abertas: new Set(Array.isArray(lido.abertas) ? lido.abertas.filter((v): v is string => typeof v === "string").slice(-2000) : []) };
+  } catch {
+    atual = { conhecidas: new Set(), abertas: new Set() };
+  }
+  unicasPorSessao.set(id, atual);
+  return atual;
+}
+
+function salvarUnicas() {
+  const atual = unicasDaSessao();
+  const dados = { conhecidas: [...atual.conhecidas].slice(-2000), abertas: [...atual.abertas].slice(-2000) };
+  mkdirSync(dirname(arquivoDeUnicas()), { recursive: true });
+  const temporario = `${arquivoDeUnicas()}.${process.pid}.tmp`;
+  writeFileSync(temporario, JSON.stringify(dados), "utf8");
+  renameSync(temporario, arquivoDeUnicas());
+}
+
 const estado = new Proxy({} as EstadoWhatsappInterno, {
   get: (_alvo, propriedade) => Reflect.get(estadoDaSessao(), propriedade),
   set: (_alvo, propriedade, valor) => {
     const atual = estadoDaSessao();
     const anterior = Reflect.get(atual, propriedade);
     const resultado = Reflect.set(atual, propriedade, valor);
-    if (resultado && anterior !== valor && typeof propriedade === "string" && new Set(["config", "vinculo", "eu", "qr", "erro", "historicoCarregado", "conversaAberta", "novidades", "seq"]).has(propriedade)) notificarMudancaWhatsapp();
+    if (resultado && anterior !== valor && typeof propriedade === "string" && new Set(["config", "vinculo", "eu", "qr", "erro", "historicoCarregado", "conversasAbertas", "novidades", "seq"]).has(propriedade)) notificarMudancaWhatsapp();
     return resultado;
   },
 });
@@ -266,12 +333,75 @@ function anunciar(m: MensagemWhatsapp) {
   estado.novidades = [...estado.novidades.filter((n) => n.jid !== id), { seq: estado.seq, jid: id, nome: conversa.nome, grupo: conversa.grupo }].slice(-MAXIMO_DE_NOVIDADES);
 }
 
+const CONVERSA_ABERTA_MS = 2 * 3600_000;
+
+function conversaEstaAberta(jid: string, agora = Date.now()): boolean {
+  const ate = estado.conversasAbertas.get(jid);
+  if (ate === undefined) return false;
+  if (ate > agora) return true;
+  estado.conversasAbertas.delete(jid);
+  return false;
+}
+
+function guardarRastro(r: RastroWhatsapp | null) {
+  if (!r || estado.config.ignoradas.includes(r.conversa)) return;
+  salvarRastros([r, ...rastrosDaSessao().filter((x) => !(x.id === r.id && x.tipo === r.tipo && x.quando === r.quando))]);
+}
+
+function registrarUnica(id: string) {
+  const u = unicasDaSessao();
+  if (u.conhecidas.has(id)) return;
+  u.conhecidas.add(id);
+  salvarUnicas();
+}
+
+function comMarcaDeUnica<M extends MensagemWhatsapp>(m: M, u = unicasDaSessao()): M {
+  const unica = m.visualizacaoUnica === true || u.conhecidas.has(m.id);
+  if (!unica) return m;
+  return { ...m, visualizacaoUnica: true, ...(u.abertas.has(m.id) ? { unicaAberta: true } : {}) };
+}
+
+function aplicarEvento(e: EventoWhatsapp) {
+  if (e.tipo === "mensagem") {
+    if (e.mensagem.visualizacaoUnica) registrarUnica(e.mensagem.id);
+    digitandoDaSessao().delete(jidNormalizado(e.mensagem.conversa));
+    guardar([e.mensagem], true);
+  } else if (e.tipo === "apagada") {
+    guardarRastro(caixa.aplicarApagada(e.id, e.quando));
+    notificarMudancaWhatsapp();
+  } else if (e.tipo === "editada") {
+    guardarRastro(caixa.aplicarEdicao(e.id, e.texto, e.quando));
+    notificarMudancaWhatsapp();
+  } else if (e.tipo === "reacao") {
+    if (caixa.aplicarReacao(e.id, e.reacao)) notificarMudancaWhatsapp();
+  } else if (e.tipo === "entrega") {
+    caixa.aplicarEntrega(e.ids, e.estado);
+    notificarMudancaWhatsapp();
+  } else if (e.parou) {
+    digitandoDaSessao().delete(e.conversa);
+    notificarMudancaWhatsapp();
+  } else {
+    digitandoDaSessao().set(e.conversa, { nome: e.nome, audio: e.audio, ate: Date.now() + 12_000 });
+    notificarMudancaWhatsapp();
+  }
+}
+
+function quemDigita(): Record<string, { nome: string; audio: boolean }> {
+  const agora = Date.now();
+  const saida: Record<string, { nome: string; audio: boolean }> = {};
+  for (const [jid, d] of digitandoDaSessao()) {
+    if (d.ate < agora) digitandoDaSessao().delete(jid);
+    else saida[jid] = { nome: d.nome, audio: d.audio };
+  }
+  return saida;
+}
+
 function guardar(mensagens: MensagemWhatsapp[], avisar: boolean) {
   for (const m of mensagens) {
     const id = jidNormalizado(m.conversa);
     const resultado = caixa.adicionar(m, estado.config, !avisar);
     if (resultado === "repetida" || resultado === "ignorada") continue;
-    if (estado.conversaAberta === id && !m.minha) {
+    if (conversaEstaAberta(id) && !m.minha) {
       caixa.marcarLida(id);
       continue;
     }
@@ -435,7 +565,10 @@ function pararTudo(esquecer: boolean) {
     fotos.clear();
     midias.clear();
     estado.novidades = [];
-    estado.conversaAberta = null;
+    estado.conversasAbertas.clear();
+    digitandoDaSessao().clear();
+    rastrosPorSessao.delete(idDaSessaoAtual());
+    unicasPorSessao.delete(idDaSessaoAtual());
   }
 }
 
@@ -569,7 +702,7 @@ function guardarMidia(chave: string, midia: MidiaBaixada) {
   }
 }
 
-async function baixarMidia(jid: string, id: string, tipoDaMidia: string): Promise<MidiaBaixada> {
+async function baixarMidia(jid: string, id: string, tipoDaMidia: string, guardar = true): Promise<MidiaBaixada> {
   const corpo = await chamarComSucesso("GET", `/message/${encodeURIComponent(id)}/download`, { query: { phone: jid }, tempoMs: 60_000 });
   const relativo = ((corpo as Record<string, unknown> | null)?.results as Record<string, unknown> | undefined)?.file_path;
   const pasta = resolve(pastaDoWhatsapp());
@@ -581,18 +714,36 @@ async function baixarMidia(jid: string, id: string, tipoDaMidia: string): Promis
     const tipo = tipoPelosBytes(bytes, tipoDaMidia) ?? TIPOS_POR_EXTENSAO[extname(caminho).slice(1).toLowerCase()];
     if (!tipo) throw new Error("midia_formato");
     const midia = { tipo, bytes };
-    guardarMidia(`${jid}/${id}`, midia);
+    if (guardar) guardarMidia(`${jid}/${id}`, midia);
     return midia;
   } finally {
     rmSync(caminho, { force: true });
   }
 }
 
+async function abrirUnica(conversa: string, mensagem: MensagemWhatsapp): Promise<MidiaBaixada> {
+  const u = unicasDaSessao();
+  const emAndamento = unicasEmAndamentoPorSessao.get(idDaSessaoAtual()) ?? new Set<string>();
+  unicasEmAndamentoPorSessao.set(idDaSessaoAtual(), emAndamento);
+  if (u.abertas.has(mensagem.id) || emAndamento.has(mensagem.id)) throw new Error("unica_ja_aberta");
+  emAndamento.add(mensagem.id);
+  try {
+    const midia = await baixarMidia(conversa, mensagem.id, mensagem.midia, false).catch(() => { throw new Error("unica_indisponivel"); });
+    u.conhecidas.add(mensagem.id);
+    u.abertas.add(mensagem.id);
+    salvarUnicas();
+    return midia;
+  } finally {
+    emAndamento.delete(mensagem.id);
+  }
+}
+
 export async function midiaDaMensagem(jid: unknown, id: unknown): Promise<MidiaBaixada> {
   if (typeof jid !== "string" || typeof id !== "string") throw new Error("pedido_invalido");
   const conversa = caixa.conversas.get(jidNormalizado(jid));
-  const mensagem = conversa?.mensagens.find((m) => m.id === id);
-  if (!conversa || !mensagem || !MIDIAS_BAIXAVEIS.has(mensagem.midia) || mensagem.visualizacaoUnica) throw new Error("midia_indisponivel");
+  const mensagem = conversa?.mensagens.find((m) => m.id === id) ?? (conversa ? caixa.mensagem(id) : undefined);
+  if (!conversa || !mensagem || mensagem.conversa !== conversa.id || !MIDIAS_BAIXAVEIS.has(mensagem.midia)) throw new Error("midia_indisponivel");
+  if (comMarcaDeUnica(mensagem).visualizacaoUnica) return abrirUnica(conversa.id, mensagem);
   if ((mensagem.tamanho ?? 0) > TAMANHO_MAXIMO_DA_MIDIA) throw new Error("midia_grande_demais");
   const chave = `${conversa.id}/${id}`;
   const guardada = midias.get(chave);
@@ -610,12 +761,14 @@ export async function midiaDaMensagem(jid: unknown, id: unknown): Promise<MidiaB
 
 function resumoDaConversa(c: ConversaWhatsapp) {
   const foto = estado.config.mostrarFotos === false ? null : fotos.get(c.id)?.imagem ?? null;
-  return { ...c, mensagens: c.mensagens.slice(-20), foto };
+  return { ...c, mensagens: c.mensagens.slice(-20).map((m) => comMarcaDeUnica(m)), foto };
 }
 
 export function estadoDoWhatsapp() {
   const filtros = estado.config;
   const visiveis = caixa.visiveis(filtros).slice(0, 30);
+  const abertas = [...estado.conversasAbertas.keys()].filter((jid) => conversaEstaAberta(jid) && caixa.conversas.has(jid));
+  const rastros = rastrosDaSessao();
   pedirFotos(visiveis);
   return {
     suportado: alvoDaPlataforma() !== null,
@@ -629,8 +782,12 @@ export function estadoDoWhatsapp() {
     erro: estado.erro,
     filtros: { silenciarGrupos: filtros.silenciarGrupos, lerAoAbrir: filtros.lerAoAbrir, esconderArquivadas: filtros.esconderArquivadas !== false, esconderGrupos: filtros.esconderGrupos === true, mostrarFotos: filtros.mostrarFotos !== false, ignoradas: filtros.ignoradas },
     conversas: visiveis.map(resumoDaConversa),
+    abertas: abertas.map((jid) => caixa.conversas.get(jid)).filter((c): c is ConversaWhatsapp => Boolean(c)).map(resumoDaConversa),
     naoLidas: caixa.naoLidasVisiveis(filtros),
     seq: estado.seq,
+    digitando: quemDigita(),
+    rastros: rastros.length,
+    ultimoRastro: rastros[0]?.quando,
   };
 }
 
@@ -698,7 +855,7 @@ async function confirmarLeitura(jid: string) {
 export async function abrirConversa(jid: unknown) {
   if (typeof jid !== "string" || !caixa.conversas.has(jidNormalizado(jid))) throw new Error("conversa_invalida");
   const id = jidNormalizado(jid);
-  estado.conversaAberta = id;
+  estado.conversasAbertas.set(id, Date.now() + CONVERSA_ABERTA_MS);
   const tinhaNaoLidas = (caixa.conversas.get(id)?.naoLidas ?? 0) > 0;
   const recentes = await chamarComSucesso("GET", `/chat/${encodeURIComponent(id)}/messages`, { query: { limit: "20" } }).catch(() => null);
   for (const m of mensagensDoGateway(recentes, estado.eu)) caixa.adicionar(m, estado.config, true);
@@ -709,8 +866,9 @@ export async function abrirConversa(jid: unknown) {
   return conversa ? resumoDaConversa(conversa) : null;
 }
 
-export function fecharConversa() {
-  estado.conversaAberta = null;
+export function fecharConversa(jid?: unknown) {
+  if (typeof jid === "string" && jid) estado.conversasAbertas.delete(jidNormalizado(jid));
+  else estado.conversasAbertas.clear();
   return { ok: true };
 }
 
@@ -727,6 +885,116 @@ export async function enviarMensagem(jid: unknown, texto: unknown) {
   await confirmarLeitura(id);
   const conversa = caixa.conversas.get(id);
   return conversa ? resumoDaConversa(conversa) : null;
+}
+
+const MENSAGENS_POR_PAGINA = 40;
+
+function conversaConhecida(jid: unknown): string {
+  if (typeof jid !== "string" || jid.length > 120 || !caixa.conversas.has(jidNormalizado(jid))) throw new Error("conversa_invalida");
+  return jidNormalizado(jid);
+}
+
+function idDeMensagem(id: unknown): string {
+  if (typeof id !== "string" || !/^[\w.:-]{1,128}$/.test(id)) throw new Error("pedido_invalido");
+  return id;
+}
+
+export async function historicoDaConversa(jid: unknown, deslocamento: unknown, busca: unknown) {
+  const id = conversaConhecida(jid);
+  const pular = Math.max(0, Math.min(10_000, Math.floor(Number(deslocamento) || 0)));
+  const termo = typeof busca === "string" ? busca.trim().slice(0, 80) : "";
+  const corpo = await chamarComSucesso("GET", `/chat/${encodeURIComponent(id)}/messages`, { query: { limit: String(MENSAGENS_POR_PAGINA), offset: String(pular), ...(termo ? { search: termo } : {}) } });
+  const paginacao = ((corpo as Record<string, unknown> | null)?.results as Record<string, unknown> | undefined)?.pagination as Record<string, unknown> | undefined;
+  const mensagens = mensagensDoGateway(corpo, estado.eu).map((m) => comMarcaDeUnica(caixa.conhecer(m))).sort((a, b) => a.data.localeCompare(b.data));
+  return { mensagens, total: typeof paginacao?.total === "number" ? paginacao.total : null, fim: mensagens.length < MENSAGENS_POR_PAGINA };
+}
+
+function minhaMensagem(jid: unknown, idBruto: unknown) {
+  const conversa = conversaConhecida(jid);
+  const id = idDeMensagem(idBruto);
+  const m = caixa.mensagem(id);
+  if (!m || m.conversa !== conversa) throw new Error("mensagem_sumiu");
+  if (!m.minha) throw new Error("mensagem_de_outra_pessoa");
+  if (m.apagada) throw new Error("mensagem_ja_apagada");
+  return { conversa, id, m };
+}
+
+export async function editarMensagem(jid: unknown, idBruto: unknown, texto: unknown) {
+  const { conversa, id } = minhaMensagem(jid, idBruto);
+  if (typeof texto !== "string") throw new Error("pedido_invalido");
+  const recusa = recusaDaResposta(texto, conversa, caixa);
+  if (recusa) throw new Error(`resposta_${recusa}`);
+  await chamarComSucesso("POST", `/message/${encodeURIComponent(id)}/update`, { json: { phone: conversa, message: texto.trim() } });
+  caixa.aplicarEdicao(id, texto.trim(), new Date().toISOString());
+  notificarMudancaWhatsapp();
+  return caixa.mensagem(id) ?? null;
+}
+
+export async function apagarMensagem(jid: unknown, idBruto: unknown) {
+  const { conversa, id } = minhaMensagem(jid, idBruto);
+  await chamarComSucesso("POST", `/message/${encodeURIComponent(id)}/revoke`, { json: { phone: conversa } });
+  caixa.aplicarApagada(id, new Date().toISOString());
+  notificarMudancaWhatsapp();
+  return caixa.mensagem(id) ?? null;
+}
+
+export function rastrosDoWhatsapp() {
+  return { rastros: rastrosDaSessao() };
+}
+
+export function limparRastros() {
+  salvarRastros([]);
+  return { rastros: [] };
+}
+
+const ANTECEDENCIA_MINIMA_MS = 60_000;
+const ANTECEDENCIA_MAXIMA_MS = 365 * 24 * 3600_000;
+
+function fusoDoSistema(): string {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+}
+
+export function quandoAgendavel(quando: unknown, agora = Date.now()): string | null {
+  if (typeof quando !== "string") return null;
+  const t = Date.parse(quando);
+  if (Number.isNaN(t) || t < agora + ANTECEDENCIA_MINIMA_MS || t > agora + ANTECEDENCIA_MAXIMA_MS) return null;
+  return new Date(t).toISOString();
+}
+
+function agendadaDoGateway(a: Record<string, unknown>) {
+  const telefone = typeof a.phone === "string" ? a.phone : "";
+  const jid = telefone.includes("@") ? jidNormalizado(telefone) : `${telefone.replace(/\D/g, "")}@s.whatsapp.net`;
+  const conversa = caixa.conversas.get(jid);
+  return {
+    id: String(a.id ?? ""), jid, nome: conversa?.nome ?? numeroParaExibir(jid), resumo: typeof a.summary === "string" ? a.summary : "",
+    tipo: typeof a.message_type === "string" ? a.message_type : "text", situacao: typeof a.status === "string" ? a.status : "active",
+    quando: typeof a.scheduled_at === "string" ? a.scheduled_at : "", proxima: typeof a.next_run_at === "string" ? a.next_run_at : null,
+    erro: typeof a.last_error === "string" ? a.last_error : "",
+  };
+}
+
+export async function listarAgendadas() {
+  const corpo = await chamarComSucesso("GET", "/send/schedules", { query: { limit: "50" } });
+  const lista = ((corpo as Record<string, unknown> | null)?.results as Record<string, unknown> | undefined)?.data;
+  return { agendadas: Array.isArray(lista) ? lista.filter((a) => a && typeof a === "object" && (a as Record<string, unknown>).id !== undefined).map((a) => agendadaDoGateway(a as Record<string, unknown>)) : [] };
+}
+
+export async function agendarMensagem(jid: unknown, texto: unknown, quandoBruto: unknown) {
+  const id = conversaConhecida(jid);
+  if (typeof texto !== "string") throw new Error("pedido_invalido");
+  const recusa = recusaDaResposta(texto, id, caixa);
+  if (recusa) throw new Error(`resposta_${recusa}`);
+  const quando = quandoAgendavel(quandoBruto);
+  if (!quando) throw new Error("agenda_horario_invalido");
+  if (!envios.permitir()) throw new Error("resposta_muitas");
+  await chamarComSucesso("POST", "/send/message", { json: { phone: id, message: texto.trim(), scheduled_at: quando, timezone: fusoDoSistema() } });
+  return listarAgendadas();
+}
+
+export async function cancelarAgendada(idBruto: unknown) {
+  if (typeof idBruto !== "string" || !/^[\w-]{1,80}$/.test(idBruto)) throw new Error("pedido_invalido");
+  await chamarComSucesso("POST", `/send/schedules/${encodeURIComponent(idBruto)}/cancel`);
+  return listarAgendadas();
 }
 
 const TAMANHO_MAXIMO_DO_ENVIO = 16 * 1024 * 1024;
@@ -834,6 +1102,11 @@ export async function esquecerWhatsapp() {
   pararTudo(true);
   await aguardarGowaParar();
   for (const pasta of ["storages", "statics"]) rmSync(join(pastaDoWhatsapp(), pasta), { recursive: true, force: true });
+  rmSync(arquivoDeRastros(), { force: true });
+  rmSync(arquivoDeUnicas(), { force: true });
+  rastrosPorSessao.delete(idDaSessaoAtual());
+  unicasPorSessao.delete(idDaSessaoAtual());
+  unicasEmAndamentoPorSessao.delete(idDaSessaoAtual());
   await apagarSegredo("whatsapp-acesso").catch(() => undefined);
   await apagarSegredo("whatsapp-webhook").catch(() => undefined);
   estado.acesso = "";
@@ -887,10 +1160,10 @@ export function receberWebhookDoWhatsapp(req: IncomingMessage, res: ServerRespon
     res.statusCode = 200;
     res.end();
     void comWhatsappUsuario(usuario, () => {
-      const mensagem = mensagemDoWebhook(lido, estado.eu);
-      if (!mensagem) return;
+      const evento = eventoDoWebhook(lido, estado.eu);
+      if (!evento) return;
       estado.ultimoWebhook = Date.now();
-      if (estado.historicoCarregado) guardar([mensagem], true);
+      if (evento.tipo !== "mensagem" || estado.historicoCarregado) aplicarEvento(evento);
     });
   });
 }

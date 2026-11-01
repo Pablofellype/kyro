@@ -7,6 +7,7 @@ import { useEstudos, revisoesParaHoje } from "../../estado/estudos";
 import { useAgentes } from "../../estado/agentes";
 import { useOrganizacao } from "../../estado/organizacao";
 import { useAuth } from "../../estado/autenticacao";
+import { useWhatsapp } from "../../estado/whatsapp";
 import { T } from "../../textos/textos";
 import { ICONE_ROTA } from "./rotas";
 import { LogoNiko } from "../../componentes/LogoNiko";
@@ -16,6 +17,7 @@ import type { Rota } from "../../tipos";
 import { funcaoLigada, rotaLigada } from "../../utilitarios/funcoes";
 import { mudarTema } from "../area-de-trabalho/mudarTema";
 import { IndicadorSincronia } from "../../componentes/IndicadorSincronia";
+import { Marca } from "../../marcas/Marca";
 
 function useContadores(): Partial<Record<Rota, { n: number; alerta?: boolean }>> {
   const hoje = hojeISO();
@@ -159,6 +161,7 @@ export function BarraLateral({ recolhida }: { recolhida: boolean }) {
   const { rolagem, caixa } = usarIndicador(rota, recolhida);
   const logout = useAuth((s) => s.logout);
   const usuario = useAuth((s) => s.usuario);
+  const naoLidasWhatsapp = useWhatsapp((s) => s.estado?.naoLidas ?? 0);
   const nomeExibido = nome || usuario?.nome || T.barraLateral.perfil;
   const [fade, setFade] = useState({ topo: false, base: false });
   const desligadas = useConfig((s) => s.funcoesDesligadas);
@@ -203,6 +206,14 @@ export function BarraLateral({ recolhida }: { recolhida: boolean }) {
     );
   };
 
+  const itemDoWhatsapp = () => (
+    <button key="whatsapp" type="button" className="barra-item barra-subitem" data-rota="whatsapp" aria-current={rota === "whatsapp" ? "page" : undefined} title={T.rotas.whatsapp} onClick={() => irPara("whatsapp")}>
+      <Marca marca="whatsapp" tamanho={15} monocromatica={rota === "whatsapp"} />
+      {!recolhida && <span className="cortar">{T.rotas.whatsapp}</span>}
+      {naoLidasWhatsapp > 0 && <span className="barra-contador barra-contador-whatsapp" aria-label={String(naoLidasWhatsapp)}>{recolhida ? "" : naoLidasWhatsapp > 99 ? "99+" : naoLidasWhatsapp}</span>}
+    </button>
+  );
+
   const sistemaEscuro = typeof window !== "undefined" && window.matchMedia?.("(prefers-color-scheme: dark)").matches;
   const escuroAgora = tema === "escuro" || (tema === "sistema" && sistemaEscuro);
   const hojeFechado = fechados.includes("hoje");
@@ -233,7 +244,7 @@ export function BarraLateral({ recolhida }: { recolhida: boolean }) {
         />
         {grupos.map(({ grupo, itens }) => {
           if (itens.length === 0) return null;
-          const fechado = !recolhida && fechados.includes(grupo) && !itens.some((i) => i.rota === rota);
+          const fechado = !recolhida && fechados.includes(grupo) && !itens.some((i) => i.rota === rota || (rota === "whatsapp" && i.rota === "conexoes"));
           return (
             <div key={grupo} className="barra-grupo">
               {!recolhida && (
@@ -242,7 +253,7 @@ export function BarraLateral({ recolhida }: { recolhida: boolean }) {
                   <ChevronDown size={12} className="barra-rotulo-seta" />
                 </button>
               )}
-              {!fechado && itens.map((i) => item(i.rota, i.nome))}
+              {!fechado && itens.flatMap((i) => (i.rota === "conexoes" ? [item(i.rota, i.nome), itemDoWhatsapp()] : [item(i.rota, i.nome)]))}
             </div>
           );
         })}

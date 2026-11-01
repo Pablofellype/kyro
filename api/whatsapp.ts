@@ -2,7 +2,7 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { validarSessao } from "../src/servicos/autenticacao.js";
 import { configurarCors } from "./cors.js";
 
-const ACOES = new Set(["estado", "novidades", "ligar", "filtros", "ignorar", "desconectar"]);
+const ACOES = new Set(["estado", "novidades", "midia", "enviar-arquivo", "historico", "abrir", "fechar", "enviar", "editar", "apagar", "rastros", "limpar-rastros", "agendadas", "agendar", "cancelar-agendada", "ligar", "filtros", "ignorar", "desconectar", "esquecer"]);
 
 function tokenDaRequisicao(req: VercelRequest): string {
   const valor = req.headers.authorization;
@@ -31,7 +31,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === "OPTIONS") return res.status(204).end();
   const acao = typeof req.query.acao === "string" ? req.query.acao : "";
   if (!ACOES.has(acao)) return res.status(404).json({ erro: "acao_invalida" });
-  const leitura = acao === "estado" || acao === "novidades";
+  const leitura = acao === "estado" || acao === "novidades" || acao === "midia" || acao === "historico" || acao === "rastros" || acao === "agendadas";
   if (req.method !== (leitura ? "GET" : "POST")) return res.status(405).json({ erro: "metodo_nao_permitido" });
   const token = tokenDaRequisicao(req);
   const usuario = token ? await validarSessao(token) : null;
@@ -42,21 +42,37 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const destino = new URL(`/gateway/whatsapp/${acao}`, gateway);
+    for (const [chave, valor] of Object.entries(req.query)) {
+      if (chave === "acao") continue;
+      if (Array.isArray(valor)) destino.searchParams.set(chave, String(valor[0] ?? ""));
+      else if (typeof valor === "string" || typeof valor === "number") destino.searchParams.set(chave, String(valor));
+    }
     if (acao === "novidades") destino.searchParams.set("desde", String(Math.max(0, Math.floor(Number(req.query.desde) || 0))));
+    const binario = acao === "midia" || acao === "enviar-arquivo";
+    const corpoBinario = binario
+      ? Buffer.isBuffer(req.body)
+        ? req.body
+        : req.body instanceof Uint8Array
+          ? Buffer.from(req.body)
+          : typeof req.body === "string"
+            ? Buffer.from(req.body)
+            : req.body instanceof ArrayBuffer
+              ? Buffer.from(new Uint8Array(req.body))
+              : Buffer.alloc(0)
+      : undefined;
     const resposta = await fetch(destino, {
       method: req.method,
       headers: {
         "x-kyro-gateway-secret": segredo,
         "x-kyro-user-id": String(usuario.id),
-        ...(leitura ? {} : { "content-type": "application/json" }),
+        ...(binario ? { "content-type": String(req.headers["content-type"] ?? "application/octet-stream") } : leitura ? {} : { "content-type": "application/json" }),
       },
-      body: leitura ? undefined : JSON.stringify(req.body && typeof req.body === "object" ? req.body : {}),
+      body: binario ? corpoBinario : leitura ? undefined : JSON.stringify(req.body && typeof req.body === "object" ? req.body : {}),
       signal: AbortSignal.timeout(30_000),
     });
-    const texto = await resposta.text();
     res.statusCode = resposta.status;
     res.setHeader("Content-Type", resposta.headers.get("content-type") ?? "application/json; charset=utf-8");
-    return res.end(texto);
+    return res.end(Buffer.from(await resposta.arrayBuffer()));
   } catch {
     return res.status(502).json({ erro: "gateway_remoto_indisponivel" });
   }
