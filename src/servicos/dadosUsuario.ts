@@ -68,6 +68,17 @@ export async function lerDadosUsuario(usuarioId: number): Promise<Record<string,
   return (await lerDadosUsuarioComVersao(usuarioId)).dados;
 }
 
+export async function lerVersaoDadosUsuario(usuarioId: number): Promise<string> {
+  const sql = getDb();
+  const revisoes = await sql`
+    SELECT versao
+    FROM dados_usuario_revisoes
+    WHERE usuario_id = ${usuarioId}
+    LIMIT 1
+  `;
+  return String(revisoes[0]?.versao ?? "0");
+}
+
 export async function lerDadosUsuarioComVersao(usuarioId: number): Promise<{ dados: Record<string, string>; versao: string }> {
   const sql = getDb();
   await sql`

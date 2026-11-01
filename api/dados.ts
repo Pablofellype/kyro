@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { validarSessao } from "../src/servicos/autenticacao.js";
-import { ConflitoDadosUsuario, gravarDadosUsuario, lerBackupsDadosUsuario, lerDadosUsuarioComVersao, lerHistoricoDadosUsuario, restaurarBackupDadosUsuario, validarItensDadosUsuario, zerarDadosUsuario } from "../src/servicos/dadosUsuario.js";
+import { ConflitoDadosUsuario, gravarDadosUsuario, lerBackupsDadosUsuario, lerDadosUsuarioComVersao, lerHistoricoDadosUsuario, lerVersaoDadosUsuario, restaurarBackupDadosUsuario, validarItensDadosUsuario, zerarDadosUsuario } from "../src/servicos/dadosUsuario.js";
 import { configurarCors } from "./cors.js";
 
 function tokenDaRequisicao(req: VercelRequest): string {
@@ -34,9 +34,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const limite = typeof req.query.limite === "string" ? Number(req.query.limite) : 30;
         return res.status(200).json({ backups: await lerBackupsDadosUsuario(usuario.id, limite) });
       }
-      const atual = await lerDadosUsuarioComVersao(usuario.id);
       const desde = typeof req.query.desde === "string" ? req.query.desde : "";
-      if (desde && desde === atual.versao) return res.status(200).json({ alterado: false, versao: atual.versao });
+      if (desde) {
+        const versao = await lerVersaoDadosUsuario(usuario.id);
+        if (desde === versao) return res.status(200).json({ alterado: false, versao });
+      }
+      const atual = await lerDadosUsuarioComVersao(usuario.id);
       return res.status(200).json({ alterado: true, ...atual });
     }
 

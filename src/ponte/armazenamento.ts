@@ -88,7 +88,7 @@ let versaoRemota = "";
 let versaoBaseLocal: string | null = null;
 let websocketSincronia: WebSocket | null = null;
 let temporizadorReconexaoWebsocket = 0;
-let atrasoReconexaoWebsocket = 1000;
+let atrasoReconexaoWebsocket = 15_000;
 let sincroniaTempoRealAtiva = false;
 const snapshotRemoto = new Map<string, string>();
 const CHAVE_FILA_SINCRONIA = "niko:sincronia-pendente:";
@@ -208,6 +208,9 @@ function avisarOutrasJanelas(chave: string, valor: string | null) {
 
 const ORIGEM_DA_PONTE = "ponte";
 const TEMPO_PARA_A_PONTE_ALCANCAR_MS = 5000;
+// O tempo real é o caminho principal. O HTTP fica apenas como fallback para
+// ambientes que não oferecem WebSocket e não deve manter uma rajada de chamadas.
+const INTERVALO_SINCRONIZACAO_REMOTA_MS = 15 * 60_000;
 const recebidosDeOutraJanela = new Map<string, number>();
 
 function receberDeFora(m: unknown) {
@@ -307,16 +310,31 @@ async function recarregarDaPonte() {
 }
 
 function urlDaSincroniaTempoReal(): string | null {
-  // Funções serverless/web não oferecem upgrade WebSocket de forma confiável.
-  // No navegador, o polling HTTP é o canal oficial; o desktop informa a ponte
-  // local explicitamente quando ela está disponível.
-  return endpointTempoReal();
+  const local = endpointTempoReal();
+  if (local) return local;
+  if (typeof window === "undefined" || !tokenDaSessao()) return null;
+
+  // Em uma build web, usamos o mesmo host da API configurada no HTML. Se ela
+  // estiver em um VPS com WebSocket, o navegador mantém a sincronização aberta.
+  const api = typeof document !== "undefined" && typeof document.querySelector === "function"
+    ? document.querySelector('meta[name="kyro-api-url"]')?.getAttribute("content")?.trim() ?? ""
+    : "";
+  const base = api ? `${api.replace(/\/+$/, "")}/api/ws` : "";
+  if (!base) return null;
+  try {
+    const url = new URL(base, window.location.href);
+    if (url.protocol === "http:") url.protocol = "ws:";
+    else if (url.protocol === "https:") url.protocol = "wss:";
+    return url.toString();
+  } catch {
+    return null;
+  }
 }
 
 function agendarReconexaoTempoReal() {
   if (temporizadorReconexaoWebsocket || !tokenDaSessao()) return;
   const atraso = atrasoReconexaoWebsocket;
-  atrasoReconexaoWebsocket = Math.min(atrasoReconexaoWebsocket * 2, 30000);
+  atrasoReconexaoWebsocket = Math.min(atrasoReconexaoWebsocket * 2, 15 * 60_000);
   temporizadorReconexaoWebsocket = window.setTimeout(() => {
     temporizadorReconexaoWebsocket = 0;
     conectarTempoReal();
@@ -333,7 +351,7 @@ function conectarTempoReal() {
     const socket = new WebSocket(url);
     websocketSincronia = socket;
     socket.addEventListener("open", () => {
-      atrasoReconexaoWebsocket = 1000;
+      atrasoReconexaoWebsocket = 15_000;
       socket.send(JSON.stringify({ tipo: "autenticar", token }));
     });
     socket.addEventListener("message", (evento) => {
@@ -359,11 +377,12 @@ function conectarTempoReal() {
       }
     });
     socket.addEventListener("close", () => {
+      const estavaAtiva = sincroniaTempoRealAtiva;
       if (websocketSincronia === socket) websocketSincronia = null;
       sincroniaTempoRealAtiva = false;
       // A queda do tempo real não significa que o banco ficou offline. O
       // fallback HTTP confirma a disponibilidade antes de alterar o estado.
-      void recarregarDaPonte();
+      if (estavaAtiva && !document.hidden) void recarregarDaPonte();
       agendarReconexaoTempoReal();
     });
     socket.addEventListener("error", () => undefined);
@@ -684,8 +703,8 @@ export async function iniciarArmazenamento(): Promise<ModoArmazenamento> {
     ouvintesIniciados = true;
     if (remoto) {
       window.setInterval(() => {
-        if (!sincroniaTempoRealAtiva) void recarregarDaPonte();
-      }, 2000);
+        if (!document.hidden && !sincroniaTempoRealAtiva) void recarregarDaPonte();
+      }, INTERVALO_SINCRONIZACAO_REMOTA_MS);
       if (pendentes.size > 0) agendar(0);
       conectarTempoReal();
     }

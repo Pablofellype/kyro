@@ -1,5 +1,5 @@
 import { alterarAtivoUsuario, alterarPermissaoAderencias, criarConviteUsuario, getDb, loginUsuario, listarUsuarios, redefinirSenhaComToken, solicitarRedefinicaoSenha, urlPublicaDoAmbiente, validarSessao, logoutSessao } from "../src/servicos/autenticacao.ts";
-import { ConflitoDadosUsuario, gravarDadosUsuario, lerBackupsDadosUsuario, lerDadosUsuarioComVersao, lerHistoricoDadosUsuario, restaurarBackupDadosUsuario, validarItensDadosUsuario, zerarDadosUsuario } from "../src/servicos/dadosUsuario.ts";
+import { ConflitoDadosUsuario, gravarDadosUsuario, lerBackupsDadosUsuario, lerDadosUsuarioComVersao, lerHistoricoDadosUsuario, lerVersaoDadosUsuario, restaurarBackupDadosUsuario, validarItensDadosUsuario, zerarDadosUsuario } from "../src/servicos/dadosUsuario.ts";
 import type { Plugin, Connect } from "./tiposVite.ts";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { randomBytes } from "node:crypto";
@@ -331,9 +331,12 @@ export const rotas: Connect.NextHandleFunction = async (req, res, proximo) => {
           const limite = Number(url.searchParams.get("limite") ?? "30");
           return responder(res, 200, { backups: await lerBackupsDadosUsuario(usuario.id, limite) });
         }
-        const atual = await lerDadosUsuarioComVersao(usuario.id);
         const desde = url.searchParams.get("desde") ?? "";
-        if (desde && desde === atual.versao) return responder(res, 200, { alterado: false, versao: atual.versao });
+        if (desde) {
+          const versao = await lerVersaoDadosUsuario(usuario.id);
+          if (desde === versao) return responder(res, 200, { alterado: false, versao });
+        }
+        const atual = await lerDadosUsuarioComVersao(usuario.id);
         return responder(res, 200, { alterado: true, ...atual });
       }
       if (req.method === "POST" && url.searchParams.get("acao") === "zerar") {
