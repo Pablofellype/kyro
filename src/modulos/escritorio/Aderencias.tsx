@@ -74,7 +74,8 @@ export function Aderencias() {
 
   useEffect(() => {
     void carregarWhatsapp();
-    const relogio = window.setInterval(() => void carregarWhatsapp(), EXECUCAO_REMOTA ? 5000 : 15000);
+    if (EXECUCAO_REMOTA) return;
+    const relogio = window.setInterval(() => void carregarWhatsapp(), 15000);
     return () => window.clearInterval(relogio);
   }, [carregarWhatsapp, EXECUCAO_REMOTA]);
   useEffect(() => {

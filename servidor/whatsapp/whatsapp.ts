@@ -125,6 +125,41 @@ const limites = new Map<string, LimiteDeEnvios>();
 const relogios = new Map<string, ReturnType<typeof setInterval>>();
 const ocupados = new Set<string>();
 const primeirasPassadas = new Map<string, Promise<void>>();
+type OuvinteWhatsapp = (pacote: PacoteWhatsapp) => void;
+const ouvintesWhatsapp = new Map<string, Set<OuvinteWhatsapp>>();
+const notificacoesWhatsappAgendadas = new Set<string>();
+
+export type PacoteWhatsapp = {
+  estado: ReturnType<typeof estadoDoWhatsapp>;
+  novidades: ReturnType<typeof novidadesDoWhatsapp>["itens"];
+};
+
+export function assinarMudancasWhatsapp(usuarioId: number | string, ouvinte: OuvinteWhatsapp): () => void {
+  const id = String(usuarioId);
+  let ouvintes = ouvintesWhatsapp.get(id);
+  if (!ouvintes) {
+    ouvintes = new Set();
+    ouvintesWhatsapp.set(id, ouvintes);
+  }
+  ouvintes.add(ouvinte);
+  return () => {
+    ouvintes?.delete(ouvinte);
+    if (ouvintes?.size === 0) ouvintesWhatsapp.delete(id);
+  };
+}
+
+function notificarMudancaWhatsapp() {
+  const id = idDaSessaoAtual();
+  if (!ouvintesWhatsapp.has(id) || notificacoesWhatsappAgendadas.has(id)) return;
+  notificacoesWhatsappAgendadas.add(id);
+  queueMicrotask(() => {
+    notificacoesWhatsappAgendadas.delete(id);
+    const ouvintes = ouvintesWhatsapp.get(id);
+    if (!ouvintes || ouvintes.size === 0) return;
+    const pacote = comWhatsappUsuario(id, () => pacoteWhatsapp());
+    for (const ouvinte of ouvintes) ouvinte(pacote);
+  });
+}
 
 function novoEstado(id: string): EstadoWhatsappInterno {
   return {
@@ -157,7 +192,13 @@ function limiteDaSessao() {
 
 const estado = new Proxy({} as EstadoWhatsappInterno, {
   get: (_alvo, propriedade) => Reflect.get(estadoDaSessao(), propriedade),
-  set: (_alvo, propriedade, valor) => Reflect.set(estadoDaSessao(), propriedade, valor),
+  set: (_alvo, propriedade, valor) => {
+    const atual = estadoDaSessao();
+    const anterior = Reflect.get(atual, propriedade);
+    const resultado = Reflect.set(atual, propriedade, valor);
+    if (resultado && anterior !== valor && typeof propriedade === "string" && new Set(["config", "vinculo", "eu", "qr", "erro", "historicoCarregado", "conversaAberta", "novidades", "seq"]).has(propriedade)) notificarMudancaWhatsapp();
+    return resultado;
+  },
 });
 const caixa = new Proxy({} as CaixaWhatsapp, {
   get: (_alvo, propriedade) => {
@@ -237,6 +278,7 @@ function guardar(mensagens: MensagemWhatsapp[], avisar: boolean) {
     if (resultado === "avisar") anunciar(m);
     if (ehGrupo(id) && caixa.conversas.get(id)?.nome === numeroParaExibir(id) && !estado.nomesPedidos.has(id)) void nomearGrupo(id);
   }
+  if (mensagens.length > 0) notificarMudancaWhatsapp();
 }
 
 async function nomearGrupo(jid: string) {
@@ -245,7 +287,10 @@ async function nomearGrupo(jid: string) {
     const corpo = await chamarComSucesso("GET", "/group/info", { query: { group_id: jid } });
     const r = (corpo as Record<string, unknown> | null)?.results as Record<string, unknown> | undefined;
     const nome = typeof r?.Name === "string" ? r.Name : typeof r?.name === "string" ? r.name : "";
-    if (nome) caixa.renomear(jid, nome);
+    if (nome) {
+      caixa.renomear(jid, nome);
+      notificarMudancaWhatsapp();
+    }
   } catch {
     return;
   }
@@ -472,6 +517,7 @@ async function buscarFoto(jid: string) {
   }
   fotos.set(jid, { imagem, quando: Date.now() });
   fotosPedidas.delete(jid);
+  notificarMudancaWhatsapp();
 }
 
 function pedirFotos(conversas: ConversaWhatsapp[]) {
@@ -592,6 +638,10 @@ export function novidadesDoWhatsapp(desde: number) {
   return { seq: estado.seq, itens: estado.novidades.filter((n) => n.seq > desde) };
 }
 
+export function pacoteWhatsapp(): PacoteWhatsapp {
+  return { estado: estadoDoWhatsapp(), novidades: [...estado.novidades] };
+}
+
 export async function instalarWhatsapp() {
   const versao = await instalarGowa(async () => {
     pararGowa();
@@ -673,6 +723,7 @@ export async function enviarMensagem(jid: unknown, texto: unknown) {
   const corpo = await chamarComSucesso("POST", "/send/message", { json: { phone: id, message: texto.trim() } });
   const idDaMensagem = ((corpo as Record<string, unknown> | null)?.results as Record<string, unknown> | undefined)?.message_id;
   caixa.adicionar({ id: typeof idDaMensagem === "string" ? idDaMensagem : `niko-${randomBytes(6).toString("hex")}`, conversa: id, remetente: estado.eu ?? id, nomeRemetente: "", texto: texto.trim(), midia: "nenhuma", data: new Date().toISOString(), minha: true, mencionaMe: false }, estado.config);
+  notificarMudancaWhatsapp();
   await confirmarLeitura(id);
   const conversa = caixa.conversas.get(id);
   return conversa ? resumoDaConversa(conversa) : null;
@@ -708,6 +759,7 @@ export async function enviarImagemNoWhatsapp(jid: unknown, bytes: Buffer, nome =
   const idFinal = typeof idDaMensagem === "string" ? idDaMensagem : `niko-${randomBytes(6).toString("hex")}`;
   guardarMidia(`${id}/${idFinal}`, { tipo, bytes });
   caixa.adicionar({ id: idFinal, conversa: id, remetente: estado.eu ?? id, nomeRemetente: "", texto, midia: "imagem", nomeDoArquivo: arquivo, tamanho: bytes.length, data: new Date().toISOString(), minha: true, mencionaMe: false }, estado.config);
+  notificarMudancaWhatsapp();
   const conversa = caixa.conversas.get(id);
   return conversa ? resumoDaConversa(conversa) : null;
 }
@@ -762,6 +814,7 @@ export async function enviarArquivoNoWhatsapp(req: IncomingMessage, consulta: UR
   const tipo = tipoPelosBytes(bytes, rota.midia);
   if (tipo && rota.midia !== "documento") guardarMidia(`${id}/${idFinal}`, { tipo, bytes });
   caixa.adicionar({ id: idFinal, conversa: id, remetente: estado.eu ?? id, nomeRemetente: "", texto: legenda, midia: rota.midia, nomeDoArquivo: nome, tamanho: bytes.length, data: new Date().toISOString(), minha: true, mencionaMe: false }, estado.config);
+  notificarMudancaWhatsapp();
   const conversa = caixa.conversas.get(id);
   return conversa ? resumoDaConversa(conversa) : null;
 }

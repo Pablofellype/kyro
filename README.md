@@ -10,7 +10,7 @@ Rotina, estudos, finanças, metas e os serviços que você acompanha, reunidos e
 
 ![Windows 10 e 11](https://img.shields.io/badge/Windows-10%20%7C%2011-0b0d10?style=flat-square)
 ![Linux](https://img.shields.io/badge/Linux-Ubuntu%20%7C%20Fedora%20(GNOME)-0b0d10?style=flat-square)
-![Versão](https://img.shields.io/badge/versão-0.2.25-0b0d10?style=flat-square)
+![Versão](https://img.shields.io/badge/versão-0.2.26-0b0d10?style=flat-square)
 ![Licença](https://img.shields.io/badge/licença-proprietária-b42318?style=flat-square)
 
 <br />
@@ -323,6 +323,40 @@ pnpm lancar:testar
 O primeiro confere se as quatro versões concordam. O segundo mostra uma prévia da sincronização, sem alterar arquivos nem consultar o GitHub. O terceiro executa os testes das proteções de release.
 
 Os números acima são exemplos de comandos, não um anúncio de release. Para reconstruir deliberadamente uma versão já publicada, use a opção `--recompilar` com a versão correspondente. Essa opção dispensa a consulta de duplicidade no GitHub, mas mantém as validações dos arquivos e do build. Não substitua uma release publicada usando esses arquivos.
+
+### Checklist de release e servidor remoto
+
+Para uma nova versão, escolha o próximo número a partir da versão atual. O comando `pnpm lancar` executa o build assinado do Tauri e exige o toolchain nativo do Windows, incluindo o linker MSVC. Quando o computador não tiver esse ambiente, sincronize apenas os números e deixe o GitHub Actions gerar os instaladores:
+
+```powershell
+pnpm versao:sincronizar 0.2.26
+pnpm verificar
+pnpm test
+git status
+git add .
+git commit -m "Prepara release 0.2.26"
+git pull --rebase origin main
+git push origin main
+git tag v0.2.26
+git push origin v0.2.26
+```
+
+O push da tag `v0.2.26` dispara `.github/workflows/pacotes-windows.yml`. Esse workflow confere a versão, compila os instaladores Windows e cria ou atualiza a Release oficial com `.exe`, `.msi`, assinaturas e `latest.json`. Não é necessário criar a Release manualmente. Se o `pull --rebase` apresentar conflito, resolva-o antes de criar a tag e nunca use `git push --force`.
+
+Depois que `main` e a tag forem publicados, atualize o gateway no Droplet da DigitalOcean pelo Web Console:
+
+```bash
+cd /opt/kyro
+git pull --ff-only origin main
+systemctl restart kyro-gowa.service kyro-worker.service
+curl -s -H "x-niko: 1" http://127.0.0.1:47831/api/health
+```
+
+O resultado esperado do health check contém `"api":"ok"` e `"banco":"ok"`. A `DATABASE_URL` do Neon fica configurada uma única vez, fora do repositório, em `/etc/kyro-gateway/gowa.env`. Não publique esse arquivo nem a connection string. Só será necessário configurá-la novamente se o servidor for recriado, o arquivo for removido ou a credencial do banco mudar. O Neon armazena os dados e o schema; a versão do Kyro é controlada pelo repositório e pela Release.
+
+### Sincronização remota sem polling agressivo
+
+O navegador mantém uma conexão WebSocket autenticada com o gateway. O gateway envia dados e estado do WhatsApp somente quando há mudança; não use timers de 1 ou 5 segundos para consultar o Neon. Se o WebSocket cair, o cliente usa apenas o fallback HTTP espaçado. Para o aviso de dados funcionar, `KYRO_GATEWAY_URL` e `KYRO_GATEWAY_SECRET` precisam estar na Vercel, e `NIKO_GATEWAY_SECRET` no gateway deve ter o mesmo valor de `KYRO_GATEWAY_SECRET`. O agendador do VPS continua independente do navegador e segue executando mensagens e prints mesmo com o computador desligado.
 
 ## Estrutura
 

@@ -2,11 +2,12 @@ import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, AtSign, EyeOff, Forward, Paperclip, Play, Send, Settings2 } from "lucide-react";
 import { T } from "../../textos/textos";
 import { useWhatsapp } from "../../estado/whatsapp";
+import { useAuth } from "../../estado/autenticacao";
 import { avisoLigado, useIlha } from "../../estado/ilha";
 import { useConfig } from "../../estado/configuracoes";
 import { useInterface } from "../../estado/interface";
 import { tocarSom } from "../../ponte/sons";
-import { corDoNome, iniciaisDoNome, whatsappPonte, type ConversaWhatsapp, type MensagemWhatsapp, type NovidadeWhatsapp } from "../../ponte/whatsapp";
+import { corDoNome, iniciaisDoNome, whatsappPonte, whatsappRemotoAtivo, type ConversaWhatsapp, type MensagemWhatsapp, type NovidadeWhatsapp } from "../../ponte/whatsapp";
 import { horarioRelativo } from "../../utilitarios/datas";
 import { formatarTamanho } from "../../utilitarios/anexos";
 import { mensagemDoWhatsapp } from "../../modulos/conexoes/ConexaoWhatsapp";
@@ -26,7 +27,21 @@ function anunciar(itens: NovidadeWhatsapp[]) {
 
 export function usarAvisosDoWhatsapp(): boolean {
   const ligado = useWhatsapp((s) => Boolean(s.estado?.ligado));
+  const usuario = useAuth((s) => s.usuario);
+  const remoto = whatsappRemotoAtivo(usuario);
   useEffect(() => {
+    if (remoto) {
+      let seq = useWhatsapp.getState().estado?.seq ?? -1;
+      const receber = (evento: Event) => {
+        const detalhe = (evento as CustomEvent<{ itens?: unknown[]; inicial?: boolean }>).detail;
+        const itens = Array.isArray(detalhe?.itens) ? detalhe.itens.filter((item): item is NovidadeWhatsapp => Boolean(item && typeof item === "object" && typeof (item as NovidadeWhatsapp).seq === "number" && typeof (item as NovidadeWhatsapp).nome === "string")) : [];
+        const novas = itens.filter((item) => item.seq > seq);
+        if (detalhe?.inicial !== true) anunciar(novas);
+        if (itens.length > 0) seq = Math.max(seq, ...itens.map((item) => item.seq));
+      };
+      window.addEventListener("niko:whatsapp-novidades", receber);
+      return () => window.removeEventListener("niko:whatsapp-novidades", receber);
+    }
     let vivo = true;
     let relogio: number | undefined;
     let seq = -1;
@@ -59,7 +74,7 @@ export function usarAvisosDoWhatsapp(): boolean {
       vivo = false;
       window.clearTimeout(relogio);
     };
-  }, []);
+  }, [remoto]);
   return ligado;
 }
 
@@ -266,17 +281,24 @@ export function VisaoWhatsapp() {
   const estado = useWhatsapp((s) => s.estado);
   const carregar = useWhatsapp((s) => s.carregar);
   const irPara = useInterface((s) => s.irPara);
+  const usuario = useAuth((s) => s.usuario);
+  const remoto = whatsappRemotoAtivo(usuario);
   const [aberta, setAberta] = useState<ConversaWhatsapp | null>(null);
   const abertaRef = useRef<string | null>(null);
 
   useEffect(() => {
     void carregar();
+    if (remoto) {
+      return () => {
+        if (abertaRef.current) void whatsappPonte.fechar().catch(() => undefined);
+      };
+    }
     const relogio = window.setInterval(() => void carregar(), 3000);
     return () => {
       window.clearInterval(relogio);
       if (abertaRef.current) void whatsappPonte.fechar().catch(() => undefined);
     };
-  }, [carregar]);
+  }, [carregar, remoto]);
 
   useEffect(() => {
     if (!aberta) return;

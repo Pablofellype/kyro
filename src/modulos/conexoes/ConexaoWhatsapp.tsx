@@ -30,7 +30,8 @@ export function CartaoWhatsapp({ aoConfigurar }: { aoConfigurar: () => void }) {
   const remoto = whatsappRemotoAtivo(usuario);
   useEffect(() => {
     void carregar();
-    const relogio = window.setInterval(() => void carregar(), remoto ? 5000 : 15000);
+    if (remoto) return;
+    const relogio = window.setInterval(() => void carregar(), 15000);
     return () => window.clearInterval(relogio);
   }, [carregar, remoto]);
   const ativa = Boolean(estado?.ligado && estado.vinculo === "conectado");
@@ -66,9 +67,10 @@ export function ConfigWhatsapp({ aberto, aoFechar }: { aberto: boolean; aoFechar
   useEffect(() => {
     if (!aberto) return;
     void carregar();
+    if (remoto) return;
     const relogio = window.setInterval(() => void carregar(), 1500);
     return () => window.clearInterval(relogio);
-  }, [aberto, carregar]);
+  }, [aberto, carregar, remoto]);
 
   const agir = async (acao: () => Promise<EstadoWhatsapp | unknown>) => {
     setErro("");

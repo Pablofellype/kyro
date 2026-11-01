@@ -1,5 +1,6 @@
 import { createJSONStorage, type StateStorage } from "zustand/middleware";
 import { urlApi } from "../estado/autenticacao";
+import { useWhatsapp } from "../estado/whatsapp";
 import { objeto } from "../utilitarios/validacoes";
 import { endpointTempoReal } from "./tempoReal";
 
@@ -365,6 +366,13 @@ function conectarTempoReal() {
       if (mensagem.tipo === "pronto") {
         sincroniaTempoRealAtiva = true;
         definirSituacaoSincronia(pendentes.size ? "pendente" : "conectado", pendentes.size, Date.now());
+        return;
+      }
+      if (mensagem.tipo === "whatsapp" && objeto(mensagem.estado)) {
+        useWhatsapp.getState().definir(mensagem.estado as never);
+        window.dispatchEvent(new CustomEvent("niko:whatsapp-novidades", {
+          detail: { itens: Array.isArray(mensagem.novidades) ? mensagem.novidades : [], inicial: mensagem.inicial === true },
+        }));
         return;
       }
       if (mensagem.tipo !== "dados" || !objeto(mensagem.dados)) return;

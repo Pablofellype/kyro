@@ -24,7 +24,7 @@ import {
 import { ehRotaDeAgente, receberEventoDeAgente, estadoDosAgentes, instalarAgente, previaDoAgente, removerAgente } from "./agentesDeCodigo.ts";
 import { listarArquivos, receberArquivo, enviarConteudo, excluirArquivo, excluirArquivosDaMateria, baixarArquivo, abrirArquivoNoPrograma, exportarParaDownloads } from "./arquivos.ts";
 import { tipoDoComputador, estadoDoSistema, listarRedes, listarBluetooth, lerComputador, conectarRede, esquecerRede, desconectarRede, definirBrilho, definirRadio, abrirConfiguracoesDoSistema } from "./sistema.ts";
-import { instalarSincroniaTempoReal } from "./sincroniaTempoReal.ts";
+import { instalarSincroniaTempoReal, notificarDadosUsuarioAlterados } from "./sincroniaTempoReal.ts";
 import { configuracaoSalva, executarAderencias, enviarAderencia, navegadorDeAderenciasDisponivel, salvarConfiguracaoAderencias, testarAderencia } from "./aderencias.ts";
 
 const LIMITE_CORPO = 24 * 1024 * 1024;
@@ -344,6 +344,7 @@ export const rotas: Connect.NextHandleFunction = async (req, res, proximo) => {
         if (corpo.confirmacao !== "APAGAR") return responder(res, 400, { erro: "confirmacao_invalida" });
         const versao = typeof corpo.versao === "string" ? corpo.versao : null;
         const novaVersao = await zerarDadosUsuario(usuario.id, versao, clienteDaRequisicao(req));
+        notificarDadosUsuarioAlterados(usuario.id, novaVersao);
         return responder(res, 200, { ok: true, versao: novaVersao });
       }
       if (req.method === "POST" && url.searchParams.get("acao") === "restaurar") {
@@ -351,12 +352,14 @@ export const rotas: Connect.NextHandleFunction = async (req, res, proximo) => {
         const id = typeof corpo.id === "number" ? corpo.id : Number(corpo.id);
         const versao = typeof corpo.versao === "string" ? corpo.versao : null;
         const novaVersao = await restaurarBackupDadosUsuario(usuario.id, id, versao, clienteDaRequisicao(req));
+        notificarDadosUsuarioAlterados(usuario.id, novaVersao);
         return responder(res, 200, { ok: true, versao: novaVersao });
       }
       if (req.method === "POST") {
         const corpo = await lerCorpo(req);
         const versao = typeof corpo.versao === "string" ? corpo.versao : null;
         const novaVersao = await gravarDadosUsuario(usuario.id, validarItensDadosUsuario(corpo.itens), versao, clienteDaRequisicao(req));
+        notificarDadosUsuarioAlterados(usuario.id, novaVersao);
         return responder(res, 200, { ok: true, versao: novaVersao });
       }
       return responder(res, 405, { erro: "metodo_nao_permitido" });
@@ -364,6 +367,19 @@ export const rotas: Connect.NextHandleFunction = async (req, res, proximo) => {
       if (e instanceof ConflitoDadosUsuario) return responder(res, 409, { erro: "conflito_sincronizacao", versao: e.versao, dados: e.dados });
       return responder(res, 400, { erro: (e as Error).message });
     }
+  }
+
+  if (url.pathname === "/gateway/dados/alterado") {
+    const esperado = process.env.NIKO_GATEWAY_SECRET?.trim();
+    const recebido = typeof req.headers["x-kyro-gateway-secret"] === "string" ? req.headers["x-kyro-gateway-secret"] : "";
+    if (req.method !== "POST") return responder(res, 405, { erro: "metodo_nao_permitido" });
+    if (!esperado) return responder(res, 503, { erro: "gateway_remoto_nao_configurado" });
+    if (!recebido || recebido !== esperado) return responder(res, 401, { erro: "gateway_nao_autorizado" });
+    const usuarioId = Number(req.headers["x-kyro-user-id"]);
+    if (!Number.isSafeInteger(usuarioId) || usuarioId <= 0) return responder(res, 400, { erro: "usuario_invalido" });
+    const versao = typeof req.headers["x-kyro-dados-versao"] === "string" ? req.headers["x-kyro-dados-versao"] : undefined;
+    notificarDadosUsuarioAlterados(usuarioId, versao);
+    return responder(res, 202, { ok: true });
   }
 
   const gatewayAderencia = /^\/gateway\/aderencias\/(estado|testar|enviar|executar|configuracao)$/.exec(url.pathname);

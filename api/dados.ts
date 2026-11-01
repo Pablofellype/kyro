@@ -13,6 +13,25 @@ function clienteDaRequisicao(req: VercelRequest): string | null {
   return typeof valor === "string" ? valor : null;
 }
 
+async function avisarGatewayDados(usuarioId: number, versao: string): Promise<void> {
+  const base = (process.env.KYRO_GATEWAY_URL ?? "").trim().replace(/\/+$/, "");
+  const segredo = process.env.KYRO_GATEWAY_SECRET?.trim();
+  if (!base || !segredo) return;
+  try {
+    await fetch(`${base}/gateway/dados/alterado`, {
+      method: "POST",
+      headers: {
+        "x-kyro-gateway-secret": segredo,
+        "x-kyro-user-id": String(usuarioId),
+        "x-kyro-dados-versao": versao,
+      },
+      signal: AbortSignal.timeout(1500),
+    });
+  } catch {
+    // O WebSocket mantem um fallback HTTP espaçado caso o gateway esteja indisponivel.
+  }
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!configurarCors(req, res)) return res.status(403).json({ erro: "origem_nao_permitida" });
   res.setHeader("Cache-Control", "no-store");
@@ -47,6 +66,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (req.body?.confirmacao !== "APAGAR") return res.status(400).json({ erro: "confirmacao_invalida" });
       const versao = typeof req.body.versao === "string" ? req.body.versao : null;
       const novaVersao = await zerarDadosUsuario(usuario.id, versao, clienteDaRequisicao(req));
+      await avisarGatewayDados(usuario.id, novaVersao);
       return res.status(200).json({ ok: true, versao: novaVersao });
     }
 
@@ -55,6 +75,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const id = typeof corpo.id === "number" ? corpo.id : Number(corpo.id);
       const versao = typeof corpo.versao === "string" ? corpo.versao : null;
       const novaVersao = await restaurarBackupDadosUsuario(usuario.id, id, versao, clienteDaRequisicao(req));
+      await avisarGatewayDados(usuario.id, novaVersao);
       return res.status(200).json({ ok: true, versao: novaVersao });
     }
 
@@ -62,6 +83,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const corpo = req.body && typeof req.body === "object" ? req.body : {};
       const versao = typeof corpo.versao === "string" ? corpo.versao : null;
       const novaVersao = await gravarDadosUsuario(usuario.id, validarItensDadosUsuario(corpo.itens), versao, clienteDaRequisicao(req));
+      await avisarGatewayDados(usuario.id, novaVersao);
       return res.status(200).json({ ok: true, versao: novaVersao });
     }
 

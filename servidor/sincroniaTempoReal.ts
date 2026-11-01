@@ -3,9 +3,9 @@ import type { IncomingMessage, Server as HttpServer } from "node:http";
 import type { Duplex } from "node:stream";
 import { validarSessao } from "../src/servicos/autenticacao.ts";
 import { lerDadosUsuarioComVersao } from "../src/servicos/dadosUsuario.ts";
+import { assinarMudancasWhatsapp, comWhatsappUsuario, iniciarWhatsapp, pacoteWhatsapp } from "./whatsapp/whatsapp.ts";
 
 const CAMINHO = "/api/ws";
-const INTERVALO_MS = 1000;
 const TEMPO_PARA_AUTENTICAR_MS = 10000;
 
 interface MensagemDeEntrada {
@@ -17,11 +17,14 @@ interface Conexao {
   socket: WebSocket;
   usuarioId: number | null;
   versao: string;
-  intervalo: NodeJS.Timeout | null;
   limiteAutenticacao: NodeJS.Timeout;
   consultando: boolean;
+  consultaPendente: boolean;
   encerrada: boolean;
+  cancelarWhatsapp: (() => void) | null;
 }
+
+const conexoesPorUsuario = new Map<number, Set<Conexao>>();
 
 function mensagemValida(valor: unknown): valor is MensagemDeEntrada {
   return Boolean(valor && typeof valor === "object" && !Array.isArray(valor));
@@ -38,7 +41,11 @@ function enviar(conexao: Conexao, valor: unknown): boolean {
 }
 
 async function enviarDadosSeMudaram(conexao: Conexao, forcar = false) {
-  if (conexao.encerrada || conexao.usuarioId === null || conexao.consultando) return;
+  if (conexao.encerrada || conexao.usuarioId === null) return;
+  if (conexao.consultando) {
+    conexao.consultaPendente = true;
+    return;
+  }
   conexao.consultando = true;
   try {
     const atual = await lerDadosUsuarioComVersao(conexao.usuarioId);
@@ -48,13 +55,23 @@ async function enviarDadosSeMudaram(conexao: Conexao, forcar = false) {
     // A próxima rodada tenta novamente sem derrubar a conexão autenticada.
   } finally {
     conexao.consultando = false;
+    if (conexao.consultaPendente && !conexao.encerrada) {
+      conexao.consultaPendente = false;
+      queueMicrotask(() => void enviarDadosSeMudaram(conexao));
+    }
   }
 }
 
 function encerrar(conexao: Conexao) {
   if (conexao.encerrada) return;
   conexao.encerrada = true;
-  if (conexao.intervalo) clearInterval(conexao.intervalo);
+  if (conexao.usuarioId !== null) {
+    const conexoes = conexoesPorUsuario.get(conexao.usuarioId);
+    conexoes?.delete(conexao);
+    if (conexoes?.size === 0) conexoesPorUsuario.delete(conexao.usuarioId);
+  }
+  conexao.cancelarWhatsapp?.();
+  conexao.cancelarWhatsapp = null;
   clearTimeout(conexao.limiteAutenticacao);
 }
 
@@ -63,10 +80,11 @@ function tratarConexao(socket: WebSocket) {
     socket,
     usuarioId: null,
     versao: "",
-    intervalo: null,
     limiteAutenticacao: setTimeout(() => socket.close(1008, "autenticacao_obrigatoria"), TEMPO_PARA_AUTENTICAR_MS),
     consultando: false,
+    consultaPendente: false,
     encerrada: false,
+    cancelarWhatsapp: null,
   };
 
   const autenticar = async (token: string) => {
@@ -77,10 +95,22 @@ function tratarConexao(socket: WebSocket) {
     }
     conexao.usuarioId = usuario.id;
     clearTimeout(conexao.limiteAutenticacao);
+    let conexoes = conexoesPorUsuario.get(usuario.id);
+    if (!conexoes) {
+      conexoes = new Set();
+      conexoesPorUsuario.set(usuario.id, conexoes);
+    }
+    conexoes.add(conexao);
+    conexao.cancelarWhatsapp = assinarMudancasWhatsapp(usuario.id, (pacote) => {
+      enviar(conexao, { tipo: "whatsapp", ...pacote });
+    });
+    await comWhatsappUsuario(usuario.id, () => iniciarWhatsapp());
     if (!enviar(conexao, { tipo: "pronto" })) return;
     await enviarDadosSeMudaram(conexao, true);
     if (conexao.encerrada) return;
-    conexao.intervalo = setInterval(() => void enviarDadosSeMudaram(conexao), INTERVALO_MS);
+    comWhatsappUsuario(usuario.id, () => {
+      enviar(conexao, { tipo: "whatsapp", ...pacoteWhatsapp(), inicial: true });
+    });
   };
 
   socket.on("message", (bruto: RawData) => {
@@ -102,8 +132,14 @@ function tratarConexao(socket: WebSocket) {
   socket.on("error", () => encerrar(conexao));
 }
 
+export function notificarDadosUsuarioAlterados(usuarioId: number, _versao?: string) {
+  for (const conexao of conexoesPorUsuario.get(usuarioId) ?? []) {
+    if (!conexao.encerrada) void enviarDadosSeMudaram(conexao);
+  }
+}
+
 export function instalarSincroniaTempoReal(servidor: HttpServer) {
-  const wss = new WebSocketServer({ noServer: true, maxPayload: 4096 });
+  const wss = new WebSocketServer({ noServer: true, maxPayload: 1024 * 1024 });
   const atualizar = (req: IncomingMessage, socket: Duplex, cabecalho: Buffer) => {
     let caminho = "";
     try {
