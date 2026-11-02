@@ -2,11 +2,17 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createLogger, loadConfigFromFile } from "vite";
 import { criarServidorDeTeste as createServer } from "./vite-para-testes.mjs";
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 const raiz = fileURLToPath(new URL("../", import.meta.url));
 const arquivo = fileURLToPath(new URL("../vite.config.ts", import.meta.url));
 const LIMITE_PEDIDO_LOCAL_MS = 15_000;
+
+test("CORS da API aceita o identificador usado pelo WhatsApp remoto no desktop", () => {
+  const cors = readFileSync(fileURLToPath(new URL("../api/cors.ts", import.meta.url)), "utf8");
+  assert.match(cors, /Access-Control-Allow-Headers.*X-Kyro-User-Id/);
+});
 
 for (const carregador of ["bundle", "native"]) {
   test(`configuração do Vite carrega com ${carregador} sem incompatibilidades nativas`, async () => {
