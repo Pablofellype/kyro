@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Sun, Moon, PanelLeftClose, PanelLeftOpen, Check, Settings, ChevronDown, LogOut } from "lucide-react";
+import { Sun, Moon, PanelLeftClose, PanelLeftOpen, Check, Settings, ChevronDown, LogOut, UserRound, Building2 } from "lucide-react";
 import { useConfig, GRUPO_DA_ROTA } from "../../estado/configuracoes";
 import { useInterface } from "../../estado/interface";
 import { useRotina, tarefasDoDia } from "../../estado/rotina";
@@ -13,8 +13,9 @@ import { ICONE_ROTA } from "./rotas";
 import { LogoNiko } from "../../componentes/LogoNiko";
 import { Avatar } from "../../componentes/FotoPerfil";
 import { hojeISO } from "../../utilitarios/datas";
-import type { Rota } from "../../tipos";
+import type { AreaSistema, Rota } from "../../tipos";
 import { funcaoLigada, rotaLigada } from "../../utilitarios/funcoes";
+import { primeiraRotaDaArea, rotaDisponivelNaArea, rotaVisivelNaArea, ROTULOS_EMPRESA, ROTULOS_PESSOAIS } from "./areas";
 import { mudarTema } from "../area-de-trabalho/mudarTema";
 import { IndicadorSincronia } from "../../componentes/IndicadorSincronia";
 import { Marca } from "../../marcas/Marca";
@@ -154,6 +155,8 @@ export function BarraLateral({ recolhida }: { recolhida: boolean }) {
   const definir = useConfig((s) => s.definir);
   const recolhidaManual = useConfig((s) => s.barraRecolhida);
   const rota = useInterface((s) => s.rota);
+  const area = useInterface((s) => s.area);
+  const definirArea = useInterface((s) => s.definirArea);
   const irPara = useInterface((s) => s.irPara);
   const tarefas = useRotina((s) => s.tarefas);
   const mudarStatus = useRotina((s) => s.mudarStatus);
@@ -166,7 +169,7 @@ export function BarraLateral({ recolhida }: { recolhida: boolean }) {
   const [fade, setFade] = useState({ topo: false, base: false });
   const desligadas = useConfig((s) => s.funcoesDesligadas);
   const hoje = tarefasDoDia(tarefas, hojeISO()).filter((t) => t.status !== "cancelada").slice(0, 5);
-  const visiveis = barra.filter((i) => i.visivel && rotaLigada(i.rota, desligadas));
+  const visiveis = barra.filter((i) => i.visivel && rotaLigada(i.rota, desligadas) && rotaVisivelNaArea(i.rota, area));
   const mostrarHoje = funcaoLigada("journal", desligadas);
 
   useEffect(() => {
@@ -190,10 +193,16 @@ export function BarraLateral({ recolhida }: { recolhida: boolean }) {
 
   const alternarGrupo = (g: string) => definir({ gruposFechados: fechados.includes(g) ? fechados.filter((x) => x !== g) : [...fechados, g] });
 
+  const trocarArea = (proxima: AreaSistema) => {
+    if (proxima === area) return;
+    definirArea(proxima);
+    if (!rotaDisponivelNaArea(rota, proxima)) irPara(primeiraRotaDaArea(proxima));
+  };
+
   const item = (r: Rota, nomeItem?: string) => {
     const Icone = ICONE_ROTA[r];
     const ativo = rota === r;
-    const rotulo = nomeItem || T.rotas[r];
+    const rotulo = nomeItem || (area === "pessoal" ? ROTULOS_PESSOAIS[r] : ROTULOS_EMPRESA[r]) || T.rotas[r];
     const posicao = visiveis.findIndex((v) => v.rota === r) + 1;
     const contador = contadores[r];
     const atalho = posicao > 0 && posicao <= 9 ? ` (Ctrl + ${posicao})` : "";
@@ -236,6 +245,16 @@ export function BarraLateral({ recolhida }: { recolhida: boolean }) {
           <PanelLeftOpen size={16} />
         </button>
       )}
+      <div className="barra-contexto" role="tablist" aria-label="Área do sistema">
+        <button type="button" className="barra-contexto-botao" data-ativo={area === "pessoal" ? "sim" : "nao"} role="tab" aria-selected={area === "pessoal"} title="Pessoal" onClick={() => trocarArea("pessoal")}>
+          <UserRound size={14} />
+          {!recolhida && <span>Pessoal</span>}
+        </button>
+        <button type="button" className="barra-contexto-botao" data-ativo={area === "empresa" ? "sim" : "nao"} role="tab" aria-selected={area === "empresa"} title="Empresa" onClick={() => trocarArea("empresa")}>
+          <Building2 size={14} />
+          {!recolhida && <span>Empresa</span>}
+        </button>
+      </div>
       <div ref={rolagem} className="barra-rolagem" data-fade-topo={fade.topo ? "sim" : "nao"} data-fade-base={fade.base ? "sim" : "nao"}>
         <span
           className="barra-indicador"
@@ -246,7 +265,7 @@ export function BarraLateral({ recolhida }: { recolhida: boolean }) {
           if (itens.length === 0) return null;
           const fechado = !recolhida && fechados.includes(grupo) && !itens.some((i) => i.rota === rota || (rota === "whatsapp" && i.rota === "conexoes"));
           return (
-            <div key={grupo} className="barra-grupo">
+            <div key={grupo} className="barra-grupo" data-grupo={grupo}>
               {!recolhida && (
                 <button type="button" className="barra-rotulo" aria-expanded={!fechado} onClick={() => alternarGrupo(grupo)}>
                   <span className="rotulo-secao">{T.gruposBarra[grupo]}</span>
@@ -258,7 +277,7 @@ export function BarraLateral({ recolhida }: { recolhida: boolean }) {
           );
         })}
         {!recolhida && mostrarHoje && (
-          <div className="barra-grupo">
+          <div className="barra-grupo" data-grupo="hoje">
             <button type="button" className="barra-rotulo" aria-expanded={!hojeFechado} onClick={() => alternarGrupo("hoje")}>
               <span className="rotulo-secao">{T.gruposBarra.hoje}</span>
               <ChevronDown size={12} className="barra-rotulo-seta" />

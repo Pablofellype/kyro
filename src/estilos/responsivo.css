@@ -1,0 +1,773 @@
+/*
+ * Mobile pass
+ * A janela vira uma aplicação de coluna única: a navegação fica no topo e
+ * cada tela recebe o espaço inteiro para organizar seus próprios painéis.
+ */
+@media (max-width: 768px), (pointer: coarse) and (max-width: 1024px) {
+  html,
+  body,
+  #raiz {
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  body {
+    font-size: 12px;
+  }
+
+  .janela.estilo-sistema .janela-corpo {
+    min-height: 0;
+  }
+
+  .estilo-sistema .sistema {
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    zoom: 1 !important;
+  }
+
+  .estilo-sistema .barra-lateral {
+    width: 100%;
+    flex: 0 0 auto;
+    min-height: 0;
+    max-height: 164px;
+    gap: 6px;
+    padding: 8px 12px 4px;
+    overflow: hidden;
+    border-right: 0;
+    border-bottom: 1px solid var(--borda);
+  }
+
+  .estilo-sistema .barra-topo {
+    height: 26px;
+    padding: 0;
+  }
+
+  .estilo-sistema .barra-topo > .botao {
+    display: none;
+  }
+
+  .estilo-sistema .barra-contexto {
+    width: 100%;
+    height: 32px;
+    padding: 2px;
+    border-radius: 9px;
+  }
+
+  .estilo-sistema .barra-contexto-botao {
+    height: 26px;
+    font-size: 10.5px;
+  }
+
+  .estilo-sistema .barra-contexto-botao[data-ativo="sim"]::after {
+    right: 12px;
+    bottom: 2px;
+    left: 12px;
+  }
+
+  .estilo-sistema .barra-rolagem {
+    flex: 0 0 40px;
+    width: calc(100% + 4px);
+    min-height: 0;
+    flex-direction: row;
+    align-items: stretch;
+    gap: 6px;
+    padding: 0 2px 4px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    mask-image: none !important;
+    scrollbar-width: none;
+    scroll-snap-type: x proximity;
+    touch-action: pan-x;
+  }
+
+  .estilo-sistema .barra-rolagem::after {
+    content: "toque · deslize ›";
+    position: sticky;
+    right: 0;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    flex: 0 0 auto;
+    height: 34px;
+    padding: 0 8px 0 14px;
+    border-left: 1px solid var(--borda);
+    background: linear-gradient(90deg, color-mix(in srgb, var(--fundo-barra) 0%, transparent), var(--fundo-barra) 30%);
+    color: var(--texto-3);
+    font-size: 9px;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+    pointer-events: none;
+  }
+
+  .estilo-sistema .barra-rolagem::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Os botões já são autoexplicativos; o aviso não deve ocupar a área de toque. */
+  .estilo-sistema .barra-rolagem::after {
+    content: none;
+    display: none;
+  }
+
+  /* O breadcrumb da janela repete o contexto que já aparece no conteúdo. */
+  .estilo-sistema .janela-titulo {
+    visibility: hidden;
+  }
+
+  .estilo-sistema .barra-indicador,
+  .estilo-sistema .barra-rotulo,
+  .estilo-sistema .barra-grupo[data-grupo="hoje"] {
+    display: none !important;
+  }
+
+  .estilo-sistema .barra-grupo {
+    flex: 0 0 auto;
+    flex-direction: row;
+    align-items: stretch;
+    gap: 4px;
+  }
+
+  .estilo-sistema .barra-item,
+  .estilo-sistema .barra-subitem {
+    width: auto;
+    min-width: 72px;
+    height: 34px;
+    flex: 0 0 auto;
+    justify-content: center;
+    gap: 6px;
+    padding: 0 10px;
+    border: 1px solid var(--borda);
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--superficie) 78%, transparent);
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    touch-action: manipulation;
+    scroll-snap-align: start;
+  }
+
+  .estilo-sistema .barra-item:hover,
+  .estilo-sistema .barra-subitem:hover {
+    border-color: var(--borda-hover);
+    background: var(--superficie-2);
+  }
+
+  .estilo-sistema .barra-item[aria-current="page"],
+  .estilo-sistema .barra-subitem[aria-current="page"] {
+    border-color: color-mix(in srgb, var(--destaque) 58%, var(--borda));
+    background: color-mix(in srgb, var(--destaque) 18%, var(--superficie-2));
+    color: var(--texto);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--destaque) 16%, transparent);
+  }
+
+  .estilo-sistema .barra-item .cortar {
+    display: block;
+    max-width: 108px;
+  }
+
+  .estilo-sistema .barra-subitem {
+    height: 34px;
+    margin-left: 0;
+    flex-basis: auto;
+  }
+
+  .estilo-sistema .barra-subitem::before {
+    display: none;
+  }
+
+  .estilo-sistema .barra-contador {
+    position: static;
+    min-width: 17px;
+    width: auto;
+    height: 17px;
+    padding: 0 4px;
+    border-radius: 999px;
+    font-size: 9px;
+    line-height: 17px;
+  }
+
+  .estilo-sistema .barra-base {
+    min-height: 30px;
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+    padding-top: 2px;
+    border-top: 0;
+  }
+
+  .estilo-sistema .barra-base-linha {
+    min-width: 0;
+  }
+
+  .estilo-sistema .barra-base-linha .barra-perfil {
+    max-width: 180px;
+    padding: 3px 6px 3px 2px;
+    border: 1px solid var(--borda);
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--superficie) 78%, transparent);
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+
+  .estilo-sistema .barra-base .barra-icone {
+    border: 1px solid var(--borda);
+    background: color-mix(in srgb, var(--superficie) 78%, transparent);
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+
+  .estilo-sistema .barra-sincronia {
+    flex: 0 0 auto;
+    width: auto;
+    min-height: 26px;
+  }
+
+  .estilo-sistema .sistema-conteudo {
+    width: 100%;
+    min-width: 0;
+    min-height: 0;
+    flex: 1 1 auto;
+    overscroll-behavior: contain;
+  }
+
+  .estilo-sistema .pagina {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    overflow-x: clip;
+    padding: 16px 12px calc(26px + env(safe-area-inset-bottom, 0px));
+    gap: 18px;
+  }
+
+  .estilo-sistema .pagina:has(> .chat-tela),
+  .estilo-sistema .pagina:has(> .wpp-tela) {
+    padding: 0;
+  }
+
+  .estilo-sistema .cabecalho-aba {
+    align-items: stretch;
+    gap: 8px;
+    min-height: 0;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--borda);
+  }
+
+  .estilo-sistema .cabecalho-aba-texto {
+    gap: 3px;
+  }
+
+  .estilo-sistema .cabecalho-aba-rotulo {
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    color: var(--texto-3);
+  }
+
+  .estilo-sistema .titulo-pagina {
+    max-width: 100%;
+    font-size: clamp(25px, 8vw, 31px);
+    font-weight: 700;
+    line-height: 1.08;
+    letter-spacing: -0.025em;
+  }
+
+  .estilo-sistema .cabecalho-aba-sub {
+    max-width: 100%;
+    margin-top: 3px;
+    color: var(--texto-2);
+    font-size: 13px;
+    line-height: 1.45;
+  }
+
+  .estilo-sistema .cabecalho-aba-acoes {
+    width: 100%;
+    max-width: 100%;
+    margin-top: 2px;
+    gap: 6px;
+    overflow-x: auto;
+    overflow-y: visible;
+    flex-wrap: nowrap;
+    padding: 1px 1px 3px;
+    scrollbar-width: none;
+    touch-action: pan-x;
+  }
+
+  .estilo-sistema .cabecalho-aba-acoes::-webkit-scrollbar {
+    display: none;
+  }
+
+  .estilo-sistema .cabecalho-aba-acoes > * {
+    flex: 0 0 auto;
+    max-width: 100%;
+  }
+
+  .estilo-sistema .cartao {
+    padding: 14px;
+    border-radius: 12px;
+  }
+
+  .estilo-sistema .cartao-cabecalho {
+    min-height: 24px;
+    margin-bottom: 10px;
+  }
+
+  .estilo-sistema .cartao-titulo {
+    font-size: 10px;
+  }
+
+  .estilo-sistema .bento {
+    border-radius: 12px;
+  }
+
+  .estilo-sistema .bento > * {
+    min-width: 0;
+  }
+
+  .estilo-sistema .grade {
+    gap: 10px;
+  }
+
+  .estilo-sistema .formulario {
+    gap: 12px;
+  }
+
+  .estilo-sistema .formulario-linha {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .estilo-sistema .formulario-acoes {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .estilo-sistema .formulario-acoes .botao {
+    flex: 1 1 120px;
+  }
+
+  .estilo-sistema .tabela-rolagem {
+    max-width: calc(100vw - 24px);
+    overscroll-behavior-x: contain;
+  }
+
+  .estilo-sistema .lista-item-acoes,
+  .estilo-sistema .fin-acoes-ocultas {
+    opacity: 1;
+  }
+
+  .fundo-modal {
+    align-items: flex-end;
+    padding: 12px 10px max(10px, env(safe-area-inset-bottom, 10px));
+  }
+
+  .modal,
+  .modal-largo {
+    width: 100%;
+    max-width: none;
+    max-height: min(92dvh, calc(100% - 4px));
+    border-radius: 16px;
+  }
+
+  .modal-cabecalho {
+    padding: 14px 14px 0;
+  }
+
+  .modal-corpo {
+    padding: 14px;
+  }
+
+  .avisos-rodape {
+    right: 10px;
+    bottom: max(10px, env(safe-area-inset-bottom, 10px));
+    left: 10px;
+    transform: none;
+    align-items: stretch;
+  }
+
+  .aviso-rodape {
+    max-width: none;
+  }
+
+  /* Início: dois cartões compactos lado a lado, preservando os blocos largos. */
+  .estilo-sistema .inicio-bento-grade {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .estilo-sistema .inicio-bloco {
+    gap: 10px;
+    padding: 14px;
+  }
+
+  .estilo-sistema .inicio-bloco[data-bloco="hoje"],
+  .estilo-sistema .inicio-bloco[data-bloco="foco"],
+  .estilo-sistema .inicio-bloco[data-bloco="mapa"],
+  .estilo-sistema .inicio-bloco[data-bloco="conquistas"] {
+    grid-column: 1 / -1;
+  }
+
+  .estilo-sistema .inicio-bloco[data-bloco="hoje"],
+  .estilo-sistema .inicio-bloco[data-bloco="foco"] {
+    gap: 14px;
+    padding: 14px 12px 16px;
+  }
+
+  .estilo-sistema .inicio-bloco[data-bloco="hoje"] > .secao-cabecalho,
+  .estilo-sistema .inicio-bloco[data-bloco="foco"] > .secao-cabecalho {
+    min-height: 30px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--borda-suave);
+  }
+
+  .estilo-sistema .inicio-bloco[data-bloco="hoje"] .secao-titulo,
+  .estilo-sistema .inicio-bloco[data-bloco="foco"] .secao-titulo {
+    font-weight: 600;
+  }
+
+  .estilo-sistema .inicio-bloco[data-bloco="hoje"] > .vazio {
+    min-height: 112px;
+    padding: 16px 8px 10px;
+    gap: 8px;
+  }
+
+  .estilo-sistema .inicio-bloco[data-bloco="hoje"] > .vazio .vazio-titulo {
+    color: var(--texto);
+    font-size: 13px;
+    line-height: 1.35;
+  }
+
+  .estilo-sistema .inicio-bloco[data-bloco="hoje"] > .vazio .botao {
+    min-height: 36px;
+  }
+
+  .estilo-sistema .inicio-agente {
+    grid-template-columns: 60px minmax(0, 1fr);
+    gap: 10px;
+    padding: 11px 12px 11px 8px;
+  }
+
+  .estilo-sistema .inicio-agente-retrato {
+    width: 60px;
+    height: 60px;
+  }
+
+  .estilo-sistema .inicio-agente-fala {
+    font-size: 11.5px;
+    -webkit-line-clamp: 2;
+  }
+
+  .estilo-sistema .inicio-foco {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: center;
+    gap: 12px;
+  }
+
+  .estilo-sistema .inicio-foco-anel {
+    width: 128px;
+    height: 128px;
+    flex: none;
+  }
+
+  .estilo-sistema .inicio-foco-anel > svg {
+    width: 128px;
+    height: 128px;
+  }
+
+  .estilo-sistema .inicio-foco-relogio {
+    font-size: 24px;
+  }
+
+  .estilo-sistema .inicio-foco-lado {
+    width: 100%;
+    flex: none;
+    gap: 8px;
+  }
+
+  .estilo-sistema .inicio-foco-etapas {
+    min-height: 36px;
+  }
+
+  .estilo-sistema .inicio-foco-materia,
+  .estilo-sistema .inicio-foco-materia .escolha-gatilho {
+    height: 36px;
+  }
+
+  .estilo-sistema .inicio-foco-botoes {
+    width: 100%;
+    min-height: 38px;
+  }
+
+  .estilo-sistema .inicio-foco-principal {
+    min-height: 38px;
+  }
+
+  .estilo-sistema .inicio-foco-icone {
+    width: 38px;
+    height: 38px;
+    flex-basis: 38px;
+  }
+
+  .estilo-sistema .inicio-par-linhas {
+    width: 100%;
+  }
+
+  .estilo-sistema .inicio-par-linhas .numero-grande {
+    font-size: 28px;
+  }
+
+  /* Finanças: o resumo vira uma matriz curta e as abas rolam na horizontal. */
+  .estilo-sistema .fin-hero {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .estilo-sistema .fin-hero-celula {
+    padding: 14px;
+  }
+
+  .estilo-sistema .fin-hero-celula:first-child {
+    grid-column: 1 / -1;
+  }
+
+  .estilo-sistema .fin-hero-numero {
+    font-size: clamp(30px, 10vw, 42px);
+  }
+
+  .estilo-sistema .fin-hero-valor {
+    font-size: 18px;
+  }
+
+  .estilo-sistema .fin-abas {
+    flex-wrap: nowrap;
+    max-width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+    touch-action: pan-x;
+  }
+
+  .estilo-sistema .fin-abas::-webkit-scrollbar {
+    display: none;
+  }
+
+  .estilo-sistema .fin-abas-grupo {
+    flex: 0 0 auto;
+    padding: 8px 10px;
+    border-right: 1px solid var(--borda-suave);
+    border-bottom: 0;
+  }
+
+  .estilo-sistema .fin-abas-botoes {
+    flex-wrap: nowrap;
+  }
+
+  .estilo-sistema .fin-abas-resumo {
+    flex: 0 0 auto;
+    align-self: center;
+    margin-left: 0;
+    padding: 0 12px;
+  }
+
+  .estilo-sistema .fin-filtros {
+    align-items: stretch;
+  }
+
+  /* Calendário: controles em uma faixa e a semana usa rolagem interna. */
+  .estilo-sistema .cl-acoes {
+    align-items: stretch;
+    gap: 6px;
+  }
+
+  .estilo-sistema .cl-acoes-linha {
+    justify-content: flex-start;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .estilo-sistema .cl-acoes-linha::-webkit-scrollbar,
+  .estilo-sistema .cl-fontes::-webkit-scrollbar {
+    display: none;
+  }
+
+  .estilo-sistema .cl-fontes {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    scrollbar-width: none;
+  }
+
+  .estilo-sistema .cl-fontes-rotulo,
+  .estilo-sistema .cl-fonte {
+    flex: 0 0 auto;
+  }
+
+  .estilo-sistema .cl-mes {
+    grid-auto-rows: minmax(46px, auto);
+  }
+
+  .estilo-sistema .cl-dia {
+    gap: 2px;
+    padding: 4px 2px;
+  }
+
+  .estilo-sistema .cl-dia-numero {
+    font-size: 11px;
+  }
+
+  .estilo-sistema .cl-dia-chips {
+    display: none;
+  }
+
+  .estilo-sistema .cl-dia-pontos {
+    display: flex;
+  }
+
+  .estilo-sistema .cl-semana-quadro {
+    max-width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+  }
+
+  .estilo-sistema .cl-semana {
+    min-width: 560px;
+  }
+
+  /* Journal: mantém a faixa semanal legível e reduz cartões auxiliares. */
+  .estilo-sistema .jn-acoes {
+    align-items: stretch;
+    gap: 6px;
+  }
+
+  .estilo-sistema .jn-acoes-linha {
+    justify-content: flex-start;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .estilo-sistema .jn-acoes-linha::-webkit-scrollbar {
+    display: none;
+  }
+
+  .estilo-sistema .jn-faixa {
+    gap: 3px;
+  }
+
+  .estilo-sistema .jn-faixa-dia {
+    padding: 8px 4px;
+  }
+
+  .estilo-sistema .jn-faixa-numero {
+    font-size: 22px;
+  }
+
+  /* WhatsApp e Chat já usam gavetas; aqui garantimos que o painel ocupe a altura útil. */
+  .estilo-sistema .wpp-tela,
+  .estilo-sistema .chat-tela {
+    min-height: 0;
+    height: 100%;
+  }
+
+  .estilo-sistema .wpp-lista-topo,
+  .estilo-sistema .chat-conversas-topo {
+    padding-top: 12px;
+  }
+
+  .estilo-sistema .chat-conversas-titulo h1 {
+    font-size: 30px;
+  }
+
+  /* Estudos e configurações: listas laterais se tornam faixas horizontais. */
+  .estilo-sistema .est-paginas,
+  .estilo-sistema .ajustes-secoes {
+    max-width: 100%;
+    overflow-x: auto;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    gap: 4px;
+    padding: 8px;
+    scrollbar-width: none;
+  }
+
+  .estilo-sistema .est-paginas::-webkit-scrollbar,
+  .estilo-sistema .ajustes-secoes::-webkit-scrollbar {
+    display: none;
+  }
+
+  .estilo-sistema .est-pagina-item,
+  .estilo-sistema .ajustes-secao {
+    flex: 0 0 auto;
+    width: auto;
+  }
+
+  .estilo-sistema .ajustes-cartao-cabecalho {
+    align-items: flex-start;
+    padding: 16px;
+  }
+
+  .estilo-sistema .ajustes-cartao-titulo {
+    font-size: 28px;
+  }
+
+  .estilo-sistema .ajuste-linha,
+  .estilo-sistema .ajuste-nota,
+  .estilo-sistema .ajuste-grupo,
+  .estilo-sistema .ajuste-bloco {
+    padding-right: 16px;
+    padding-left: 16px;
+  }
+}
+
+@media (max-width: 420px) {
+  .estilo-sistema .barra-lateral {
+    max-height: 158px;
+    padding-right: 8px;
+    padding-left: 8px;
+  }
+
+  .estilo-sistema .barra-item,
+  .estilo-sistema .barra-subitem {
+    min-width: 62px;
+    padding-right: 8px;
+    padding-left: 8px;
+    font-size: 10px;
+  }
+
+  .estilo-sistema .barra-item .cortar {
+    max-width: 84px;
+  }
+
+  .estilo-sistema .pagina {
+    padding-right: 10px;
+    padding-left: 10px;
+  }
+
+  .estilo-sistema .formulario-linha {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .estilo-sistema .inicio-bento-grade {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .estilo-sistema .inicio-bloco:not([data-bloco="hoje"]):not([data-bloco="foco"]):not([data-bloco="mapa"]):not([data-bloco="conquistas"]) {
+    grid-column: 1 / -1;
+  }
+
+  .estilo-sistema .fin-hero-celula {
+    padding: 12px 10px;
+  }
+
+  .estilo-sistema .fin-hero-valor {
+    font-size: 16px;
+  }
+
+  .estilo-sistema .cl-mes {
+    grid-auto-rows: minmax(40px, auto);
+  }
+
+  .estilo-sistema .cl-mes-cabecalho span {
+    padding-right: 2px;
+    padding-left: 2px;
+    font-size: 8px;
+  }
+}

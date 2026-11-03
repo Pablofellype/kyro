@@ -5,7 +5,7 @@ import { TextoRico } from "../../componentes/TextoRico";
 import { CartoesDaMensagem } from "../../componentes/CartaoAcao";
 import { EscolhaDoAgente } from "../../componentes/EscolhaDoAgente";
 import { AnexosDaMensagem, ChipsAnexos, ZonaDeSoltar, useAnexos, useArrastarArquivos } from "../../componentes/AnexosChat";
-import { Personagem } from "../../personagens/Personagem";
+import { CARGO_KYRO, NOME_KYRO, PersonagemKyro } from "../../personagens/PersonagemKyro";
 import { Botao } from "../../componentes/basicos";
 import { Marca, type MarcaId } from "../../marcas/Marca";
 import { useComunicacao } from "../../estado/comunicacao";
@@ -100,7 +100,7 @@ const MensagemChat = memo(function MensagemChat({ conversaId, m, nome, cargo, ul
       <div className={`chat-msg chat-msg-${m.autor}`} data-agente={m.agenteId}>
         {doAgente && (
           <span className="chat-msg-avatar">
-            <Personagem agente={m.agenteId} estado="ocioso" tamanho={46} interativo={false} halo={false} olhar={false} />
+            <PersonagemKyro tamanho={46} />
           </span>
         )}
         <div className="chat-msg-corpo">
@@ -174,7 +174,7 @@ function RespostaAoVivo({ conversaId }: { conversaId: string }) {
   return (
     <div className="chat-msg chat-msg-agente chat-msg-viva" data-agente={agente}>
       <span className="chat-msg-avatar">
-        <Personagem agente={agente} estado="escrevendo" tamanho={46} interativo={false} halo={false} />
+        <PersonagemKyro tamanho={46} />
       </span>
       <div className="chat-msg-corpo">
         <div className="chat-msg-cabeca">
@@ -200,22 +200,18 @@ function RolarParaFim({ alvo, conversaId, quantidade }: { alvo: React.RefObject<
   return null;
 }
 
-function previaDaConversa(c: Conversa, nomes: Record<AgenteId, string>): string {
+function previaDaConversa(c: Conversa): string {
   const ultima = c.mensagens[c.mensagens.length - 1];
   if (!ultima) return "";
   const texto = (ultima.texto || ultima.anexos?.map((a) => a.nome).join(", ") || "").replace(/\s+/g, " ").trim();
-  return ultima.autor === "agente" ? `${nomes[ultima.agenteId]}: ${texto}` : texto;
-}
-
-function agenteDaConversa(c: Conversa): AgenteId {
-  for (let i = c.mensagens.length - 1; i >= 0; i -= 1) if (c.mensagens[i].autor === "agente") return c.mensagens[i].agenteId;
-  return c.agenteId;
+  return ultima.autor === "agente" ? `${NOME_KYRO}: ${texto}` : texto;
 }
 
 export default function Chat() {
   const parametros = useInterface((s) => s.parametros);
   const avisar = useInterface((s) => s.avisar);
   const irPara = useInterface((s) => s.irPara);
+  const area = useInterface((s) => s.area);
   const conversas = useComunicacao((s) => s.conversas);
   const criar = useComunicacao((s) => s.criarConversa);
   const excluir = useComunicacao((s) => s.excluirConversa);
@@ -356,6 +352,7 @@ export default function Chat() {
   const podeAcoesDeAnexo = anexos.lista.length > 0 && anexos.lista.every((a) => a.tipo === "texto" || a.tipo === "imagem");
   const mostrarRecursos = anexos.lista.length === 0 && !atual?.mensagens.length;
   const tituloIa = provedor ? fila.map((p) => `${p.provedor.nome} . ${p.modelo}`).join("\n") : T.chat.configurarIa;
+  const mostrarDetalhesIa = area === "empresa";
 
   return (
     <div className="chat-tela" data-gaveta={gavetaAberta ? "aberta" : "fechada"}>
@@ -367,7 +364,7 @@ export default function Chat() {
               <button type="button" className="chat-fechar-gaveta" aria-label={T.chat.fecharConversas} title={T.chat.fecharConversas} onClick={() => setGavetaAberta(false)}>
                 <X size={14} />
               </button>
-              <h1>{T.chat.titulo}</h1>
+              <h1>{area === "pessoal" ? "Assistente" : T.chat.titulo}</h1>
             </span>
             <Botao variante="primario" className="chat-nova" icone={<Plus size={13} />} onClick={novaConversa}>{T.chat.novaConversa}</Botao>
           </div>
@@ -386,14 +383,14 @@ export default function Chat() {
                 {grupos[g].map((c) => (
                   <button key={c.id} type="button" className="chat-conversa" aria-current={c.id === atualId} onClick={() => abrirConversa(c.id)}>
                     <span className="chat-conversa-avatar">
-                      <Personagem agente={agenteDaConversa(c)} estado="ocioso" tamanho={34} interativo={false} halo={false} olhar={false} />
+                      <PersonagemKyro tamanho={34} />
                     </span>
                     <span className="chat-conversa-texto">
                       <span className="chat-conversa-linha">
                         <span className="chat-conversa-titulo">{c.titulo || T.chat.novaConversa}</span>
                         <span className="chat-conversa-hora">{horaDaConversa(c.atualizadaEm)}</span>
                       </span>
-                      <span className="chat-conversa-previa privado">{previaDaConversa(c, nomes)}</span>
+                      <span className="chat-conversa-previa privado">{previaDaConversa(c)}</span>
                     </span>
                   </button>
                 ))}
@@ -403,7 +400,7 @@ export default function Chat() {
         </div>
       </aside>
       <section className="chat-area" ref={principal}>
-        <ZonaDeSoltar ativo={arrastando} agente={mascote} />
+        <ZonaDeSoltar ativo={arrastando} />
         <header className="chat-cabecalho">
           <div className="chat-cabecalho-info">
             <button type="button" className="chat-botao-conversas" onClick={() => setGavetaAberta(true)} aria-expanded={gavetaAberta}>
@@ -412,15 +409,13 @@ export default function Chat() {
               <span className="chat-contador">{conversas.length}</span>
             </button>
             <div className="chat-avatares">
-              {AGENTES.map((a) => (
-                <span key={a} className="chat-avatar">
-                  <Personagem agente={a} tamanho={38} halo={false} rotulo={nomes[a]} />
-                </span>
-              ))}
+              <span className="chat-avatar">
+                <PersonagemKyro tamanho={38} />
+              </span>
             </div>
             <div className="chat-cabecalho-texto">
               <b className="cortar">{atual?.titulo || T.chat.tituloTime}</b>
-              <span className="chat-cabecalho-sub">{T.chat.listaNomes(AGENTES.map((a) => nomes[a]))} · {T.chat.funcionaSemIa}</span>
+              <span className="chat-cabecalho-sub">{area === "pessoal" ? "Seu assistente para organizar a rotina." : `${NOME_KYRO} · ${T.chat.funcionaSemIa}`}</span>
             </div>
           </div>
           {atual && (
@@ -440,27 +435,31 @@ export default function Chat() {
               />
             </span>
           )}
-          <div className="chat-ia" data-estado={provedor ? "conectada" : "comandos"} title={tituloIa}>
+          <div className="chat-ia" data-estado={provedor ? "conectada" : "comandos"} title={mostrarDetalhesIa ? tituloIa : "Assistente pronto"}>
             <span className="chat-ia-logo">
-              {provedor ? <LogoDoProvedor uso={provedor} /> : <Terminal size={13} />}
+              {provedor && mostrarDetalhesIa ? <LogoDoProvedor uso={provedor} /> : <MessagesSquare size={13} />}
               <span className="chat-ia-ponto" />
             </span>
             <span className="chat-ia-texto">
               <span className="chat-ia-nome">
-                <span className="cortar">{provedor ? provedor.provedor.nome : T.chat.modoComandos}</span>
-                <span className="chat-ia-estado">{provedor ? T.chat.iaConectada : T.chat.semIa}</span>
+                <span className="cortar">{mostrarDetalhesIa && provedor ? provedor.provedor.nome : area === "pessoal" ? "Assistente" : T.chat.modoComandos}</span>
+                <span className="chat-ia-estado">{area === "pessoal" ? "pronto" : provedor ? T.chat.iaConectada : T.chat.semIa}</span>
               </span>
-              {provedor && (
+              {provedor && mostrarDetalhesIa && (
                 <span className="chat-ia-modelo">
                   <span className="cortar">{provedor.modelo}</span>
                   {fila.length > 1 && <span className="chat-ia-reservas">+{fila.length - 1}</span>}
                 </span>
               )}
             </span>
-            <span className="chat-ia-divisor" />
-            <button type="button" className="chat-ia-config" aria-label={T.chat.configurarIa} title={T.chat.configurarIa} onClick={() => irPara("ia")}>
-              <Settings2 size={14} />
-            </button>
+            {mostrarDetalhesIa && (
+              <>
+                <span className="chat-ia-divisor" />
+                <button type="button" className="chat-ia-config" aria-label={T.chat.configurarIa} title={T.chat.configurarIa} onClick={() => irPara("ia")}>
+                  <Settings2 size={14} />
+                </button>
+              </>
+            )}
           </div>
         </header>
         <div className="chat-rolagem">
@@ -468,16 +467,14 @@ export default function Chat() {
             {!atual || atual.mensagens.length === 0 ? (
               <div className="chat-inicio">
                 <div className="chat-inicio-time">
-                  {AGENTES.map((a, i) => (
-                    <motion.div key={a} className="chat-inicio-agente" data-agente={a} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0, transition: { delay: i * 0.08 } }}>
-                      <Personagem agente={a} tamanho={84} rotulo={nomes[a]} />
-                      <b>{nomes[a]}</b>
-                      <span>{cargos[a]}</span>
-                    </motion.div>
-                  ))}
+                  <motion.div className="chat-inicio-agente" data-agente={mascote} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
+                    <PersonagemKyro tamanho={84} />
+                    <b>{NOME_KYRO}</b>
+                    <span>{CARGO_KYRO}</span>
+                  </motion.div>
                 </div>
                 <p className="chat-inicio-texto">{provedor ? T.chat.boasVindasIa : T.chat.boasVindasSemIa}</p>
-                {!provedor && (
+                {!provedor && mostrarDetalhesIa && (
                   <Botao pequeno icone={<Settings2 size={13} />} onClick={() => irPara("ia")}>{T.chat.configurarIa}</Botao>
                 )}
                 <div className="chat-inicio-exemplos">
@@ -496,8 +493,8 @@ export default function Chat() {
                       key={m.id}
                       conversaId={atual.id}
                       m={m}
-                      nome={nomes[m.agenteId]}
-                      cargo={cargos[m.agenteId]}
+                      nome={NOME_KYRO}
+                      cargo={CARGO_KYRO}
                       ultima={i === atual.mensagens.length - 1}
                       dia={novoDia ? formatar(m.criadaEm, "EEEE, d 'de' MMMM") : undefined}
                     />
@@ -516,7 +513,7 @@ export default function Chat() {
               <div className="chat-sugestoes-nova" role="listbox" aria-label={T.chat.mencionar}>
                 {mencoes.map((a, i) => (
                   <button key={a} type="button" role="option" aria-selected={i === ativoMencao} className="chat-sugestao" onPointerMove={() => setAtivoMencao(i)} onClick={() => escolherMencao(a)}>
-                    <Personagem agente={a} tamanho={26} interativo={false} halo={false} olhar={false} />
+                    <PersonagemKyro tamanho={26} />
                     <b>{nomes[a]}</b>
                     <span className="cortar">{cargos[a]}: {T.agentes.areas[a]}</span>
                   </button>
@@ -540,7 +537,7 @@ export default function Chat() {
                   {anexos.lista.length > 0 ? (
                     <>
                       <div className="chat-caixa-chips" role="group" aria-label={T.chat.anexos.painelTitulo(anexos.lista.length)}>
-                        <ChipsAnexos lista={anexos.lista} agente={mascote} aoRemover={anexos.remover} />
+                        <ChipsAnexos lista={anexos.lista} aoRemover={anexos.remover} />
                         {podeAcoesDeAnexo &&
                           (Object.keys(T.chat.anexos.acoes) as AcaoAnexo[]).map((acao) => {
                             const Icone = ICONES_ACAO_ANEXO[acao];

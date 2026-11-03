@@ -13,6 +13,7 @@ import { aparenciaPadrao, type AparenciaAgente } from "../personagens/personaliz
 import { SEM_ACESSORIOS, type AcessoriosAgente } from "../personagens/acessorios";
 
 const DESTAQUE_ESCURO_PADRAO = "#a78bfa";
+const NOMES_LEGADOS_DO_PERSONAGEM = new Set(["Rubi", "Nanquim", "Sol", "Java", "Pablo"]);
 
 export type Tema = "claro" | "escuro" | "sistema";
 export type Paleta = "padrao" | "areia" | "grafite" | "floresta" | "oceano";
@@ -85,10 +86,10 @@ export const BLOCOS_INICIO_PADRAO: { id: BlocoInicio; visivel: boolean }[] = [
   { id: "foco", visivel: true },
   { id: "financas", visivel: true },
   { id: "revisoes", visivel: true },
-  { id: "conexoes", visivel: true },
-  { id: "consumo", visivel: true },
+  { id: "conexoes", visivel: false },
+  { id: "consumo", visivel: false },
   { id: "mapa", visivel: true },
-  { id: "conquistas", visivel: true },
+  { id: "conquistas", visivel: false },
 ];
 
 export interface AtalhoDock {
@@ -233,7 +234,7 @@ export const CONFIG_PADRAO: Configuracoes = {
     categorias: { personagens: true, avisos: true, pomodoro: true, interface: true },
   },
   agentes: {
-    nomes: { organizador: "Rubi", tutor: "Nanquim", operador: "Sol", java: "Java" },
+    nomes: { organizador: "Kyro", tutor: "Kyro", operador: "Kyro", java: "Kyro" },
     cargos: { organizador: "Gerente de projetos", tutor: "Professor", operador: "Analista de operações", java: "Engenheiro de software" },
     aparencias: { organizador: aparenciaPadrao("organizador"), tutor: aparenciaPadrao("tutor"), operador: aparenciaPadrao("operador"), java: aparenciaPadrao("java") },
     acessorios: { organizador: { ...SEM_ACESSORIOS }, tutor: { ...SEM_ACESSORIOS }, operador: { ...SEM_ACESSORIOS }, java: { ...SEM_ACESSORIOS } },
@@ -377,7 +378,7 @@ export const useConfig = create<Configuracoes & AcoesConfig>()(
             nomes: Object.fromEntries(
               (Object.keys(CONFIG_PADRAO.agentes.nomes) as AgenteId[]).map((a) => {
                 const nome = salvo.agentes?.nomes?.[a];
-                const antigo = ["Organizador", "Tutor", "Operador"].includes(nome ?? "");
+                const antigo = ["Organizador", "Tutor", "Operador"].includes(nome ?? "") || NOMES_LEGADOS_DO_PERSONAGEM.has(nome ?? "");
                 return [a, nome && !antigo ? nome : CONFIG_PADRAO.agentes.nomes[a]];
               }),
             ) as Record<AgenteId, string>,

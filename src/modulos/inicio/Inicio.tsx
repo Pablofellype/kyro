@@ -3,7 +3,6 @@ import { PainelFuncoes } from "./PainelFuncoes";
 import { blocoLigado, conquistaLigada, funcaoLigada } from "../../utilitarios/funcoes";
 import { Plus, Timer, Wallet, Plug, Layers, Gauge, Trophy, CalendarDays, Users, ListTodo, SlidersHorizontal, ToggleRight, GripVertical, ArrowUpRight, Cpu, Play, Pause, RotateCcw, SkipForward } from "lucide-react";
 import { useMosaico } from "../../componentes/useMosaico";
-import { resumoPorAgente } from "../../utilitarios/contextoIa";
 import { lerConsumo, type Consumo } from "../../ponte/ponteLocal";
 import { faltaPara, nivelDoUso, rotuloJanela } from "../../utilitarios/consumo";
 import { DndContext, closestCenter, type DragEndEvent } from "@dnd-kit/core";
@@ -15,14 +14,13 @@ import { CabecalhoAba } from "../../componentes/CabecalhoAba";
 import { ItemTarefa } from "../../componentes/ItemTarefa";
 import { MapaDeCalor } from "../../componentes/MapaDeCalor";
 import { BarrasHorizontais, BarrasVerticais, Anel } from "../../componentes/Graficos";
-import { Personagem } from "../../personagens/Personagem";
 import { Marca } from "../../marcas/Marca";
 import { useConfig, type BlocoInicio } from "../../estado/configuracoes";
 import { useRotina, tarefasDoDia, habitoCumprido } from "../../estado/rotina";
 import { useEstudos, revisoesParaHoje, cartoesVencidos } from "../../estado/estudos";
 import { usePomodoro, restanteAtual, formatarRelogio } from "../../estado/pomodoro";
 import type { EtapaPomodoro } from "../../tipos";
-import { useFinancas, gastoPorCategoria, receitasDoMes, gastosDoMes, parteDoUsuario, saldoDaConta, moedaDaConta, valorEmReais } from "../../estado/financas";
+import { useFinancas, gastoPorCategoria, receitasDoMes, saldoDaConta, moedaDaConta, valorEmReais } from "../../estado/financas";
 import { useComunicacao } from "../../estado/comunicacao";
 import { useAgentes, AGENTES, estadoDoAgente } from "../../estado/agentes";
 import { useConquistas, CONQUISTAS } from "../../estado/conquistas";
@@ -66,6 +64,7 @@ const TITULO: Record<BlocoInicio, string> = {
 };
 
 const BLOCOS_LARGOS: BlocoInicio[] = ["mapa", "conquistas"];
+const BLOCOS_PESSOAIS: ReadonlySet<BlocoInicio> = new Set(["time", "hoje", "foco", "financas", "revisoes", "mapa"]);
 
 function CabecalhoBloco({ numero, id, children }: { numero: string; id: BlocoInicio; children?: ReactNode }) {
   return (
@@ -89,50 +88,32 @@ function BotaoIrPara({ rotulo, aoClicar }: { rotulo: string; aoClicar: () => voi
 
 function SecaoTime() {
   const agentes = useAgentes();
-  const nomes = useConfig((s) => s.agentes.nomes);
-  const cargos = useConfig((s) => s.agentes.cargos);
+  const favorito = useConfig((s) => s.agentes.favorito);
   const irPara = useInterface((s) => s.irPara);
   const tarefas = useRotina((s) => s.tarefas);
-  const estudos = useEstudos();
-  const fin = useFinancas();
   const hoje = hojeISO();
   const abertas = tarefasDoDia(tarefas, hoje).filter((t) => t.status !== "concluida" && t.status !== "cancelada").length;
-  const revisoes = revisoesParaHoje(estudos);
-  const prova = estudos.datas.filter((d) => !d.concluida && d.data >= hoje).sort((a, b) => a.data.localeCompare(b.data))[0];
-  const gasto = somar(gastosDoMes(fin, hoje.slice(0, 7)), (t) => valorEmReais(t, fin, parteDoUsuario(t, fin.divisoes)));
-  const falha = agentes.alertas.find((a) => a.agenteId === "operador");
-
   const desligadas = useConfig((s) => s.funcoesDesligadas);
   const comTarefas = funcaoLigada("journal", desligadas);
-  const comEstudos = funcaoLigada("estudos", desligadas);
-  const comFinancas = funcaoLigada("financas", desligadas);
-  const falas = {
-    organizador: comTarefas && abertas > 0 ? T.falas.organizador.bomDia(abertas) : T.falas.organizador.livre,
-    tutor: !comEstudos ? T.falas.tutor.semFuncao : revisoes > 0 ? T.falas.tutor.revisoes(revisoes) : prova ? T.falas.tutor.prova(prova.titulo, descreverDistancia(prova.data)) : T.falas.tutor.livre,
-    operador: falha ? falha.texto : !comFinancas ? T.falas.operador.semFuncao : gasto > 0 ? T.falas.operador.gasto(formatarDinheiro(gasto)) : T.falas.operador.livre,
-    java: resumoPorAgente().java,
-  };
+  const estado = (["erro", "alerta", "escrevendo", "pensando", "ouvindo", "sucesso", "dormindo", "ocioso"] as const)
+    .find((candidato) => AGENTES.some((a) => estadoDoAgente(agentes, a) === candidato)) ?? "ocioso";
+  const fala = agentes.alertas.at(-1)?.texto ?? (comTarefas && abertas > 0 ? T.falas.organizador.bomDia(abertas) : T.falas.organizador.livre);
 
   return (
     <section className="inicio-time" aria-label={T.inicio.time}>
-      {AGENTES.map((a) => {
-        const estado = estadoDoAgente(agentes, a);
-        return (
-          <button key={a} type="button" className="inicio-agente" data-estado={estado} onClick={() => irPara("chat", { agente: a })}>
-            <span className="inicio-agente-retrato">
-              <Personagem agente={a} tamanho={76} interativo={false} halo={false} />
-            </span>
-            <span className="inicio-agente-texto">
-              <span className="inicio-agente-topo">
-                <b className="inicio-agente-nome cortar">{nomes[a]}</b>
-                <span className="inicio-agente-estado">{T.agentes.estados[estado]}</span>
-              </span>
-              <span className="inicio-agente-cargo cortar">{cargos[a]}</span>
-              <span className="inicio-agente-fala privado">{falas[a]}</span>
-            </span>
-          </button>
-        );
-      })}
+      <button type="button" className="inicio-agente" data-estado={estado} onClick={() => irPara("chat", { agente: favorito })}>
+        <span className="inicio-agente-retrato">
+          <img src="/personagens/kyro/ocioso.svg" width="76" height="76" alt="" draggable={false} decoding="async" className="personagem-imagem" />
+        </span>
+        <span className="inicio-agente-texto">
+          <span className="inicio-agente-topo">
+            <b className="inicio-agente-nome cortar">Kyro</b>
+            <span className="inicio-agente-estado">{T.agentes.estados[estado]}</span>
+          </span>
+          <span className="inicio-agente-cargo cortar">Assistente pessoal</span>
+          <span className="inicio-agente-fala privado">{fala}</span>
+        </span>
+      </button>
     </section>
   );
 }
@@ -731,7 +712,7 @@ export default function Inicio() {
   const irPara = useInterface((s) => s.irPara);
   const todosOsBlocos = useConfig((s) => s.blocosInicio);
   const desligadas = useConfig((s) => s.funcoesDesligadas);
-  const blocos = useMemo(() => todosOsBlocos.filter((b) => blocoLigado(b.id, desligadas)), [todosOsBlocos, desligadas]);
+  const blocos = useMemo(() => todosOsBlocos.filter((b) => BLOCOS_PESSOAIS.has(b.id) && blocoLigado(b.id, desligadas)), [todosOsBlocos, desligadas]);
   const definir = useConfig((s) => s.definir);
   const nome = useConfig((s) => s.nome);
   const [personalizando, setPersonalizando] = useState(false);

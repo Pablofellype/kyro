@@ -61,7 +61,7 @@ export function AreaDeTrabalho() {
 
   return (
     <div className="area-trabalho" data-mobile={ehMobile ? "sim" : "nao"}>
-      <AnimatePresence>{sistemaVisivel && <JanelaSistema key="sistema" />}</AnimatePresence>
+      <AnimatePresence>{sistemaVisivel && <JanelaSistema key="sistema" mobile={ehMobile} />}</AnimatePresence>
       <AnimatePresence>
         {!ehMobile && janelas.filter((j) => !j.minimizada).map((j) => (
           <JanelaConexao key={j.id} janela={j} />

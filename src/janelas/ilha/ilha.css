@@ -2407,6 +2407,538 @@ html[data-mobile="sim"] .ilha-gatilho {
 }
 
 @media (max-width: 768px), (orientation: landscape) and (max-height: 540px), (pointer: coarse) and (max-width: 1024px) {
+  .ilha-expandida {
+    padding: 0 8px 8px;
+  }
+
+  .ilha-cabecalho {
+    height: 46px;
+    flex-basis: 46px;
+    gap: 4px;
+  }
+
+  .ilha-abas {
+    flex: 1 1 auto;
+    min-width: 0;
+    gap: 3px;
+    padding-left: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .ilha-abas::-webkit-scrollbar {
+    display: none;
+  }
+
+  .ilha-aba {
+    width: 36px;
+    height: 36px;
+    flex: 0 0 auto;
+    border-radius: 10px;
+  }
+
+  .ilha-aba:has(.ilha-aba-nome) {
+    height: 36px;
+    padding-right: 9px;
+    padding-left: 8px;
+  }
+
+  .ilha-aba-nome {
+    font-size: 12px;
+  }
+
+  .ilha-acoes {
+    flex: 0 0 auto;
+    gap: 1px;
+    padding-right: 0;
+  }
+
+  .ilha-acao {
+    width: 34px;
+    height: 34px;
+    flex: 0 0 34px;
+    border-radius: 10px;
+  }
+
+  .ilha-titulo {
+    font-size: 14px;
+  }
+
+  .ilha-sub {
+    font-size: 13px;
+  }
+
+  .ilha-mini {
+    font-size: 12px;
+  }
+
+  .ilha-miolo {
+    gap: 8px;
+  }
+
+  .ilha-raiz:has(.vsc) {
+    right: 4px !important;
+  }
+
+  .ilha-miolo:has(.vsc) {
+    display: block;
+  }
+
+  .ilha-miolo:has(.vsc) .ilha-lateral {
+    display: none;
+  }
+
+  .ilha-miolo:has(.vsc) .ilha-visoes {
+    width: 100%;
+    height: 100%;
+  }
+
+  /* Agenda da Ilha: no celular os compromissos ficam acima do mês para a grade não esmagar. */
+  .ilha-calendario-corpo {
+    flex-direction: column;
+    gap: 10px;
+    overflow-y: auto;
+    padding-right: 2px;
+    overscroll-behavior: contain;
+  }
+
+  .ilha-calendario-relogio {
+    flex: 0 0 auto;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    column-gap: 10px;
+    row-gap: 2px;
+    padding: 0 0 9px;
+    border-right: 0;
+    border-bottom: 1px solid var(--i-linha);
+  }
+
+  .ilha-calendario-hora {
+    grid-row: span 2;
+    align-self: start;
+    font-size: 30px;
+  }
+
+  .ilha-calendario-data {
+    align-self: center;
+    font-size: 12.5px;
+  }
+
+  .ilha-calendario-hoje {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4px;
+    margin-top: 5px;
+  }
+
+  .ilha-calendario-hoje > .ilha-sub,
+  .ilha-calendario-hoje > .ilha-mini {
+    grid-column: 1 / -1;
+  }
+
+  .ilha-calendario-item {
+    min-height: 36px;
+    gap: 7px;
+    margin-left: 0;
+    padding: 5px 6px;
+    font-size: 13px;
+    background: rgba(var(--i-rgb), 0.035);
+  }
+
+  .ilha-calendario-check {
+    width: 20px;
+    height: 20px;
+    border-radius: 6px;
+  }
+
+  .ilha-calendario-item-hora {
+    font-size: 11.5px;
+  }
+
+  .ilha-calendario-mes-bloco {
+    flex: 0 0 auto;
+    min-height: 0;
+  }
+
+  .ilha-calendario {
+    gap: 4px;
+    margin-top: 8px;
+  }
+
+  .ilha-calendario-semana {
+    height: 22px;
+    font-size: 11px;
+  }
+
+  .ilha-calendario-dia {
+    height: 38px;
+    border-radius: 10px;
+    font-size: 14px;
+  }
+
+  .ilha-calendario-ponto {
+    bottom: 5px;
+    width: 5px;
+    height: 5px;
+    margin-left: -2.5px;
+  }
+
+  .ilha-lateral {
+    flex-basis: 76px;
+  }
+
+  .ilha-cartao-corpo {
+    padding: 12px;
+    gap: 10px;
+  }
+
+  .ilha-rolagem {
+    margin-right: -4px;
+    padding-right: 4px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .ilha-linha {
+    min-height: 36px;
+    gap: 9px;
+    padding: 5px 6px;
+    font-size: 13.5px;
+  }
+
+  .ilha-marca {
+    width: 20px;
+    height: 20px;
+    flex-basis: 20px;
+  }
+
+  .ilha-campo {
+    height: 42px;
+    gap: 9px;
+    padding-left: 12px;
+  }
+
+  .ilha-campo input,
+  .ilha-campo textarea.whatsapp-resposta {
+    font-size: 14px;
+  }
+
+  .ilha-botao {
+    height: 34px;
+    padding-right: 13px;
+    padding-left: 13px;
+    font-size: 13px;
+  }
+
+  .ilha-botao-icone {
+    width: 34px;
+  }
+
+  .ilha-chips-linha {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .ilha-chips {
+    gap: 4px;
+  }
+
+  .ilha-chip {
+    height: 32px;
+    padding-right: 10px;
+    padding-left: 10px;
+    font-size: 13px;
+  }
+
+  .ilha-modo {
+    margin-left: 0;
+  }
+
+  .ilha-modo-opcao {
+    height: 28px;
+    padding-right: 9px;
+    padding-left: 9px;
+    font-size: 12px;
+  }
+
+  .ilha-chat {
+    padding: 10px;
+  }
+
+  .ilha-chat-eu,
+  .ilha-chat-texto {
+    font-size: 14px;
+  }
+
+  /* Código/Claude: duas faixas no topo e conteúdo com leitura confortável. */
+  .vsc {
+    border-radius: 14px;
+    font-size: 13px;
+  }
+
+  .vsc-topo {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-rows: 40px 38px;
+    height: auto;
+    min-height: 78px;
+  }
+
+  .vsc-topo:has(.vsc-lista-botao) > .vsc-acoes-abas {
+    grid-column: 2;
+  }
+
+  .vsc-lista-botao {
+    grid-column: 1;
+    grid-row: 1;
+    height: 40px;
+    padding: 0 12px;
+  }
+
+  .vsc-topo > .vsc-abas {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    width: 100%;
+    height: 38px;
+    min-width: 0;
+  }
+
+  .vsc-aba {
+    min-width: 126px;
+    max-width: 190px;
+    flex: 0 0 auto;
+  }
+
+  .vsc-aba-botao {
+    gap: 7px;
+    padding-left: 10px;
+  }
+
+  .vsc-aba-fechar {
+    width: 30px;
+    height: 30px;
+    margin-right: 4px;
+    opacity: 1;
+  }
+
+  .vsc-topo > .vsc-acoes-abas {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    min-width: 0;
+    max-width: 100%;
+    margin: 0 4px 0 auto;
+    gap: 3px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .vsc-topo > .vsc-acoes-abas::-webkit-scrollbar {
+    display: none;
+  }
+
+  .vsc-acoes-texto {
+    display: none;
+  }
+
+  .vsc-icone-botao {
+    width: 34px;
+    height: 34px;
+    flex: 0 0 34px;
+    border-radius: 8px;
+  }
+
+  .vsc-paineis {
+    height: 40px;
+    gap: 18px;
+    padding: 0 12px;
+  }
+
+  .vsc-painel {
+    font-size: 12px;
+  }
+
+  .vsc-atividade {
+    overflow-x: hidden;
+    padding: 6px 0 12px;
+    font-size: 13px;
+    line-height: 1.55;
+  }
+
+  .vsc-linha {
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 4px 10px;
+  }
+
+  .vsc-hora {
+    width: 42px;
+    font-size: 11px;
+  }
+
+  .vsc-rotulo {
+    font-size: 13px;
+  }
+
+  .vsc-detalhe {
+    flex: 1 0 100%;
+    padding-left: 48px;
+    overflow: visible;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    line-height: 1.4;
+  }
+
+  .vsc-contagem {
+    margin-left: auto;
+    font-size: 12px;
+  }
+
+  .vsc-linha-diff {
+    padding: 4px 10px 10px;
+  }
+
+  .vsc-diff {
+    max-width: 100%;
+    overflow-x: auto;
+    font-size: 12px;
+  }
+
+  .vsc-diff-corpo {
+    max-height: 230px;
+    overflow: auto;
+  }
+
+  .vsc-migalhas {
+    height: 38px;
+    padding: 0 10px;
+    font-size: 12.5px;
+  }
+
+  .vsc-markdown {
+    padding: 4px 12px 14px;
+    font-size: 13px;
+  }
+
+  .vsc-markdown code,
+  .vsc-markdown .bloco-codigo pre {
+    font-size: 12px;
+  }
+
+  .vsc-pedido {
+    margin: 0 10px 8px;
+    padding: 8px 10px;
+    font-size: 13px;
+  }
+
+  .vsc-permissao {
+    margin: 10px;
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .vsc-permissao-topo {
+    flex-wrap: wrap;
+    line-height: 1.35;
+  }
+
+  .vsc-chip {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .vsc-codigo {
+    min-height: 120px;
+    font-size: 12.5px;
+    line-height: 1.55;
+  }
+
+  .vsc-permissao-rodape {
+    flex-wrap: wrap;
+    align-items: stretch;
+    gap: 6px;
+  }
+
+  .vsc-permissao-rodape .vsc-dim {
+    flex: 1 0 100%;
+    margin-right: 0;
+  }
+
+  .vsc-permissao-rodape .vsc-botao {
+    flex: 1 1 120px;
+    min-height: 38px;
+    height: auto;
+    justify-content: center;
+    padding-right: 10px;
+    padding-left: 10px;
+  }
+
+  .vsc-pergunta-corpo {
+    gap: 12px;
+    padding: 0 10px 12px;
+  }
+
+  .vsc-pergunta-texto {
+    font-size: 14px;
+  }
+
+  .vsc-pergunta-opcao {
+    min-height: 44px;
+    padding: 9px 10px;
+  }
+
+  .vsc-pergunta-rotulo {
+    font-size: 13px;
+  }
+
+  .vsc-pergunta-descricao {
+    font-size: 12px;
+  }
+
+  .vsc-pergunta-livre {
+    min-height: 42px;
+    font-size: 14px;
+  }
+
+  .cfg-grade {
+    grid-template-columns: minmax(0, 1fr);
+    grid-auto-rows: minmax(84px, auto);
+    gap: 8px;
+    padding: 10px;
+    overflow-y: auto;
+  }
+
+  .cfg-ladrilho {
+    min-height: 84px;
+  }
+
+  .cfg-detalhe-corpo {
+    flex-direction: column;
+    gap: 10px;
+    padding: 14px 12px 6px;
+    overflow-y: auto;
+  }
+
+  .cfg-detalhe-logo {
+    width: 52px;
+    height: 52px;
+    border-radius: 14px;
+  }
+
+  .cfg-acoes {
+    flex-wrap: wrap;
+    justify-content: stretch;
+    padding: 10px 12px 12px;
+  }
+
+  .cfg-acoes .vsc-botao {
+    min-height: 38px;
+    flex: 1 1 120px;
+    justify-content: center;
+  }
+
   .ilha-compacta {
     padding: 0 8px !important;
     gap: 6px !important;
@@ -2426,5 +2958,22 @@ html[data-mobile="sim"] .ilha-gatilho {
   }
   .ilha-tempo {
     flex-shrink: 0 !important;
+  }
+}
+
+/* No celular a Ilha fica fora da hierarquia do cabeçalho e permanece no topo. */
+@media (max-width: 768px), (pointer: coarse) and (max-width: 1024px) {
+  .ilha-raiz,
+  html[data-mobile="sim"] .ilha-raiz,
+  .area-trabalho[data-mobile="sim"] .ilha-raiz {
+    top: calc(max(6px, env(safe-area-inset-top, 6px)) + 7px) !important;
+    bottom: auto !important;
+  }
+
+  .ilha-gatilho,
+  html[data-mobile="sim"] .ilha-gatilho,
+  .area-trabalho[data-mobile="sim"] .ilha-gatilho {
+    top: calc(max(6px, env(safe-area-inset-top, 6px)) + 7px) !important;
+    bottom: auto !important;
   }
 }

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { Personagem } from "../personagens/Personagem";
+import { PersonagemKyro } from "../personagens/PersonagemKyro";
 import { AGENTES } from "../estado/agentes";
 import { useConfig } from "../estado/configuracoes";
 import { useConversando } from "../estado/conversando";
@@ -68,7 +68,7 @@ export function EscolhaDoAgente({ tamanho = 30 }: { tamanho?: number }) {
             animate={parou ? { y: [0, -7, 0], opacity: 1, transition: { duration: 0.34, ease: "easeOut" } } : { y: 0, opacity: 1, transition: { duration: 0.06 } }}
             exit={{ y: "90%", opacity: 0, transition: { duration: 0.06 } }}
           >
-            <Personagem agente={mostrado} estado={parou ? (fase === "respondendo" ? "pensando" : "sucesso") : "ocioso"} tamanho={tamanho} interativo={false} halo={false} olhar={false} />
+            <PersonagemKyro tamanho={tamanho} />
           </motion.span>
         </AnimatePresence>
       </div>

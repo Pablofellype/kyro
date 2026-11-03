@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 import { motion, useMotionValue, useSpring } from "motion/react";
-import { Personagem } from "../../../personagens/Personagem";
-import type { AgenteId, EstadoAgente } from "../../../tipos";
+import { PersonagemKyro } from "../../../personagens/PersonagemKyro";
+import type { AgenteId } from "../../../tipos";
 import { calcularDestinoPersonagem } from "./regras";
 import { usarMovimentoReduzido } from "./usarMovimentoReduzido";
 import "./animacoes.css";
@@ -11,11 +11,9 @@ export function EspacoDoPersonagem({ agente, tamanho, posicao, flutuar = false, 
 }
 
 const QUALQUER_AGENTE = "qualquer";
-const ESTADOS_ANIMADOS_NA_COMPACTA: EstadoAgente[] = ["pensando", "escrevendo"];
 
-export function PersonagemContinuo({ ilha, posicao, ativo, escala, agente, estado, rotulo, destinoKey }: { ilha: RefObject<HTMLDivElement | null>; posicao: "compacta" | "expandida"; ativo: boolean; escala: number; agente: AgenteId; estado: EstadoAgente; rotulo: string; destinoKey?: string }) {
+export function PersonagemContinuo({ ilha, posicao, ativo, escala, agente, destinoKey }: { ilha: RefObject<HTMLDivElement | null>; posicao: "compacta" | "expandida"; ativo: boolean; escala: number; agente: AgenteId; destinoKey?: string }) {
   const reduzir = usarMovimentoReduzido();
-  const parado = posicao === "compacta" && !ESTADOS_ANIMADOS_NA_COMPACTA.includes(estado);
   const x = useSpring(0, { stiffness: 460, damping: 38 });
   const y = useSpring(0, { stiffness: 460, damping: 38 });
   const tamanho = useSpring(1, { stiffness: 460, damping: 38 });
@@ -99,7 +97,7 @@ export function PersonagemContinuo({ ilha, posicao, ativo, escala, agente, estad
     <motion.div className="ilha-personagem-continuo" data-personagem-continuo={agente} style={{ x, y, scale: tamanho, opacity: opacidade, pointerEvents: posicao === "expandida" && temDestino ? "auto" : "none", visibility: temDestino ? "visible" : "hidden" }} aria-hidden={!temDestino || undefined}>
       {ativo && temDestino && (
         <span className="ilha-personagem-flutuante" data-flutuando={(flutuando && !reduzir) || undefined}>
-          <Personagem key={agente} agente={agente} estado={estado} tamanho={70} interativo={posicao === "expandida"} halo={false} rotulo={rotulo} olhar={posicao === "expandida"} estatico={parado} />
+          <PersonagemKyro tamanho={70} />
         </span>
       )}
     </motion.div>

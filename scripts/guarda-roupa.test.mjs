@@ -22,6 +22,7 @@ const { ESTADOS_SVG } = await vite.ssrLoadModule("/src/personagens/cores.ts");
 const { primeiroQuadroSvg, encaixeDoAcessorio } = await vite.ssrLoadModule("/src/personagens/desenhosDosAcessorios.ts");
 const { PersonalizacaoDoTime } = await vite.ssrLoadModule("/src/modulos/agentes/PersonalizacaoDoTime.tsx");
 const agentes = ["organizador", "tutor", "java", "operador"];
+const ESTADOS_COMPOSITEIS = ESTADOS_SVG.filter((estado) => estado !== "alerta");
 
 test("dez novas peças têm nomes, cores próprias e ocupam somente uma posição", async () => {
   const { T } = await vite.ssrLoadModule("/src/textos/textos.ts");
@@ -45,7 +46,7 @@ test("nenhum personagem gera a máscara radial do ponto branco", () => {
 });
 
 test("composição estática preserva todos os acessórios e encaixes dos quatro formatos", () => {
-  for (const modelo of agentes) for (const estado of ESTADOS_SVG) {
+  for (const modelo of agentes) for (const estado of ESTADOS_COMPOSITEIS) {
     const original = readFileSync(new URL(`../public/personagens/${modelo}/${estado}.svg`, import.meta.url), "utf8");
     for (const acessorio of roupas.ACESSORIOS) {
       const selecao = { ...roupas.SEM_ACESSORIOS, [acessorio.posicao]: acessorio.id };
@@ -85,7 +86,7 @@ test("acessórios salvam e reidratam sem alterar formato, cor, persona ou os out
 });
 
 test("todos os acessórios seguem a matriz de cada quadro nos quatro formatos e oito estados", () => {
-  for (const modelo of agentes) for (const estado of ESTADOS_SVG) {
+  for (const modelo of agentes) for (const estado of ESTADOS_COMPOSITEIS) {
     const original = readFileSync(new URL(`../public/personagens/${modelo}/${estado}.svg`, import.meta.url), 'utf8');
     for (const acessorio of roupas.ACESSORIOS) {
       const vestido = personalizarSvg(original, { formato: modelo, cor: '#123456' }, modelo, { ...roupas.SEM_ACESSORIOS, [acessorio.posicao]: acessorio.id });

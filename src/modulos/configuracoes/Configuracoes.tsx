@@ -794,8 +794,8 @@ export default function Configuracoes() {
               <option value="">{T.configuracoes.estadoReal}</option>
               {(Object.keys(T.agentes.estados) as EstadoAgente[]).map((s) => <option key={s} value={s}>{T.agentes.estados[s]}</option>)}
             </select>
-            <Botao pequeno onClick={() => agentes.alertar(a, T.configuracoes.alertaTeste, "inicio")}>{T.configuracoes.dispararAlerta}</Botao>
-            <Botao pequeno onClick={() => void agentes.trabalhar(a, T.configuracoes.tarefaTeste, 2500)}>{T.configuracoes.simularTrabalho}</Botao>
+            <Botao pequeno onClick={() => { agentes.forcar(a, null); agentes.alertar(a, T.configuracoes.alertaTeste, "inicio"); }}>{T.configuracoes.dispararAlerta}</Botao>
+            <Botao pequeno onClick={() => { agentes.forcar(a, null); void agentes.trabalhar(a, T.configuracoes.tarefaTeste, 2500); }}>{T.configuracoes.simularTrabalho}</Botao>
           </LinhaAjuste>
         ))}
         <LinhaAjuste rotulo={T.configuracoes.secoes.pomodoro}>

@@ -223,7 +223,10 @@ export const Personagem = forwardRef<ControlePersonagem, Props>(function Persona
   const estadoExibido: EstadoAgente = reacao === "feliz" ? "sucesso" : reacao === "tonto" ? "erro" : sobre && interativo && estado === "ocioso" ? "ouvindo" : estado;
   const corHalo = reacao === "tonto" ? "#a855f7" : COR_ESTADO[estado];
   const mostrarHalo = halo && tamanho >= 32 && reacao === "tonto";
-  const comporArte = personalizado || vestido || reduzirAnimacoes;
+  // O alerta fornecido pelo usuário é uma animação completa em SVG rasterizado,
+  // sem o corpo/path interno usado pelo guarda-roupa. Nesse estado, preserve a
+  // animação original em vez de tentar compor acessórios por cima dela.
+  const comporArte = estadoExibido !== "alerta" && (personalizado || vestido || reduzirAnimacoes);
   const artePersonalizada = usarArtePersonalizada(agente, estadoExibido, aparencia, comporArte && visivel, acessorios, reduzirAnimacoes, corAcessorio);
   const caminhoDaArte = comporArte ? artePersonalizada : caminhoPersonagem(modelo, estadoExibido);
   const idsDosAcessorios = (svg: string) => svg.replaceAll("niko-ac-", `niko-ac-${idClip}-`);

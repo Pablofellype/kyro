@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { Rota, ServicoId } from "../tipos";
+import type { AreaSistema, Rota, ServicoId } from "../tipos";
 import { gerarId } from "../utilitarios/basicos";
 import { NATIVO, enviarComando, foraDoSistema, mostrarSistema } from "../desktop/desktop";
 import { rotaLigada } from "../utilitarios/funcoes";
@@ -50,6 +50,8 @@ interface EstadoInterface {
   sistemaMinimizado: boolean;
   sistemaMaximizado: boolean;
   geometria: Geometria;
+  area: AreaSistema;
+  definirArea: (area: AreaSistema) => void;
   irPara: (rota: Rota, parametros?: Record<string, string>) => void;
   voltar: () => void;
   abrirBusca: (aberta: boolean) => void;
@@ -73,6 +75,15 @@ function geometriaSalva(): Geometria | null {
 }
 
 const CHAVE_SISTEMA_ABERTO = "niko:sistema-aberto";
+const CHAVE_AREA_SISTEMA = "niko:area-sistema";
+
+function areaSalva(): AreaSistema {
+  try {
+    return localStorage.getItem(CHAVE_AREA_SISTEMA) === "empresa" ? "empresa" : "pessoal";
+  } catch {
+    return "pessoal";
+  }
+}
 
 function sistemaAbertoSalvo(): boolean {
   if (NATIVO) return true;
@@ -161,6 +172,15 @@ export const useInterface = create<EstadoInterface>()((set, get) => ({
   sistemaMinimizado: false,
   sistemaMaximizado: false,
   geometria: geometriaSalva() ?? { x: 0, y: 0, w: 0, h: 0 },
+  area: areaSalva(),
+  definirArea: (area) => {
+    set({ area });
+    try {
+      localStorage.setItem(CHAVE_AREA_SISTEMA, area);
+    } catch {
+      return;
+    }
+  },
   irPara: (rota, parametros = {}) => {
     if (foraDoSistema()) {
       enviarComando({ tipo: "irPara", rota, parametros });

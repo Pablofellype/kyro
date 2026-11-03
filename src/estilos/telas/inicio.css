@@ -8,18 +8,6 @@
   overflow: hidden;
 }
 
-@container conteudo (min-width: 640px) {
-  .estilo-sistema .inicio-time {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@container conteudo (min-width: 1320px) {
-  .estilo-sistema .inicio-time {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-}
-
 .estilo-sistema .inicio-agente {
   --cor-estado: var(--texto-2);
   position: relative;

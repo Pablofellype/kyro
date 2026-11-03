@@ -28,6 +28,8 @@ export type Rota =
   | "agentes"
   | "whatsapp";
 
+export type AreaSistema = "pessoal" | "empresa";
+
 export type StatusTarefa = "a_fazer" | "em_andamento" | "concluida" | "reagendada" | "cancelada" | "em_aguardo";
 
 export type Prioridade = "baixa" | "media" | "alta";

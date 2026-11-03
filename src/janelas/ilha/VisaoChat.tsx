@@ -4,7 +4,7 @@ import { useComunicacao } from "../../estado/comunicacao";
 import { useConfig } from "../../estado/configuracoes";
 import { useInterface } from "../../estado/interface";
 import { useConversando, enviarAoTime, pararResposta } from "../../estado/conversando";
-import { Personagem } from "../../personagens/Personagem";
+import { PersonagemKyro } from "../../personagens/PersonagemKyro";
 import { TextoRico } from "../../componentes/TextoRico";
 import { CartoesDaMensagem } from "../../componentes/CartaoAcao";
 import { EscolhaDoAgente } from "../../componentes/EscolhaDoAgente";
@@ -87,7 +87,7 @@ export function VisaoChat() {
               </div>
             ) : (
               <div key={m.id} className="ilha-chat-agente">
-                <Personagem agente={m.agenteId} estado="ocioso" tamanho={22} interativo={false} halo={false} olhar={false} />
+                <PersonagemKyro tamanho={22} />
                 <div className="ilha-chat-bolha">
                   <span className="ilha-chat-nome">{nomes[m.agenteId]}</span>
                   {m.texto && <div className="ilha-chat-texto"><TextoRico texto={m.texto} /></div>}
@@ -99,7 +99,7 @@ export function VisaoChat() {
         )}
         {aoVivo && agente && (parcial && fase === "respondendo" ? (
           <div className="ilha-chat-agente">
-            <Personagem agente={agente} estado="escrevendo" tamanho={22} interativo={false} halo={false} />
+            <PersonagemKyro tamanho={22} />
             <div className="ilha-chat-bolha">
               <span className="ilha-chat-nome">{nomes[agente]}</span>
               <div className="ilha-chat-texto"><TextoRico texto={parcial} /></div>

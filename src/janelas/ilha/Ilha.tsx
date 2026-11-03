@@ -13,7 +13,7 @@ import { usePomodoro, restanteAtual, formatarRelogio } from "../../estado/pomodo
 import { useMidia, midiaAtivaNaIlha } from "../../estado/midia";
 import { CompactaDaMidia, usarDadosDaMidia } from "./midia/PlayerDaMidia";
 import { CapaDaMidia } from "./midia/CapaDaMidia";
-import { Personagem } from "../../personagens/Personagem";
+import { PersonagemKyro } from "../../personagens/PersonagemKyro";
 import { Marca } from "../../marcas/Marca";
 import { Anel } from "../../componentes/Graficos";
 import { T } from "../../textos/textos";
@@ -45,7 +45,7 @@ import { EspacoDoPersonagem, PersonagemContinuo } from "./animacoes/PersonagemCo
 import { EtapaDeTrabalho, EtapasAnimadas } from "./animacoes/EtapasAnimadas";
 import { atributosDoFundo, usarAparenciaDeBorda, variaveisDaBorda } from "../aparencia";
 import { movimentoDaVisibilidade } from "./animacoes/visibilidade";
-import type { AgenteId, EstadoAgente, ServicoId } from "../../tipos";
+import type { AgenteId, ServicoId } from "../../tipos";
 import { alturaDasConexoes } from "./alturaDasConexoes";
 import { atrasoDeFechamento, editandoNaIlha } from "./fechamento";
 import { VisaoTime } from "./VisaoTime";
@@ -99,9 +99,6 @@ const LARGURA_ABA: Partial<Record<VisaoIlha, number>> = { claude: 820, time: 780
 
 const ESCALA = { pequena: 0.85, media: 1, grande: 1.15 };
 
-function estadoCalmo(e: EstadoAgente): EstadoAgente {
-  return e === "alerta" || e === "erro" ? "ocioso" : e;
-}
 const LARGURA_EXPANDIDA = 660;
 const LARGURA_DO_QUADRO = 880;
 const ALTURA_DO_QUADRO = 480;
@@ -428,7 +425,12 @@ export function Ilha() {
     : compacta.largura;
   const alturaConexoes = alturaDasConexoes(conexaoSelecionada, conexaoLigada);
   const quadroDeTarefasAberto = cfg.tarefasEmQuadro && abaAtual === "hoje" && secaoHoje === "tarefas";
-  const alvo = saudando
+  const alturaDaVisaoAtual = ehMobile && abaAtual === "hoje" && secaoHoje === "agenda"
+    ? 560
+    : ehMobile && abaAtual === "claude"
+      ? 520
+      : alturaDaVisao(abaAtual, secaoHoje, alturaConexoes);
+  const alvoBase = saudando
     ? { w: LARGURA_DA_SAUDACAO, h: ALTURA_DA_SAUDACAO, r: 40 }
     : estadoEfetivo === "escondida"
       ? { w: 120, h: 6, r: 6 }
@@ -436,9 +438,18 @@ export function Ilha() {
         ? { w: larguraCompacta, h: compacta.tipo === "revelacao" ? 56 : compacta.tipo === "midia" ? ALTURA_COMPACTA_MIDIA : ALTURA_COMPACTA, r: compacta.tipo === "midia" || compacta.tipo === "revelacao" ? 14 : 12 }
         : quadroDeTarefasAberto
           ? { w: LARGURA_DO_QUADRO, h: ALTURA_DO_QUADRO, r: 30 }
-          : { w: LARGURA_ABA[abaAtual] ?? LARGURA_EXPANDIDA, h: alturaDaVisao(abaAtual, secaoHoje, alturaConexoes), r: 30 };
-  const margemTela = ehMobile ? 8 : MARGEM_DA_TELA;
-  const escala = escalaQueCabe(ESCALA[cfg.tamanho], { largura: alvo.w, altura: alvo.h }, { largura: tela.largura - margemTela * 2, altura: tela.altura - (ehMobile ? 0 : ALTURA_DA_FAIXA) - margemTela });
+          : { w: LARGURA_ABA[abaAtual] ?? LARGURA_EXPANDIDA, h: alturaDaVisaoAtual, r: 30 };
+  const margemTela = ehMobile ? (abaAtual === "claude" ? 4 : 8) : MARGEM_DA_TELA;
+  const alvo = ehMobile && estadoEfetivo !== "escondida"
+    ? {
+        ...alvoBase,
+        w: Math.min(alvoBase.w, Math.max(240, tela.largura - margemTela * 2)),
+        h: Math.min(alvoBase.h, Math.max(220, tela.altura - 24)),
+      }
+    : alvoBase;
+  const escala = ehMobile
+    ? 1
+    : escalaQueCabe(ESCALA[cfg.tamanho], { largura: alvo.w, altura: alvo.h }, { largura: tela.largura - margemTela * 2, altura: tela.altura - ALTURA_DA_FAIXA - margemTela });
   const crescendo = alvo.w * alvo.h >= anterior.current.w * anterior.current.h;
   anterior.current = { w: alvo.w, h: alvo.h };
   const transicao = crescendo ? MOLA : FECHAR;
@@ -876,7 +887,7 @@ export function Ilha() {
               )}
             </AnimatePresence>
           </div>
-          <PersonagemContinuo ilha={corpoIlha} posicao={estadoEfetivo === "expandida" ? "expandida" : "compacta"} ativo={estadoEfetivo !== "escondida" && !saudando} escala={escala} agente={agenteContinuo} estado={estadoEfetivo === "compacta" ? estadoCalmo(estadoDoAgente(agentes, agenteContinuo)) : estadoDoAgente(agentes, agenteContinuo)} rotulo={nomes[agenteContinuo]} destinoKey={estadoEfetivo === "expandida" ? abaAtual : compacta.tipo} />
+          <PersonagemContinuo ilha={corpoIlha} posicao={estadoEfetivo === "expandida" ? "expandida" : "compacta"} ativo={estadoEfetivo !== "escondida" && !saudando} escala={escala} agente={agenteContinuo} destinoKey={estadoEfetivo === "expandida" ? abaAtual : compacta.tipo} />
           {restanteFechar != null && restanteFechar <= 10000 && (
             <span className="ilha-contagem" style={{ width: (restanteFechar / 10000) * 160 }} aria-hidden="true" />
           )}
@@ -891,7 +902,7 @@ function MiniAgentes({ ids, continuo = false }: { ids: string[]; continuo?: bool
     <div className="ilha-compacta-lado" style={{ gap: 2 }}>
       {ids.slice(0, 3).map((id, i) => (
         <motion.span key={id} initial={{ opacity: 0, scale: 0.6 }} animate={{ opacity: 1, scale: 1, transition: { delay: i * 0.035 } }}>
-          {i === 0 && continuo ? <EspacoDoPersonagem agente={id as AgenteId} tamanho={20} posicao="compacta" /> : <Personagem agente={id as AgenteId} tamanho={20} interativo={false} halo={false} />}
+          {i === 0 && continuo ? <EspacoDoPersonagem agente={id as AgenteId} tamanho={20} posicao="compacta" /> : <PersonagemKyro tamanho={20} />}
         </motion.span>
       ))}
     </div>

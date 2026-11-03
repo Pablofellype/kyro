@@ -1,4 +1,67 @@
 .time-na-ilha { min-width: 0; height: 100%; padding: 0; }
+.time-kyro-painel {
+  container-type: inline-size;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 18px;
+  min-height: 260px;
+  height: 100%;
+  padding: 26px 30px;
+  overflow: hidden;
+  border: 1px solid var(--borda);
+  border-radius: 18px;
+  background: radial-gradient(circle at 12% 8%, color-mix(in srgb, var(--destaque) 12%, transparent), transparent 38%), linear-gradient(135deg, var(--superficie), var(--superficie-2));
+}
+.time-kyro-painel::after {
+  content: "";
+  position: absolute;
+  right: -70px;
+  bottom: -90px;
+  width: 240px;
+  height: 240px;
+  border: 1px solid color-mix(in srgb, var(--destaque) 18%, transparent);
+  border-radius: 50%;
+  pointer-events: none;
+}
+.time-kyro-cabecalho { position: relative; z-index: 1; display: flex; align-items: center; gap: 20px; }
+.time-kyro-figura { display: grid; place-items: center; width: 112px; height: 128px; flex: 0 0 auto; }
+.time-kyro-figura .personagem-imagem { width: 100%; height: 100%; object-fit: contain; }
+.time-kyro-identidade { display: grid; gap: 6px; min-width: 0; }
+.time-kyro-nome-linha { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.time-kyro-nome-linha strong { color: var(--texto); font-size: 24px; font-weight: 650; letter-spacing: -.02em; }
+.time-kyro-status { display: inline-flex; align-items: center; gap: 5px; color: var(--texto-2); font-family: var(--fonte-mono); font-size: 10px; letter-spacing: .06em; text-transform: uppercase; }
+.time-kyro-status i { width: 6px; height: 6px; border-radius: 50%; background: var(--texto-3); }
+.time-kyro-status[data-ativo="sim"] i { background: var(--destaque); box-shadow: 0 0 0 4px color-mix(in srgb, var(--destaque) 14%, transparent); }
+.time-kyro-cargo { color: var(--texto-2); font-family: var(--fonte-mono); font-size: 10px; letter-spacing: .08em; text-transform: uppercase; }
+.time-kyro-identidade p { max-width: 390px; margin: 5px 0 0; color: var(--texto-2); font-size: 12px; line-height: 1.5; }
+.time-kyro-resumos { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.time-kyro-resumo { display: flex; align-items: flex-start; gap: 9px; min-width: 0; padding: 11px 10px; border: 1px solid color-mix(in srgb, var(--borda) 86%, transparent); border-radius: 12px; background: color-mix(in srgb, var(--superficie-2) 72%, transparent); }
+.time-kyro-resumo-icone { display: grid; place-items: center; width: 25px; height: 25px; flex: 0 0 auto; border-radius: 8px; color: var(--destaque); background: color-mix(in srgb, var(--destaque) 12%, transparent); }
+.time-kyro-resumo-texto { display: grid; gap: 2px; min-width: 0; }
+.time-kyro-resumo-texto > span { overflow: hidden; color: var(--texto-2); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.time-kyro-resumo-texto strong { overflow: hidden; color: var(--texto); font-size: 17px; font-weight: 650; line-height: 1.15; text-overflow: ellipsis; white-space: nowrap; }
+.time-kyro-resumo-texto small { overflow: hidden; color: var(--texto-3); font-size: 9px; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
+.time-kyro-acoes { position: relative; z-index: 1; display: flex; gap: 8px; }
+.time-kyro-acao { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 34px; flex: 1; padding: 7px 10px; border: 1px solid var(--borda); border-radius: 9px; color: var(--texto-2); background: color-mix(in srgb, var(--superficie-2) 70%, transparent); font: inherit; font-size: 11px; cursor: pointer; transition: border-color 160ms ease, color 160ms ease, background 160ms ease, transform 160ms ease; }
+.time-kyro-acao:hover { border-color: color-mix(in srgb, var(--destaque) 55%, var(--borda)); color: var(--texto); background: color-mix(in srgb, var(--destaque) 9%, var(--superficie-2)); transform: translateY(-1px); }
+.time-kyro-acao-primaria { border-color: color-mix(in srgb, var(--destaque) 48%, var(--borda)); color: var(--destaque); }
+@container (max-width: 560px) {
+  .time-kyro-painel { padding: 22px; }
+  .time-kyro-resumos { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@container (max-width: 390px) {
+  .time-kyro-painel { gap: 14px; padding: 18px; }
+  .time-kyro-cabecalho { gap: 12px; }
+  .time-kyro-figura { width: 82px; height: 100px; }
+  .time-kyro-nome-linha strong { font-size: 20px; }
+  .time-kyro-acoes { flex-wrap: wrap; }
+  .time-kyro-acao { min-width: calc(50% - 4px); }
+  .time-kyro-acao-primaria { min-width: 100%; }
+}
+
+/* Compact styles used by the Time editor and wardrobe outside the island. */
 .time-editor-compacto { position: relative; padding: 14px 16px; border: 0; background: transparent; }
 .time-editor-compacto .time-grade { display: block; }
 .time-seletor { position: absolute; top: 14px; left: 16px; display: flex; align-items: center; gap: 8px; width: 150px; color: var(--texto-2); }

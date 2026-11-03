@@ -12,6 +12,7 @@ import { AvisosRodape } from "../../componentes/basicos";
 import { tocarSom } from "../../ponte/sons";
 import { NATIVO, ocultarSistemaNativo } from "../../desktop/desktop";
 import { rotaLigada } from "../../utilitarios/funcoes";
+import { primeiraRotaDaArea, rotaDisponivelNaArea, ROTULOS_EMPRESA, ROTULOS_PESSOAIS } from "./areas";
 import { LimiteDeErro } from "../../componentes/LimiteDeErro";
 import { NotificacoesSistema } from "../../componentes/NotificacoesSistema";
 
@@ -24,10 +25,12 @@ function geometriaPadrao(): Geometria {
   return { x: Math.round((area.w - w) / 2), y: Math.min(44, Math.max(0, area.h - h)), w, h };
 }
 
-export function JanelaSistema() {
+export function JanelaSistema({ mobile = false }: { mobile?: boolean } = {}) {
   const rotaPedida = useInterface((s) => s.rota);
+  const area = useInterface((s) => s.area);
   const desligadas = useConfig((s) => s.funcoesDesligadas);
-  const rota = rotaLigada(rotaPedida, desligadas) ? rotaPedida : "inicio";
+  const rotaValida = rotaLigada(rotaPedida, desligadas) && rotaDisponivelNaArea(rotaPedida, area);
+  const rota = rotaValida ? rotaPedida : primeiraRotaDaArea(area);
   const geometriaSalva = useInterface((s) => s.geometria);
   const maximizada = useInterface((s) => s.sistemaMaximizado);
   const definirSistema = useInterface((s) => s.definirSistema);
@@ -51,10 +54,14 @@ export function JanelaSistema() {
     conteudo.current?.scrollTo({ top: 0 });
   }, [rota]);
 
+  useEffect(() => {
+    if (!rotaValida) useInterface.getState().irPara(rota);
+  }, [rota, rotaValida]);
+
   const aoMudarGeometria = useCallback((g: Geometria) => definirSistema({ geometria: g }), [definirSistema]);
 
   const Pagina = PAGINA_ROTA[rota];
-  const recolhida = recolhidaManual || largura < 1100;
+  const recolhida = !mobile && (recolhidaManual || largura < 1100);
 
   return (
     <Janela
@@ -64,7 +71,7 @@ export function JanelaSistema() {
           <span>{T.gruposBarra[GRUPO_DA_ROTA[rota]]}</span>
           <span className="migalha-barra" aria-hidden="true">/</span>
           <span className="migalha-atual">
-            {numeroDaRota(rota)} {T.rotas[rota]}
+            {area === "empresa" ? "Empresa" : "Pessoal"} / {numeroDaRota(rota)} {(area === "pessoal" ? ROTULOS_PESSOAIS[rota] : ROTULOS_EMPRESA[rota]) || T.rotas[rota]}
           </span>
         </span>
       }

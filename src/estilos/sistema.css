@@ -211,6 +211,78 @@
   padding: 0 var(--esp-1);
 }
 
+.barra-contexto {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 3px;
+  width: 100%;
+  padding: 3px;
+  border: 1px solid var(--borda);
+  border-radius: 10px;
+  background: var(--fundo-barra);
+}
+
+.barra-recolhida .barra-contexto {
+  grid-template-columns: 1fr;
+  width: 40px;
+}
+
+.barra-contexto-botao {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+  height: 28px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 7px;
+  color: var(--texto-3);
+  font-size: 11px;
+  transition: background 180ms ease, color 180ms ease, transform 180ms var(--curva-lista);
+}
+
+.barra-contexto-botao:hover {
+  color: var(--texto);
+  background: var(--superficie-2);
+}
+
+.barra-contexto-botao[data-ativo="sim"] {
+  color: var(--texto);
+  background: var(--superficie-2);
+  box-shadow: inset 0 0 0 1px var(--borda-forte), 0 2px 8px color-mix(in srgb, var(--destaque) 8%, transparent);
+}
+
+.barra-contexto-botao[data-ativo="sim"]::after {
+  content: "";
+  position: absolute;
+  right: 7px;
+  bottom: 4px;
+  left: 7px;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--destaque);
+  transform-origin: center;
+  animation: barra-contexto-entra 220ms var(--curva-lista) both;
+}
+
+.barra-recolhida .barra-contexto-botao {
+  width: 32px;
+  padding: 0;
+}
+
+.barra-recolhida .barra-contexto-botao[data-ativo="sim"]::after {
+  right: 4px;
+  bottom: 3px;
+  left: 4px;
+}
+
+@keyframes barra-contexto-entra {
+  from { opacity: 0; transform: scaleX(.35); }
+  to { opacity: 1; transform: scaleX(1); }
+}
+
 .barra-marca {
   font-size: 15px;
   font-weight: 600;

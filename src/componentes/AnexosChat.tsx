@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useMotionValue, useSpring, useTransform, useAnimate, useVelocity } from "motion/react";
 import { Check, FileCode2, FileSpreadsheet, FileText, Image as ImagemIcone, Presentation, X } from "lucide-react";
-import { Personagem } from "../personagens/Personagem";
+import { PersonagemKyro } from "../personagens/PersonagemKyro";
 import { lerAnexo, tipoDoAnexo, formatarTamanho, MAXIMO_ANEXOS, type AnexoPronto, type FalhaAnexo } from "../utilitarios/anexos";
 import { gerarId } from "../utilitarios/basicos";
 import { mensagemDeLeitura } from "../utilitarios/leitorDeArquivos";
@@ -129,7 +129,9 @@ export function useArrastarArquivos(alvo: React.RefObject<HTMLElement | null>, a
   return arrastando;
 }
 
-export function ZonaDeSoltar({ ativo, agente, compacta, texto = T.chat.anexos.solte, tipos = T.chat.anexos.tipos }: { ativo: boolean; agente: AgenteId; compacta?: boolean; texto?: string; tipos?: readonly string[] }) {
+type ZonaDeSoltarProps = { ativo: boolean; agente?: AgenteId; compacta?: boolean; texto?: string; tipos?: readonly string[] };
+
+export function ZonaDeSoltar({ ativo, compacta, texto = T.chat.anexos.solte, tipos = T.chat.anexos.tipos }: ZonaDeSoltarProps) {
   const caixa = useRef<HTMLDivElement>(null);
   const xBruto = useMotionValue(0);
   const x = useSpring(xBruto, { stiffness: 260, damping: 22 });
@@ -137,11 +139,9 @@ export function ZonaDeSoltar({ ativo, agente, compacta, texto = T.chat.anexos.so
   const inclinacao = useTransform(velocidade, [-1200, 0, 1200], [-12, 0, 12], { clamp: true });
   const [perto, setPerto] = useState(false);
   const [escopo, animar] = useAnimate();
-  const [engoliu, setEngoliu] = useState(false);
 
   useEffect(() => {
     if (!ativo) {
-      setEngoliu(false);
       return;
     }
     const el = caixa.current;
@@ -156,7 +156,6 @@ export function ZonaDeSoltar({ ativo, agente, compacta, texto = T.chat.anexos.so
     };
     const soltou = (evento: DragEvent) => {
       if (!evento.dataTransfer?.files.length || !caixa.current?.parentElement?.contains(evento.target as Node)) return;
-      setEngoliu(true);
       if (escopo.current) void animar(escopo.current, { scaleY: [1, 0.86, 1.12, 0.95, 1], scaleX: [1, 1.14, 0.94, 1.03, 1] }, { duration: 0.5, ease: "easeOut" });
     };
     window.addEventListener("dragover", mover);
@@ -188,7 +187,7 @@ export function ZonaDeSoltar({ ativo, agente, compacta, texto = T.chat.anexos.so
           <span className="zona-soltar-brilho" />
           <motion.div className="zona-soltar-boneco" style={{ x, rotate: inclinacao }}>
             <div ref={escopo}>
-              <Personagem agente={agente} estado={engoliu ? "pensando" : perto ? "ouvindo" : "pensando"} tamanho={compacta ? 84 : 112} interativo={false} halo={false} />
+              <PersonagemKyro tamanho={compacta ? 84 : 112} />
             </div>
           </motion.div>
           <div className="zona-soltar-texto" style={{ opacity: perto ? 0.35 : 1 }}>
@@ -230,7 +229,9 @@ function IconeAnexo({ a }: { a: AnexoEmAndamento }) {
   return <IconeDoTipo tipo={tipoVisual(a.nome, a.tipo === "imagem")} />;
 }
 
-export function ChipsAnexos({ lista, agente, aoRemover }: { lista: AnexoEmAndamento[]; agente: AgenteId; aoRemover: (id: string) => void }) {
+type ChipsAnexosProps = { lista: AnexoEmAndamento[]; agente?: AgenteId; aoRemover: (id: string) => void };
+
+export function ChipsAnexos({ lista, aoRemover }: ChipsAnexosProps) {
   if (lista.length === 0) return null;
   return (
     <div className="anexos-chips">
@@ -254,7 +255,7 @@ export function ChipsAnexos({ lista, agente, aoRemover }: { lista: AnexoEmAndame
                 <span className="anexo-barra">
                   <motion.span className="anexo-barra-cheia" style={{ width: `${Math.round(a.progresso * 100)}%` }} />
                   <span className="anexo-viajante" style={{ left: `${Math.round(a.progresso * 100)}%` }}>
-                    <Personagem agente={agente} estado="escrevendo" tamanho={16} interativo={false} halo={false} olhar={false} />
+                    <PersonagemKyro tamanho={16} />
                   </span>
                 </span>
               )}
