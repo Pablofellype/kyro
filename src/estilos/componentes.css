@@ -534,7 +534,8 @@
 .fundo-modal {
   position: absolute;
   inset: 0;
-  z-index: 50;
+  /* O login cria uma camada própria acima do app; modais precisam ficar acima dela. */
+  z-index: 1000000;
   background: rgba(10, 10, 12, 0.32);
   display: flex;
   align-items: flex-start;
