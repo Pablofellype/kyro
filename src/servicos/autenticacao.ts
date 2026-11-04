@@ -181,7 +181,40 @@ export async function solicitarRedefinicaoSenha(emailRecebido: string, urlBase: 
     WHERE email = ${email} AND ativo = TRUE
     LIMIT 1
   `;
-  if (usuarios.length === 0) return;
+  if (usuarios.length === 0) {
+    const convites = await sql`
+      SELECT email, nome
+      FROM tokens_acesso
+      WHERE email = ${email}
+        AND tipo = 'convite'
+        AND usado_em IS NULL
+        AND expira_em > CURRENT_TIMESTAMP
+      ORDER BY expira_em DESC
+      LIMIT 1
+    `;
+    if (convites.length === 0) return;
+    const convite = convites[0];
+    const token = tokenSeguro();
+    const tokenHash = hashToken(token);
+    await sql`UPDATE tokens_acesso SET usado_em = CURRENT_TIMESTAMP WHERE email = ${email} AND tipo = 'convite' AND usado_em IS NULL`;
+    await sql`
+      INSERT INTO tokens_acesso (token_hash, tipo, email, nome, expira_em)
+      VALUES (${tokenHash}, 'convite', ${email}, ${convite.nome ?? ""}, CURRENT_TIMESTAMP + (${EXPIRACAO_CONVITE_HORAS} * INTERVAL '1 hour'))
+    `;
+    try {
+      await enviarEmailDeAcesso({
+        para: email,
+        assunto: "Ative seu acesso ao Kyro",
+        titulo: "Ative seu acesso ao Kyro",
+        texto: `OlÃ¡${convite.nome ? `, ${convite.nome}` : ""}. Use o botÃ£o abaixo para criar sua senha e entrar no sistema.`,
+        link: linkDeAcesso(urlBase, "convite", token),
+      });
+    } catch (erro) {
+      await sql`DELETE FROM tokens_acesso WHERE token_hash = ${tokenHash}`;
+      throw erro;
+    }
+    return;
+  }
   const token = tokenSeguro();
   const tokenHash = hashToken(token);
   await sql`UPDATE tokens_acesso SET usado_em = CURRENT_TIMESTAMP WHERE email = ${email} AND tipo = 'recuperacao' AND usado_em IS NULL`;
