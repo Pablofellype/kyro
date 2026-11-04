@@ -1292,6 +1292,72 @@
   gap: 14px;
 }
 
+.estilo-sistema .boas-vindas-kyro {
+  display: flex;
+  min-width: 150px;
+  align-items: center;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 18px 12px;
+  border: 1px solid var(--borda-controle);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--fundo) 72%, transparent);
+  text-align: center;
+}
+
+.estilo-sistema .boas-vindas-kyro-status {
+  align-self: stretch;
+  font-family: var(--fonte-mono);
+  font-size: 8px;
+  letter-spacing: 0.1em;
+  color: var(--sucesso);
+}
+
+.estilo-sistema .boas-vindas-kyro-imagem {
+  width: auto;
+  max-width: 100%;
+  margin: 2px 0;
+  object-fit: contain;
+}
+
+.estilo-sistema .boas-vindas-kyro strong {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--texto);
+}
+
+.estilo-sistema .boas-vindas-kyro > span:not(.boas-vindas-kyro-status) {
+  font-size: 10px;
+  color: var(--texto-3);
+}
+
+.estilo-sistema .boas-vindas-kyro p {
+  max-width: 160px;
+  margin: 4px 0 0;
+  font-size: 10px;
+  line-height: 1.4;
+  color: var(--texto-2);
+}
+
+.estilo-sistema .boas-vindas-time-coluna .boas-vindas-kyro {
+  min-width: 0;
+  padding: 6px;
+  border: 0;
+  background: transparent;
+}
+
+.estilo-sistema .boas-vindas-time-coluna .boas-vindas-kyro-status,
+.estilo-sistema .boas-vindas-time-coluna .boas-vindas-kyro strong,
+.estilo-sistema .boas-vindas-time-coluna .boas-vindas-kyro > span:not(.boas-vindas-kyro-status),
+.estilo-sistema .boas-vindas-time-coluna .boas-vindas-kyro p {
+  display: none;
+}
+
+.estilo-sistema .boas-vindas-time-coluna .boas-vindas-kyro-imagem {
+  width: 64px;
+  height: 64px;
+}
+
 .estilo-sistema .boas-vindas-personagens {
   display: flex;
   justify-content: center;
@@ -1306,6 +1372,7 @@
   .estilo-sistema .boas-vindas-conteudo { flex-basis: 0; }
   .estilo-sistema .boas-vindas-time-coluna { flex-basis: 48px; }
   .estilo-sistema .boas-vindas-time-coluna .personagem { width: 48px !important; height: 48px !important; }
+  .estilo-sistema .boas-vindas-time-coluna .boas-vindas-kyro-imagem { width: 48px; height: 48px; }
   .estilo-sistema .boas-vindas-corpo:has(.boas-vindas-time-apresentacao) { flex-wrap: wrap; }
 }
 
@@ -1336,6 +1403,10 @@
   font-size: 12.5px;
   font-weight: 500;
   color: var(--texto);
+}
+
+.estilo-sistema .boas-vindas-nomes li span {
+  max-width: 220px;
 }
 
 .estilo-sistema .boas-vindas-rodape {

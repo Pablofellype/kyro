@@ -4,8 +4,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { ArrowRight, BrainCircuit } from "lucide-react";
 import { useInterface } from "../../estado/interface";
 import { useConfig, type ModoBorda, type Tema } from "../../estado/configuracoes";
-import { Personagem } from "../../personagens/Personagem";
-import { AGENTES } from "../../estado/agentes";
+import { PersonagemKyro } from "../../personagens/PersonagemKyro";
 import { Botao, Campo, Segmentado } from "../../componentes/basicos";
 import { T } from "../../textos/textos";
 import { tocarSom } from "../../ponte/sons";
@@ -142,21 +141,19 @@ export function PrimeiraExecucao() {
               )}
             </div>
             <div className={`boas-vindas-time${passo === 0 ? " boas-vindas-time-apresentacao" : " boas-vindas-time-coluna"}`}>
-              <div className="boas-vindas-personagens">
-                {AGENTES.map((a) => (
-                  <span key={a} className="boas-vindas-personagem">
-                    <Personagem agente={a} tamanho={76} rotulo={T.agentes.nomes[a]} />
-                  </span>
-                ))}
+              <div className="boas-vindas-kyro">
+                <span className="boas-vindas-kyro-status">KYRO · ONLINE</span>
+                <PersonagemKyro tamanho={passo === 0 ? 132 : 92} className="boas-vindas-kyro-imagem" />
+                <strong>Kyro</strong>
+                <span>Assistente pessoal</span>
+                <p>{passo === 0 ? "Seu espaço começa aqui." : "Estou com você em cada etapa."}</p>
               </div>
               {passo === 0 && (
                 <ul className="boas-vindas-nomes">
-                  {AGENTES.map((a) => (
-                    <li key={a}>
-                      <b>{T.agentes.nomes[a]}</b>
-                      <span>{cfg.agentes.cargos[a]}: {T.agentes.areas[a]}</span>
-                    </li>
-                  ))}
+                  <li>
+                    <b>Kyro</b>
+                    <span>Organiza sua rotina, seus estudos e seu próximo passo.</span>
+                  </li>
                 </ul>
               )}
             </div>
