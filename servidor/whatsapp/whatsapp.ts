@@ -47,6 +47,10 @@ const idDaSessaoAtual = () => contextoWhatsapp.getStore() ?? (usaGowaExterno() ?
 const idSeguro = (valor: string) => valor.replace(/[^a-zA-Z0-9_-]/g, "-").slice(0, 80) || "local";
 const dispositivoDaSessao = (id: string) => id === "local" || id === "1" ? "niko" : `niko-user-${idSeguro(id)}`;
 const pastaDosUsuarios = () => join(pastaDados(), "usuarios");
+const pastaDaSessao = () => {
+  const id = idDaSessaoAtual();
+  return id === "local" || id === "1" ? pastaDados() : join(pastaDosUsuarios(), idSeguro(id));
+};
 
 export function comWhatsappUsuario<T>(usuarioId: number | string | undefined, trabalho: () => T): T {
   return contextoWhatsapp.run(usuarioId === undefined || usuarioId === null ? (usaGowaExterno() ? "1" : "local") : String(usuarioId), trabalho);
@@ -82,8 +86,7 @@ interface ConfigWhatsapp extends FiltrosWhatsapp {
 
 const PADRAO: ConfigWhatsapp = { ligado: false, silenciarGrupos: true, ignoradas: [], lerAoAbrir: true, esconderArquivadas: true, esconderGrupos: false, mostrarFotos: true };
 const arquivoDeConfig = () => {
-  const id = idDaSessaoAtual();
-  return GOWA_EXTERNO && id !== "local" && id !== "1" ? join(pastaDosUsuarios(), idSeguro(id), "whatsapp.json") : join(pastaDados(), "whatsapp.json");
+  return join(pastaDaSessao(), "whatsapp.json");
 };
 
 function lerConfig(): ConfigWhatsapp {
@@ -122,6 +125,9 @@ async function segredoGuardado(id: string, criar: () => string): Promise<string>
 const estados = new Map<string, EstadoWhatsappInterno>();
 const caixas = new Map<string, CaixaWhatsapp>();
 const limites = new Map<string, LimiteDeEnvios>();
+let portaLocalCompartilhada = 0;
+let acessoLocalCompartilhado = "";
+let segredoLocalCompartilhado = "";
 const relogios = new Map<string, ReturnType<typeof setInterval>>();
 const ocupados = new Set<string>();
 const primeirasPassadas = new Map<string, Promise<void>>();
@@ -195,8 +201,7 @@ function limiteDaSessao() {
 }
 
 function arquivoDeRastros() {
-  const id = idDaSessaoAtual();
-  return GOWA_EXTERNO && id !== "local" && id !== "1" ? join(pastaDosUsuarios(), idSeguro(id), "whatsapp-rastros.json") : join(pastaDados(), "whatsapp-rastros.json");
+  return join(pastaDaSessao(), "whatsapp-rastros.json");
 }
 
 function rastrosDaSessao(): RastroWhatsapp[] {
@@ -230,8 +235,7 @@ function digitandoDaSessao() {
 }
 
 function arquivoDeUnicas() {
-  const id = idDaSessaoAtual();
-  return GOWA_EXTERNO && id !== "local" && id !== "1" ? join(pastaDosUsuarios(), idSeguro(id), "whatsapp-unicas.json") : join(pastaDados(), "whatsapp-unicas.json");
+  return join(pastaDaSessao(), "whatsapp-unicas.json");
 }
 
 function unicasDaSessao() {
@@ -281,6 +285,10 @@ const envios = new Proxy({} as LimiteDeEnvios, {
     return typeof valor === "function" ? valor.bind(atual) : valor;
   },
 });
+
+function existeOutraSessaoLigada(id: string): boolean {
+  return [...estados.entries()].some(([outroId, atual]) => outroId !== id && atual.config.ligado);
+}
 
 function relogioDaSessao() { return relogios.get(idDaSessaoAtual()) ?? null; }
 function definirRelogio(valor: ReturnType<typeof setInterval> | null) {
@@ -480,11 +488,14 @@ async function prepararGateway() {
     if (!estado.acesso || !estado.segredo) throw new Error("gateway_externo_sem_credenciais");
     return;
   }
-  estado.acesso ||= await segredoGuardado("whatsapp-acesso", () => `niko:${randomBytes(18).toString("hex")}`);
-  estado.segredo ||= await segredoGuardado("whatsapp-webhook", () => randomBytes(32).toString("hex"));
-  if (!estado.porta || (!gowaRodando() && estado.falhasSeguidas > 2)) estado.porta = await portaLivre();
+  acessoLocalCompartilhado ||= await segredoGuardado("whatsapp-acesso", () => `niko:${randomBytes(18).toString("hex")}`);
+  segredoLocalCompartilhado ||= await segredoGuardado("whatsapp-webhook", () => randomBytes(32).toString("hex"));
+  if (!portaLocalCompartilhada) portaLocalCompartilhada = await portaLivre();
+  estado.porta = portaLocalCompartilhada;
+  estado.acesso = acessoLocalCompartilhado;
+  estado.segredo = segredoLocalCompartilhado;
   if (!estado.config.ligado || !relogioDaSessao()) throw new Error("gateway_parado");
-  iniciarGowa({ porta: estado.porta, acesso: estado.acesso, urlDoWebhook: `http://127.0.0.1:${portaDaPonte()}${CAMINHO_DO_WEBHOOK}`, segredoDoWebhook: estado.segredo });
+  iniciarGowa({ porta: portaLocalCompartilhada, acesso: acessoLocalCompartilhado, urlDoWebhook: `http://127.0.0.1:${portaDaPonte()}${CAMINHO_DO_WEBHOOK}`, segredoDoWebhook: segredoLocalCompartilhado });
 }
 
 async function passo() {
@@ -551,11 +562,15 @@ function iniciarRelogio() {
 }
 
 function pararTudo(esquecer: boolean) {
+  const id = idDaSessaoAtual();
   const relogio = relogioDaSessao();
   if (relogio) clearInterval(relogio);
   definirRelogio(null);
-  primeirasPassadas.delete(idDaSessaoAtual());
-  pararGowa();
+  primeirasPassadas.delete(id);
+  if (!existeOutraSessaoLigada(id)) {
+    pararGowa();
+    portaLocalCompartilhada = 0;
+  }
   estado.vinculo = "desligado";
   estado.qr = null;
   estado.porta = 0;
@@ -567,8 +582,8 @@ function pararTudo(esquecer: boolean) {
     estado.novidades = [];
     estado.conversasAbertas.clear();
     digitandoDaSessao().clear();
-    rastrosPorSessao.delete(idDaSessaoAtual());
-    unicasPorSessao.delete(idDaSessaoAtual());
+    rastrosPorSessao.delete(id);
+    unicasPorSessao.delete(id);
   }
 }
 
@@ -805,6 +820,7 @@ export async function instalarWhatsapp() {
     await aguardarGowaParar();
   });
   estado.porta = 0;
+  portaLocalCompartilhada = 0;
   if (estado.config.ligado) iniciarRelogio();
   return { ok: true, versao };
 }
@@ -1100,15 +1116,18 @@ export async function desconectarWhatsapp() {
 export async function esquecerWhatsapp() {
   await chamarComSucesso("POST", `/devices/${encodeURIComponent(estado.dispositivo)}/logout`).catch(() => undefined);
   pararTudo(true);
-  await aguardarGowaParar();
-  for (const pasta of ["storages", "statics"]) rmSync(join(pastaDoWhatsapp(), pasta), { recursive: true, force: true });
+  if (!existeOutraSessaoLigada(idDaSessaoAtual())) await aguardarGowaParar();
   rmSync(arquivoDeRastros(), { force: true });
   rmSync(arquivoDeUnicas(), { force: true });
   rastrosPorSessao.delete(idDaSessaoAtual());
   unicasPorSessao.delete(idDaSessaoAtual());
   unicasEmAndamentoPorSessao.delete(idDaSessaoAtual());
-  await apagarSegredo("whatsapp-acesso").catch(() => undefined);
-  await apagarSegredo("whatsapp-webhook").catch(() => undefined);
+  if (!existeOutraSessaoLigada(idDaSessaoAtual())) {
+    await apagarSegredo("whatsapp-acesso").catch(() => undefined);
+    await apagarSegredo("whatsapp-webhook").catch(() => undefined);
+    acessoLocalCompartilhado = "";
+    segredoLocalCompartilhado = "";
+  }
   estado.acesso = "";
   estado.segredo = "";
   estado.config = { ...PADRAO };

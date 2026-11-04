@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { motion } from "motion/react";
-import { Check, Copy, FileText, Package, Pencil, Plus, Search, Trash2, X } from "lucide-react";
+import { Check, Copy, FileText, ImagePlus, Package, Pencil, Plus, Search, Trash2, X } from "lucide-react";
 import {
   formatarVariacoes,
   useMateriais,
@@ -8,6 +8,7 @@ import {
   type VariacaoMaterial,
 } from "../../../estado/materiais";
 import { tocarSom } from "../../../ponte/sons";
+import { otimizarImagem, removerFotoDoBlob, uploadarFoto } from "../../../servicos/fotos";
 
 function normalizar(texto: string): string {
   return texto
@@ -31,6 +32,8 @@ export function MateriaisNaBarra({
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [nomeNovo, setNomeNovo] = useState("");
   const [codigosNovo, setCodigosNovo] = useState("");
+  const [imagemNova, setImagemNova] = useState("");
+  const [carregandoImagem, setCarregandoImagem] = useState(false);
   const [textoLote, setTextoLote] = useState("");
   const [avisoLote, setAvisoLote] = useState<string | null>(null);
 
@@ -51,21 +54,39 @@ export function MateriaisNaBarra({
     setEditandoId(item.id);
     setNomeNovo(item.nome);
     setCodigosNovo(formatarVariacoes(item.variacoes));
+    setImagemNova(item.imagem ?? "");
     setModoCadastro("item");
   };
 
   const salvarItem = () => {
     if (!nomeNovo.trim() || !codigosNovo.trim()) return;
+    const imagemAnterior = editandoId ? materiais.find((item) => item.id === editandoId)?.imagem : undefined;
     if (editandoId) {
-      atualizarMaterial(editandoId, nomeNovo, codigosNovo);
+      atualizarMaterial(editandoId, nomeNovo, codigosNovo, imagemNova || undefined);
     } else {
-      adicionarMaterial(nomeNovo, codigosNovo);
+      adicionarMaterial(nomeNovo, codigosNovo, imagemNova || undefined);
     }
+    if (imagemAnterior && imagemAnterior !== imagemNova) void removerFotoDoBlob(imagemAnterior);
     void tocarSom("blip");
     setNomeNovo("");
     setCodigosNovo("");
+    setImagemNova("");
     setEditandoId(null);
     setModoCadastro("fechado");
+  };
+
+  const escolherImagem = async (arquivo?: File) => {
+    if (!arquivo) return;
+    setCarregandoImagem(true);
+    try {
+      const otimizada = await otimizarImagem(arquivo, { larguraMaxima: 1400, alturaMaxima: 1000, qualidade: 0.84 });
+      setImagemNova((await uploadarFoto(otimizada.blob, "materiais")) ?? otimizada.dataUrl);
+    } catch {
+      setAvisoLote("Escolha uma imagem PNG, JPG, WEBP ou GIF de até 8 MB.");
+      window.setTimeout(() => setAvisoLote(null), 3200);
+    } finally {
+      setCarregandoImagem(false);
+    }
   };
 
   const salvarLote = () => {
@@ -113,7 +134,7 @@ export function MateriaisNaBarra({
 
   return (
     <motion.div
-      className="ilha-pop ilha-personalizar ilha-materiais"
+      className="ilha-pop ilha-personalizar ilha-materiais estilo-sistema"
       style={{ top: topo, maxHeight: `calc(100vh - ${topo + 12}px)` }}
       role="dialog"
       aria-label="Catálogo de Materiais"
@@ -124,19 +145,24 @@ export function MateriaisNaBarra({
     >
       <div className="ilha-materiais-topo">
         <div className="ilha-materiais-cabecalho">
-          <span className="ilha-personalizar-titulo">
-            <Package size={14} />
-            Códigos de Materiais ({materiais.length})
-          </span>
+          <div className="ilha-materiais-identidade">
+            <span className="ilha-materiais-titulo">
+              <span className="ilha-materiais-titulo-icone"><Package size={14} /></span>
+              <span>Catálogo de materiais</span>
+              <span className="ilha-materiais-contagem">{materiais.length}</span>
+            </span>
+            <span className="ilha-materiais-subtitulo">Encontre e copie rapidamente por tamanho ou código.</span>
+          </div>
           <div className="ilha-materiais-acoes-topo">
             <button
               type="button"
-              className="ilha-rapido-texto-pequeno ilha-materiais-btn"
+              className="ilha-rapido-texto-pequeno ilha-materiais-btn ilha-materiais-btn-principal"
               data-ativo={modoCadastro === "item" || undefined}
               onClick={() => {
                 setEditandoId(null);
                 setNomeNovo("");
                 setCodigosNovo("");
+                setImagemNova("");
                 setModoCadastro((m) => (m === "item" ? "fechado" : "item"));
               }}
               title="Adicionar um material"
@@ -199,6 +225,27 @@ export function MateriaisNaBarra({
             value={codigosNovo}
             onChange={(e) => setCodigosNovo(e.target.value)}
           />
+          <div className="ilha-materiais-foto">
+            <label className="ilha-materiais-foto-botao">
+              <ImagePlus size={14} />
+              {carregandoImagem ? "Preparando foto..." : imagemNova ? "Trocar foto" : "Adicionar foto"}
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/gif"
+                hidden
+                disabled={carregandoImagem}
+                onChange={(e) => { void escolherImagem(e.target.files?.[0]); e.target.value = ""; }}
+              />
+            </label>
+            {imagemNova && (
+              <div className="ilha-materiais-foto-previa">
+                <img src={imagemNova} alt="Prévia do material" />
+                <button type="button" className="bt-botao-icone" title="Remover foto" onClick={() => setImagemNova("")} disabled={carregandoImagem}>
+                  <X size={12} />
+                </button>
+              </div>
+            )}
+          </div>
           <div className="ilha-materiais-form-botoes">
             <button
               type="button"
@@ -206,6 +253,7 @@ export function MateriaisNaBarra({
               onClick={() => {
                 setModoCadastro("fechado");
                 setEditandoId(null);
+                setImagemNova("");
               }}
             >
               Cancelar
@@ -261,7 +309,10 @@ export function MateriaisNaBarra({
             return (
               <section key={item.id} className="ilha-personalizar-grupo ilha-material-card">
                 <div className="ilha-material-topo">
-                  <span className="ilha-material-nome">{item.nome}</span>
+                  <div className="ilha-material-identidade">
+                    {item.imagem && <img className="ilha-material-imagem" src={item.imagem} alt={`Foto de ${item.nome}`} />}
+                    <span className="ilha-material-nome">{item.nome}</span>
+                  </div>
                   <div className="ilha-material-controles">
                     {unico && (
                       <button

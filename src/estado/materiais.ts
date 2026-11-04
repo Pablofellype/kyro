@@ -12,6 +12,7 @@ export interface MaterialItem {
   id: string;
   nome: string;
   variacoes: VariacaoMaterial[];
+  imagem?: string;
 }
 
 export function interpretarVariacoes(texto: string): VariacaoMaterial[] {
@@ -101,8 +102,8 @@ export const MATERIAIS_INICIAIS: MaterialItem[] = [
 
 interface EstadoMateriais {
   materiais: MaterialItem[];
-  adicionarMaterial: (nome: string, textoCodigos: string) => void;
-  atualizarMaterial: (id: string, nome: string, textoCodigos: string) => void;
+  adicionarMaterial: (nome: string, textoCodigos: string, imagem?: string) => void;
+  atualizarMaterial: (id: string, nome: string, textoCodigos: string, imagem?: string) => void;
   importarTexto: (bloco: string) => number;
   excluirMaterial: (id: string) => void;
 }
@@ -111,24 +112,24 @@ export const useMateriais = create<EstadoMateriais>()(
   persist(
     (set, get) => ({
       materiais: MATERIAIS_INICIAIS,
-      adicionarMaterial: (nome, textoCodigos) => {
+      adicionarMaterial: (nome, textoCodigos, imagem) => {
         const nomeLimpo = nome.trim().toUpperCase();
         const variacoes = interpretarVariacoes(textoCodigos);
         if (!nomeLimpo || variacoes.length === 0) return;
         set((s) => ({
           materiais: [
             ...s.materiais,
-            { id: gerarId(), nome: nomeLimpo, variacoes },
+            { id: gerarId(), nome: nomeLimpo, variacoes, ...(imagem ? { imagem } : {}) },
           ],
         }));
       },
-      atualizarMaterial: (id, nome, textoCodigos) => {
+      atualizarMaterial: (id, nome, textoCodigos, imagem) => {
         const nomeLimpo = nome.trim().toUpperCase();
         const variacoes = interpretarVariacoes(textoCodigos);
         if (!nomeLimpo || variacoes.length === 0) return;
         set((s) => ({
           materiais: s.materiais.map((m) =>
-            m.id === id ? { ...m, nome: nomeLimpo, variacoes } : m,
+            m.id === id ? { ...m, nome: nomeLimpo, variacoes, ...(imagem ? { imagem } : { imagem: undefined }) } : m,
           ),
         }));
       },

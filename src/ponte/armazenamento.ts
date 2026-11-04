@@ -16,6 +16,15 @@ const bancoDeTeste = (() => {
 const CABECALHOS: Record<string, string> = { "x-niko": "1", "content-type": "application/json", ...(bancoDeTeste ? { "x-niko-banco": bancoDeTeste } : {}) };
 const CHAVE_CLIENTE = "kyro_cliente_id";
 
+function idDoUsuarioLocal(): string | null {
+  try {
+    const usuario = JSON.parse(localStorage.getItem("kyro_usuario") ?? "null") as { id?: unknown } | null;
+    return typeof usuario?.id === "number" && Number.isSafeInteger(usuario.id) && usuario.id > 0 ? String(usuario.id) : null;
+  } catch {
+    return null;
+  }
+}
+
 function tokenDaSessao(): string | null {
   try {
     const token = localStorage.getItem("kyro_token");
@@ -50,13 +59,19 @@ export function idDoCliente(): string | null {
 
 function cabecalhosDosDados(): Record<string, string> {
   const token = tokenDaSessao();
-  if (!token) return CABECALHOS;
+  const usuarioId = idDoUsuarioLocal();
+  const usuario: Record<string, string> = usuarioId ? { "x-kyro-user-id": usuarioId } : {};
+  if (!token) return { ...CABECALHOS, ...usuario };
   const cliente = clienteDaInstalacao();
-  return { ...CABECALHOS, Authorization: `Bearer ${token}`, ...(cliente ? { "x-niko-cliente": cliente } : {}) };
+  return { ...CABECALHOS, Authorization: `Bearer ${token}`, ...(cliente ? { "x-niko-cliente": cliente } : {}), ...usuario };
 }
 
 export function cabecalhoDoBanco(): Record<string, string> {
-  return bancoDeTeste ? { "x-niko-banco": bancoDeTeste } : {};
+  const usuarioId = idDoUsuarioLocal();
+  return {
+    ...(bancoDeTeste ? { "x-niko-banco": bancoDeTeste } : {}),
+    ...(usuarioId ? { "x-kyro-user-id": usuarioId } : {}),
+  };
 }
 
 export type ModoArmazenamento = "banco" | "local";
@@ -602,7 +617,7 @@ function validarDadosRecebidos(resposta: unknown): Record<string, string> {
 
 async function lerDadosLegadosDaPonte(): Promise<Record<string, string>> {
   try {
-    const r = await fetch("/ponte/dados", { headers: CABECALHOS, signal: AbortSignal.timeout(4000) });
+    const r = await fetch("/ponte/dados", { headers: cabecalhosDosDados(), signal: AbortSignal.timeout(4000) });
     if (!r.ok) return {};
     return validarDadosRecebidos(await r.json());
   } catch {
@@ -614,6 +629,11 @@ export async function iniciarArmazenamento(): Promise<ModoArmazenamento> {
   let limite = 0;
   try {
     const remoto = Boolean(tokenDaSessao());
+    const usuarioId = idDoUsuarioLocal();
+    // As chaves antigas do localStorage não têm dono: em uma troca de conta
+    // elas podem ser do administrador. Só o usuário 1 pode migrá-las; os
+    // demais usam exclusivamente o banco local já separado pelo ID.
+    const podeMigrarChavesLocais = !remoto || usuarioId === "1";
     const filaSalva = remoto ? lerFilaSincronia() : null;
     const dadosLegados = remoto ? await lerDadosLegadosDaPonte() : {};
     const controle = new AbortController();
@@ -646,11 +666,13 @@ export async function iniciarArmazenamento(): Promise<ModoArmazenamento> {
       }
     }
     const locais = chavesLocais().filter((k) => k !== `${PREFIXO}migrado`);
-    if (remoto && Object.keys(dados).length === 0 && (Object.keys(dadosLegados).length > 0 || locais.length > 0)) {
+    if (remoto && Object.keys(dados).length === 0 && (Object.keys(dadosLegados).length > 0 || (podeMigrarChavesLocais && locais.length > 0))) {
       const migrados = { ...dadosLegados };
-      for (const k of locais) {
-        const v = localStorage.getItem(k);
-        if (v != null) migrados[k] = v;
+      if (podeMigrarChavesLocais) {
+        for (const k of locais) {
+          const v = localStorage.getItem(k);
+          if (v != null) migrados[k] = v;
+        }
       }
       for (const [k, v] of Object.entries(migrados)) {
         cache.set(k, v);
@@ -658,7 +680,7 @@ export async function iniciarArmazenamento(): Promise<ModoArmazenamento> {
       }
       await enviarPendentes();
       if (pendentes.size === 0) for (const k of locais) localSeguro(() => localStorage.removeItem(k), undefined);
-    } else if (remoto && Object.keys(dados).length > 0) {
+    } else if (remoto && Object.keys(dados).length > 0 && podeMigrarChavesLocais) {
       for (const k of locais) localSeguro(() => localStorage.removeItem(k), undefined);
     }
     if (ouvintesIniciados) {

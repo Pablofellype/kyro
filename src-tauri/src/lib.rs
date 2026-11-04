@@ -419,6 +419,10 @@ fn iniciar_ponte(app: &AppHandle, token: &str, reinicio: bool) {
     let recursos = sem_prefixo(pasta.join("recursos"));
     let node = plataforma::node_da_ponte(&recursos);
     let script = recursos.join("ponte.mjs");
+    if !node.exists() || !script.exists() {
+        registrar(format!("recursos ausentes: node={} script={}", node.display(), script.display()));
+        return;
+    }
     let saida_erro = dados.as_ref().and_then(|p| {
         let caminho = sem_prefixo(p.join("ponte.log"));
         if reinicio {

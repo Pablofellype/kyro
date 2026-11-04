@@ -8,6 +8,7 @@ import { lerContribuicoesGithub, lerCommitsGithub } from "./github.ts";
 import { exigirConexaoDisponivel } from "../src/utilitarios/disponibilidadeConexoes.ts";
 import { autorizarStrava, lerJson, lerCalendarios, lerDiscord, lerEmail, lerJira, lerLinear, lerRailway, lerReddit, lerStrava, lerTrello, urlPublicaSegura } from "./conexoesExtras.ts";
 import { configDaCripto, enderecoValido, lerCripto } from "./cripto.ts";
+import { pastaDoUsuario, segredoDoUsuario, usuarioLocalAtual } from "./escopoUsuario.ts";
 
 export const SERVICOS = [
   "stripe", "github", "vercel", "resend", "notion", "calcom", "n8n", "google", "supabase", "cloudflare",
@@ -16,7 +17,7 @@ export const SERVICOS = [
 const SERVICOS_ANTIGOS_DO_GOOGLE = ["gmail", "agenda"];
 export type Servico = (typeof SERVICOS)[number];
 
-const ARQUIVO = () => join(pastaDados(), "conexoes.json");
+const ARQUIVO = () => join(pastaDoUsuario(pastaDados()), "conexoes.json");
 
 interface ConfigConexoes {
   [servico: string]: { url?: string; temChave: boolean };
@@ -426,34 +427,36 @@ export async function credencialDoServico(servico: Servico, dados: Record<string
   }
 }
 
-const cacheDados = new Map<Servico, { quando: number; dados: unknown }>();
-const leiturasEmAndamento = new Map<Servico, Promise<unknown>>();
+const cacheDados = new Map<string, { quando: number; dados: unknown }>();
+const leiturasEmAndamento = new Map<string, Promise<unknown>>();
+const chaveDoCache = (servico: Servico) => `${usuarioLocalAtual()}:${servico}`;
 
 async function buscarConexao(servico: Servico, aindaValida: () => boolean) {
   const config = lerConfig()[servico];
-  const chave = config?.temChave ? await lerSegredo(`conexao-${servico}`) : null;
+  const chave = config?.temChave ? await lerSegredo(segredoDoUsuario(`conexao-${servico}`)) : null;
   if (!chave) throw new Error("sem_chave");
   const dados = await LEITORES[servico](chave, config?.url);
-  if (aindaValida()) cacheDados.set(servico, { quando: Date.now(), dados });
+  if (aindaValida()) cacheDados.set(chaveDoCache(servico), { quando: Date.now(), dados });
   return dados;
 }
 
 export async function lerConexao(servico: Servico, forcar = false) {
   exigirConexaoDisponivel(servico);
-  const anterior = cacheDados.get(servico);
+  const escopo = chaveDoCache(servico);
+  const anterior = cacheDados.get(escopo);
   if (!forcar && anterior && Date.now() - anterior.quando < 20000) return anterior.dados;
-  const emAndamento = leiturasEmAndamento.get(servico);
+  const emAndamento = leiturasEmAndamento.get(escopo);
   if (emAndamento) return emAndamento;
-  const leitura: Promise<unknown> = buscarConexao(servico, () => leiturasEmAndamento.get(servico) === leitura).finally(() => {
-    if (leiturasEmAndamento.get(servico) === leitura) leiturasEmAndamento.delete(servico);
+  const leitura: Promise<unknown> = buscarConexao(servico, () => leiturasEmAndamento.get(escopo) === leitura).finally(() => {
+    if (leiturasEmAndamento.get(escopo) === leitura) leiturasEmAndamento.delete(escopo);
   });
-  leiturasEmAndamento.set(servico, leitura);
+  leiturasEmAndamento.set(escopo, leitura);
   return leitura;
 }
 
 export async function chaveDe(servico: Servico): Promise<string> {
   exigirConexaoDisponivel(servico);
-  const chave = lerConfig()[servico]?.temChave ? await lerSegredo(`conexao-${servico}`) : null;
+  const chave = lerConfig()[servico]?.temChave ? await lerSegredo(segredoDoUsuario(`conexao-${servico}`)) : null;
   if (!chave) throw new Error("sem_chave");
   return chave;
 }
@@ -464,39 +467,39 @@ export async function salvarChaveConexao(servico: Servico, dados: Record<string,
     const credencial = await autorizarWorkspace(String(dados.clienteId ?? "").trim(), String(dados.segredo ?? "").trim());
     const texto = JSON.stringify(credencial);
     await LEITORES[servico](texto);
-    await gravarSegredo(`conexao-${servico}`, texto);
-    for (const antigo of SERVICOS_ANTIGOS_DO_GOOGLE) await apagarSegredo(`conexao-${antigo}`).catch(() => undefined);
+    await gravarSegredo(segredoDoUsuario(`conexao-${servico}`), texto);
+    for (const antigo of SERVICOS_ANTIGOS_DO_GOOGLE) await apagarSegredo(segredoDoUsuario(`conexao-${antigo}`)).catch(() => undefined);
     const c = lerConfig();
     for (const antigo of SERVICOS_ANTIGOS_DO_GOOGLE) delete c[antigo];
     c[servico] = { temChave: true };
     salvarConfig(c);
-    cacheDados.delete(servico);
-    leiturasEmAndamento.delete(servico);
+    cacheDados.delete(chaveDoCache(servico));
+    leiturasEmAndamento.delete(chaveDoCache(servico));
     return { ok: true };
   }
   if (servico === "outlook") {
     const credencial = await autorizarOutlook(String(dados.clienteId ?? "").trim());
     const texto = JSON.stringify(credencial);
     await LEITORES[servico](texto);
-    await gravarSegredo(`conexao-${servico}`, texto);
+    await gravarSegredo(segredoDoUsuario(`conexao-${servico}`), texto);
     const c = lerConfig();
     c[servico] = { temChave: true };
     salvarConfig(c);
-    cacheDados.delete(servico);
-    leiturasEmAndamento.delete(servico);
+    cacheDados.delete(chaveDoCache(servico));
+    leiturasEmAndamento.delete(chaveDoCache(servico));
     return { ok: true };
   }
   const url = servico === "n8n" ? validarUrlBase(String(dados.url ?? ""), true) : undefined;
-  const guardada = lerConfig()[servico]?.temChave ? await lerSegredo(`conexao-${servico}`) : null;
+  const guardada = lerConfig()[servico]?.temChave ? await lerSegredo(segredoDoUsuario(`conexao-${servico}`)) : null;
   const chave = await credencialDoServico(servico, dados, guardada);
   if (chave.length > 8000) throw new Error("chave_invalida");
   await LEITORES[servico](chave, url);
-  await gravarSegredo(`conexao-${servico}`, chave);
+  await gravarSegredo(segredoDoUsuario(`conexao-${servico}`), chave);
   const c = lerConfig();
   c[servico] = { temChave: true, url };
   salvarConfig(c);
-  cacheDados.delete(servico);
-  leiturasEmAndamento.delete(servico);
+  cacheDados.delete(chaveDoCache(servico));
+  leiturasEmAndamento.delete(chaveDoCache(servico));
   return { ok: true };
 }
 
@@ -504,7 +507,7 @@ const finalDaChave = (v: unknown) => (typeof v === "string" && v.length > 4 ? `.
 
 export async function configPublica(servico: Servico): Promise<Record<string, unknown>> {
   exigirConexaoDisponivel(servico);
-  const texto = lerConfig()[servico]?.temChave ? await lerSegredo(`conexao-${servico}`) : null;
+  const texto = lerConfig()[servico]?.temChave ? await lerSegredo(segredoDoUsuario(`conexao-${servico}`)) : null;
   if (!texto) return {};
   const c = lerJson<Record<string, unknown>>(texto);
   switch (servico) {
@@ -534,11 +537,11 @@ export async function configPublica(servico: Servico): Promise<Record<string, un
 }
 
 export async function removerChaveConexao(servico: Servico) {
-  await apagarSegredo(`conexao-${servico}`).catch(() => undefined);
+  await apagarSegredo(segredoDoUsuario(`conexao-${servico}`)).catch(() => undefined);
   const c = lerConfig();
   delete c[servico];
   salvarConfig(c);
-  cacheDados.delete(servico);
-  leiturasEmAndamento.delete(servico);
+  cacheDados.delete(chaveDoCache(servico));
+  leiturasEmAndamento.delete(chaveDoCache(servico));
   return { ok: true };
 }

@@ -59,10 +59,12 @@ async function iniciar() {
   await prepararPonte();
   desviarLinksExternos();
   let modo = "local";
-  for (let tentativa = 0; tentativa < (NATIVO ? 5 : 1); tentativa++) {
+  // Em algumas máquinas o Windows Defender demora alguns segundos para
+  // liberar o node.exe empacotado. Aguarde a ponte antes de mostrar a falha.
+  for (let tentativa = 0; tentativa < (NATIVO ? 15 : 1); tentativa++) {
     modo = await iniciarArmazenamento();
     if (modo === "banco") break;
-    await new Promise((r) => setTimeout(r, 500));
+    await new Promise((r) => setTimeout(r, NATIVO ? 750 : 500));
   }
   const raiz = document.getElementById("raiz");
   if (!raiz) return;

@@ -24,7 +24,7 @@ export function configurarCors(req: VercelRequest, res: VercelResponse): boolean
   const origem = typeof req.headers.origin === "string" ? req.headers.origin : "";
   const permitida = origemCorsPermitida(origem);
   if (permitida && origem) res.setHeader("Access-Control-Allow-Origin", origem);
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Niko, X-Niko-Token, X-Niko-Cliente, X-Kyro-User-Id");
   res.setHeader("Access-Control-Allow-Credentials", "true");
   res.setHeader("Vary", "Origin");

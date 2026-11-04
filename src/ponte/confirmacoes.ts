@@ -17,13 +17,19 @@ export async function reservarConfirmacao(id: string, aceitar: boolean): Promise
     return { reservada: resultado.reservada, situacao: resultado.situacao };
   }
   const reservar = (): { reservada: boolean; situacao: "confirmado" | "cancelado" } => {
-    const chave = `niko-confirmacao:${cabecalhoDoBanco()["x-niko-banco"] ?? ""}:${id}`;
+    const cabecalho = cabecalhoDoBanco();
+    const escopo = `${cabecalho["x-niko-banco"] ?? ""}:${cabecalho["x-kyro-user-id"] ?? "local"}`;
+    const chave = `niko-confirmacao:${escopo}:${id}`;
     const salvo = localStorage.getItem(chave);
     if (salvo === "confirmado" || salvo === "cancelado") return { reservada: false, situacao: salvo };
     const situacao = aceitar ? "confirmado" as const : "cancelado" as const;
     localStorage.setItem(chave, situacao);
     return { reservada: true, situacao };
   };
-  if (typeof navigator !== "undefined" && navigator.locks) return navigator.locks.request(`niko-confirmacao:${id}`, reservar);
+  if (typeof navigator !== "undefined" && navigator.locks) {
+    const cabecalho = cabecalhoDoBanco();
+    const escopo = `${cabecalho["x-niko-banco"] ?? ""}:${cabecalho["x-kyro-user-id"] ?? "local"}`;
+    return navigator.locks.request(`niko-confirmacao:${escopo}:${id}`, reservar);
+  }
   return reservar();
 }

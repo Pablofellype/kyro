@@ -27,6 +27,7 @@ import { listarArquivos, receberArquivo, enviarConteudo, excluirArquivo, excluir
 import { tipoDoComputador, estadoDoSistema, listarRedes, listarBluetooth, lerComputador, conectarRede, esquecerRede, desconectarRede, definirBrilho, definirRadio, abrirConfiguracoesDoSistema } from "./sistema.ts";
 import { instalarSincroniaTempoReal, notificarDadosUsuarioAlterados } from "./sincroniaTempoReal.ts";
 import { configuracaoSalva, executarAderencias, enviarAderencia, navegadorDeAderenciasDisponivel, salvarConfiguracaoAderencias, testarAderencia } from "./aderencias.ts";
+import { comUsuarioLocal } from "./escopoUsuario.ts";
 
 const LIMITE_CORPO = 24 * 1024 * 1024;
 
@@ -126,6 +127,17 @@ function tokenDaRequisicao(req: IncomingMessage): string {
 function clienteDaRequisicao(req: IncomingMessage): string | null {
   const valor = req.headers["x-niko-cliente"];
   return typeof valor === "string" ? valor : null;
+}
+
+function bancoDaRequisicao(req: IncomingMessage): string {
+  const base = String(req.headers["x-niko-banco"] ?? "").trim();
+  const usuarioId = typeof req.headers["x-kyro-user-id"] === "string" ? req.headers["x-kyro-user-id"].trim() : "";
+  // O banco antigo continua sendo o banco do dono. Cada outro usuário do
+  // aplicativo nativo recebe um arquivo próprio, mesmo quando usa a ponte
+  // local no mesmo computador.
+  if (!/^\d+$/.test(usuarioId) || usuarioId === "1") return base;
+  const prefixo = base ? `${base.slice(0, 10)}-` : "";
+  return `${prefixo}u${usuarioId}`.slice(0, 20);
 }
 
 function origemDaRequisicao(req: IncomingMessage): string {
@@ -446,8 +458,10 @@ export const rotas: Connect.NextHandleFunction = async (req, res, proximo) => {
   if (url.pathname === CAMINHO_DO_WEBHOOK && req.method === "POST") return receberWebhookDoWhatsapp(req, res);
   if (!origemConfiavel(req)) return responder(res, 403, { erro: "origem_nao_permitida" });
   const caminho = url.pathname.slice("/ponte".length);
+  const usuarioDaRequisicao = typeof req.headers["x-kyro-user-id"] === "string" ? req.headers["x-kyro-user-id"] : undefined;
 
-  try {
+  return await comUsuarioLocal(usuarioDaRequisicao, async () => {
+    try {
     const aderenciaRemota = /^\/aderencias-remota\/(estado|testar|enviar|executar|configuracao)$/.exec(caminho);
     if (aderenciaRemota) {
       if (!origemConfiavel(req)) return responder(res, 403, { erro: "origem_nao_permitida" });
@@ -496,45 +510,48 @@ export const rotas: Connect.NextHandleFunction = async (req, res, proximo) => {
       if (acao) return await atenderAderencia(req, res, acao);
     }
     if (caminho.startsWith("/whatsapp/")) {
-      iniciarWhatsapp();
-      const acao = caminho.slice("/whatsapp/".length);
-      if (acao === "estado" && req.method === "GET") return responder(res, 200, estadoDoWhatsapp());
-      if (acao === "novidades" && req.method === "GET") return responder(res, 200, novidadesDoWhatsapp(Number(url.searchParams.get("desde")) || 0));
-      if (acao === "midia" && req.method === "GET") {
-        const midia = await midiaDaMensagem(url.searchParams.get("jid"), url.searchParams.get("id"));
-        res.statusCode = 200;
-        res.setHeader("content-type", midia.tipo);
-        res.setHeader("cache-control", "no-store");
-        return res.end(midia.bytes);
-      }
-      if (acao === "historico" && req.method === "GET") return responder(res, 200, await historicoDaConversa(url.searchParams.get("jid"), url.searchParams.get("deslocamento"), url.searchParams.get("busca")));
-      if (acao === "rastros" && req.method === "GET") return responder(res, 200, rastrosDoWhatsapp());
-      if (acao === "agendadas" && req.method === "GET") return responder(res, 200, await listarAgendadas());
-      if (acao === "enviar-arquivo" && req.method === "POST") return responder(res, 200, await enviarArquivoNoWhatsapp(req, url.searchParams));
-      if (req.method === "POST") {
-        const corpo = await lerCorpo(req);
-        if (acao === "instalar") return responder(res, 200, await instalarWhatsapp());
-        if (acao === "ligar") return responder(res, 200, ligarWhatsapp(corpo.ligado === true));
-        if (acao === "filtros") return responder(res, 200, definirFiltrosDoWhatsapp(corpo));
-        if (acao === "ignorar") return responder(res, 200, ignorarConversa(corpo.jid, corpo.ignorar));
-        if (acao === "abrir") return responder(res, 200, await abrirConversa(corpo.jid));
-        if (acao === "fechar") return responder(res, 200, fecharConversa(corpo.jid));
-        if (acao === "enviar") return responder(res, 200, await enviarMensagem(corpo.jid, corpo.texto));
-        if (acao === "editar") return responder(res, 200, await editarMensagem(corpo.jid, corpo.id, corpo.texto));
-        if (acao === "apagar") return responder(res, 200, await apagarMensagem(corpo.jid, corpo.id));
-        if (acao === "limpar-rastros") return responder(res, 200, limparRastros());
-        if (acao === "agendar") return responder(res, 200, await agendarMensagem(corpo.jid, corpo.texto, corpo.quando));
-        if (acao === "cancelar-agendada") return responder(res, 200, await cancelarAgendada(corpo.id));
-        if (acao === "desconectar") return responder(res, 200, await desconectarWhatsapp());
-        if (acao === "esquecer") return responder(res, 200, await esquecerWhatsapp());
-      }
+      return await comWhatsappUsuario(usuarioDaRequisicao, async () => {
+        iniciarWhatsapp();
+        const acao = caminho.slice("/whatsapp/".length);
+        if (acao === "estado" && req.method === "GET") return responder(res, 200, estadoDoWhatsapp());
+        if (acao === "novidades" && req.method === "GET") return responder(res, 200, novidadesDoWhatsapp(Number(url.searchParams.get("desde")) || 0));
+        if (acao === "midia" && req.method === "GET") {
+          const midia = await midiaDaMensagem(url.searchParams.get("jid"), url.searchParams.get("id"));
+          res.statusCode = 200;
+          res.setHeader("content-type", midia.tipo);
+          res.setHeader("cache-control", "no-store");
+          return res.end(midia.bytes);
+        }
+        if (acao === "historico" && req.method === "GET") return responder(res, 200, await historicoDaConversa(url.searchParams.get("jid"), url.searchParams.get("deslocamento"), url.searchParams.get("busca")));
+        if (acao === "rastros" && req.method === "GET") return responder(res, 200, rastrosDoWhatsapp());
+        if (acao === "agendadas" && req.method === "GET") return responder(res, 200, await listarAgendadas());
+        if (acao === "enviar-arquivo" && req.method === "POST") return responder(res, 200, await enviarArquivoNoWhatsapp(req, url.searchParams));
+        if (req.method === "POST") {
+          const corpo = await lerCorpo(req);
+          if (acao === "instalar") return responder(res, 200, await instalarWhatsapp());
+          if (acao === "ligar") return responder(res, 200, ligarWhatsapp(corpo.ligado === true));
+          if (acao === "filtros") return responder(res, 200, definirFiltrosDoWhatsapp(corpo));
+          if (acao === "ignorar") return responder(res, 200, ignorarConversa(corpo.jid, corpo.ignorar));
+          if (acao === "abrir") return responder(res, 200, await abrirConversa(corpo.jid));
+          if (acao === "fechar") return responder(res, 200, fecharConversa(corpo.jid));
+          if (acao === "enviar") return responder(res, 200, await enviarMensagem(corpo.jid, corpo.texto));
+          if (acao === "editar") return responder(res, 200, await editarMensagem(corpo.jid, corpo.id, corpo.texto));
+          if (acao === "apagar") return responder(res, 200, await apagarMensagem(corpo.jid, corpo.id));
+          if (acao === "limpar-rastros") return responder(res, 200, limparRastros());
+          if (acao === "agendar") return responder(res, 200, await agendarMensagem(corpo.jid, corpo.texto, corpo.quando));
+          if (acao === "cancelar-agendada") return responder(res, 200, await cancelarAgendada(corpo.id));
+          if (acao === "desconectar") return responder(res, 200, await desconectarWhatsapp());
+          if (acao === "esquecer") return responder(res, 200, await esquecerWhatsapp());
+        }
+        return responder(res, 404, { erro: "rota_desconhecida" });
+      });
     }
     if (caminho === "/web/buscar" && req.method === "POST") return responder(res, 200, await buscarNaWeb(String((await lerCorpo(req)).consulta ?? "")));
     if (caminho === "/web/ler" && req.method === "POST") return responder(res, 200, await lerPagina(String((await lerCorpo(req)).url ?? "")));
     if (caminho === "/exportar" && req.method === "POST") return responder(res, 200, await exportarParaDownloads(req, url.searchParams.get("nome") ?? "", url.searchParams.get("mostrar") !== "0"));
     const arquivo = /^\/arquivos\/([A-Za-z0-9-]{1,64})(?:\/([A-Za-z0-9-]{1,64})(?:\/(baixar|abrir))?)?$/.exec(caminho);
     if (arquivo) {
-      const banco = String(req.headers["x-niko-banco"] ?? "");
+      const banco = bancoDaRequisicao(req);
       const [, materia, id, acao] = arquivo;
       if (!id && req.method === "GET") return responder(res, 200, { arquivos: await listarArquivos(banco, materia) });
       if (!id && req.method === "POST") return responder(res, 200, await receberArquivo(req, banco, materia, url.searchParams.get("nome") ?? ""));
@@ -578,19 +595,19 @@ export const rotas: Connect.NextHandleFunction = async (req, res, proximo) => {
       if (conexao[2] && req.method === "DELETE") return responder(res, 200, await removerChaveConexao(servico));
     }
     if (caminho === "/dados" && req.method === "GET") {
-      return responder(res, 200, { dados: lerTudo(String(req.headers["x-niko-banco"] ?? "")) });
+      return responder(res, 200, { dados: lerTudo(bancoDaRequisicao(req)) });
     }
     if (caminho === "/dados" && req.method === "POST") {
       const corpo = await lerCorpo(req);
       const itens = corpo.itens;
       if (!itens || typeof itens !== "object" || Array.isArray(itens)) return responder(res, 400, { erro: "itens_invalidos" });
-      gravar(itens as Record<string, string | null>, String(req.headers["x-niko-banco"] ?? ""));
+      gravar(itens as Record<string, string | null>, bancoDaRequisicao(req));
       return responder(res, 200, { ok: true });
     }
     if (caminho === "/dados/zerar" && req.method === "POST") {
       const corpo = await lerCorpo(req);
       if (corpo.confirmacao !== "APAGAR") return responder(res, 400, { erro: "confirmacao_invalida" });
-      const pasta = zerarBanco(String(req.headers["x-niko-banco"] ?? ""));
+      const pasta = zerarBanco(bancoDaRequisicao(req));
       if (corpo.chaves === true) {
         for (const p of listarProvedores()) await removerProvedor(p.id);
         for (const s of SERVICOS_CONEXAO) await removerChaveConexao(s);
@@ -598,12 +615,12 @@ export const rotas: Connect.NextHandleFunction = async (req, res, proximo) => {
       return responder(res, 200, { pasta });
     }
     if (caminho === "/dados/backup" && req.method === "POST") {
-      return responder(res, 200, { pasta: backupManual(String(req.headers["x-niko-banco"] ?? "")) });
+      return responder(res, 200, { pasta: backupManual(bancoDaRequisicao(req)) });
     }
     if (caminho === "/confirmacoes/reservar" && req.method === "POST") {
       const corpo = await lerCorpo(req);
       if (typeof corpo.id !== "string" || typeof corpo.aceitar !== "boolean") return responder(res, 400, { erro: "confirmacao_invalida" });
-      return responder(res, 200, reservarConfirmacao(corpo.id, corpo.aceitar, String(req.headers["x-niko-banco"] ?? "")));
+      return responder(res, 200, reservarConfirmacao(corpo.id, corpo.aceitar, bancoDaRequisicao(req)));
     }
     if (caminho === "/consumo" && req.method === "GET") {
       if (url.searchParams.get("oficial") === "1") return responder(res, 200, usoOficial());
@@ -662,10 +679,11 @@ export const rotas: Connect.NextHandleFunction = async (req, res, proximo) => {
       if (req.method === "POST" && escrita[acao]) return responder(res, 200, await escrita[acao](await lerCorpo(req)));
     }
     return responder(res, 404, { erro: "rota_desconhecida" });
-  } catch (e) {
-    if (!res.headersSent) return responder(res, 400, { erro: (e as Error).message });
-    res.end();
-  }
+    } catch (e) {
+      if (!res.headersSent) return responder(res, 400, { erro: (e as Error).message });
+      res.end();
+    }
+  });
 };
 
 export function ponteLocal(): Plugin {

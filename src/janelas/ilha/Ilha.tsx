@@ -4,7 +4,7 @@ import {
   Plus, Eye, EyeOff, Music, Timer, CalendarDays, MessageCircle, Plug, Bell, Volume2, VolumeX, AppWindow, ChevronUp, Pin, PinOff, Check, CircleAlert, Download, CodeXml, ShieldAlert, LoaderCircle, MessagesSquare,
   Users, Palette, type LucideIcon,
 } from "lucide-react";
-import { useConfig, GRUPO_DA_ROTA, type AbaIlha, type SecaoHoje, type VisaoIlha } from "../../estado/configuracoes";
+import { useConfig, ABAS_ILHA, GRUPO_DA_ROTA, type AbaIlha, type SecaoHoje, type VisaoIlha } from "../../estado/configuracoes";
 import { estadoComAviso, useIlha } from "../../estado/ilha";
 import { useInterface } from "../../estado/interface";
 import { useComunicacao } from "../../estado/comunicacao";
@@ -39,7 +39,8 @@ import { Saudacao } from "./animacoes/Saudacao";
 import { usarSaudacaoDiaria } from "./animacoes/usarSaudacaoDiaria";
 import { ALTURA_DA_SAUDACAO, EVENTO_DA_SAUDACAO, LARGURA_DA_SAUDACAO } from "./animacoes/pedirSaudacao";
 import { BarraDoTopo, ALTURA_DA_FAIXA } from "./barra/BarraDoTopo";
-import { abaVizinha, alternarAbaDaBarra } from "./barra/acoesDaBarra";
+import { Personalizacao } from "./barra/Personalizacao";
+import { abaVizinha } from "./barra/acoesDaBarra";
 import { areaDeTrabalhoNaFrente, focoDaAreaPeloElemento, mostrarLateraisDaIlha } from "./barra/visibilidadeDaBarra";
 import { EspacoDoPersonagem, PersonagemContinuo } from "./animacoes/PersonagemContinuo";
 import { EtapaDeTrabalho, EtapasAnimadas } from "./animacoes/EtapasAnimadas";
@@ -108,6 +109,7 @@ const ALTURA_COMPACTA = 30;
 const ALTURA_COMPACTA_MIDIA = 34;
 const TAMANHO_DA_CAPA_COMPACTA = 28;
 const AGENTE_DA_ABA: Partial<Record<VisaoIlha, AgenteId>> = { hoje: "organizador", foco: "tutor", conexoes: "java", claude: "java" };
+const MOSTRAR_CODIGO_NA_ILHA = false;
 const RODIZIO_MS = 8 * 60_000;
 const ABAS_SEM_LATERAL: VisaoIlha[] = ["chat", "midia", "time"];
 const LIMIAR_DA_ROLAGEM = 40;
@@ -147,6 +149,7 @@ export function Ilha() {
   const aba = useIlha((s) => s.aba);
   const secaoHoje = useIlha((s) => s.secaoHoje);
   const [conexaoSelecionada, setConexaoSelecionada] = useState<ServicoId | null>(null);
+  const [personalizacaoAberta, setPersonalizacaoAberta] = useState(false);
   const conexaoLigada = useComunicacao((s) => Boolean(s.conexoes.find((c) => c.id === conexaoSelecionada)?.ligada));
   const revelacao = useIlha((s) => s.revelacao);
   const saudacao = useIlha((s) => s.saudacao);
@@ -168,7 +171,7 @@ export function Ilha() {
   const pomodoro = usePomodoro();
   const midia = useMidia();
   const dadosDaMidia = usarDadosDaMidia(cfg.layoutDaMidia === "vinil" || cfg.layoutDaMidia === "cartaz");
-  usarClaudeCode(cfg.ativa && cfg.blocos.claude);
+  usarClaudeCode(cfg.ativa && MOSTRAR_CODIGO_NA_ILHA);
   const pedidosClaude = useClaudeCode((s) => s.pedidos);
   const minuto = useAgora(60_000, true);
   const agenteDaVez = agenteDoRodizio(favorito, minuto);
@@ -222,7 +225,7 @@ export function Ilha() {
   const desligadas = useConfig((s) => s.funcoesDesligadas);
   const comAvisos = agentes.alertas.length > 0 || (estado === "expandida" && aba === "avisos");
   usarAvisosDoWhatsapp();
-  const abas = cfg.ordemAbas.filter((a) => cfg.blocos[a] && (a !== "avisos" || comAvisos) && abaLigada(a, desligadas));
+  const abas = cfg.ordemAbas.filter((a) => ABAS_ILHA.includes(a) && cfg.blocos[a] && (a !== "avisos" || comAvisos) && abaLigada(a, desligadas));
   const capturaDisponivel = tiposDeCapturaLigados(desligadas).length > 0;
   const abaAtual: VisaoIlha = aba === "captura" && capturaDisponivel ? "captura" : abas.includes(aba as AbaIlha) ? aba : abas[0] ?? "hoje";
   const abaAntesDaCaptura = useRef<AbaIlha>("hoje");
@@ -296,7 +299,7 @@ export function Ilha() {
   const frescos = alertas.filter((a) => alertaFresco(a, agentes.relogio)).length;
   const trabalhando = AGENTES.filter((a) => ["pensando", "escrevendo"].includes(estadoDoAgente(agentes, a)));
 
-  const pedidoPendente = pedidosClaude.length > 0;
+  const pedidoPendente = MOSTRAR_CODIGO_NA_ILHA && pedidosClaude.length > 0;
   const estadoEfetivo = saudando ? "compacta" : coberta && estado !== "expandida" && !revelacao && !pedidoPendente ? "escondida" : (cfg.modo === "fixo" || pedidoPendente) && estado === "escondida" ? "compacta" : estadoComAviso(estado, Boolean(revelacao));
   useEffect(() => {
     if (estadoEfetivo !== "expandida" || abaAtual !== "conexoes") setConexaoSelecionada(null);
@@ -316,6 +319,10 @@ export function Ilha() {
 
   useEffect(() => {
     if (estadoEfetivo !== "expandida") setFixada(false);
+  }, [estadoEfetivo]);
+
+  useEffect(() => {
+    if (estadoEfetivo !== "expandida") setPersonalizacaoAberta(false);
   }, [estadoEfetivo]);
 
   useEffect(() => {
@@ -370,7 +377,7 @@ export function Ilha() {
     };
   }, [estadoEfetivo, recolher, fixada]);
 
-  const claudeIndisponivel = !cfg.ativa || !cfg.blocos.claude;
+  const claudeIndisponivel = !cfg.ativa || !MOSTRAR_CODIGO_NA_ILHA;
   useEffect(() => {
     if (claudeIndisponivel && pedidosClaude.length > 0) devolverPendentesAoTerminal();
   }, [claudeIndisponivel, pedidosClaude.length]);
@@ -394,10 +401,10 @@ export function Ilha() {
   const compacta = useMemo(() => {
     if (revelacao) return { tipo: "revelacao" as const, largura: 380 };
     if (atualizacao.fase !== "nada") return { tipo: "atualizacao" as const, largura: 350 };
-    if (pedidosClaude.length > 0) return { tipo: "claudePedido" as const, largura: 340 };
+    if (MOSTRAR_CODIGO_NA_ILHA && pedidosClaude.length > 0) return { tipo: "claudePedido" as const, largura: 340 };
     if (pomodoroIniciado) return { tipo: "pomodoro" as const, largura: midia.tocando ? 330 : 290 };
     if (cfg.blocos.midia && cfg.midiaNaCompacta && midiaAtivaNaIlha(midia)) return { tipo: "midia" as const, largura: 330 };
-    if (claudeAtivo) return { tipo: "claude" as const, largura: 330 };
+    if (MOSTRAR_CODIGO_NA_ILHA && claudeAtivo) return { tipo: "claude" as const, largura: 330 };
     if (trabalhando.length > 0) return { tipo: "trabalho" as const, largura: 280 };
     if (cfg.repouso === "relogio") return { tipo: "relogio" as const, largura: 190 };
     if (cfg.repouso === "midia") return { tipo: "relogio" as const, largura: 190 };
@@ -584,7 +591,6 @@ export function Ilha() {
           escala={escala}
           larguraDaIlha={alvo.w * escala}
           aparencia={aparencia}
-          aoAbrirAba={(a, secao) => alternarAbaDaBarra(abas.includes(a) ? a : abas[0] ?? "hoje", secao)}
           aoUsar={setBarraEmUso}
         />
       )}
@@ -747,6 +753,20 @@ export function Ilha() {
                       })}
                     </div>
                     <div className="ilha-acoes">
+                      <button
+                        type="button"
+                        className="ilha-acao"
+                        aria-label={T.ilha.barra.personalizar}
+                        data-dica={T.ilha.barra.personalizar}
+                        aria-pressed={personalizacaoAberta}
+                        data-ativa={personalizacaoAberta || undefined}
+                        onClick={() => {
+                          void tocarSom(personalizacaoAberta ? "close" : "open");
+                          setPersonalizacaoAberta((aberta) => !aberta);
+                        }}
+                      >
+                        <Palette size={14} />
+                      </button>
                       {capturaDisponivel && (
                         <button
                           type="button"
@@ -893,6 +913,11 @@ export function Ilha() {
           )}
         </motion.div>
       </motion.div>
+      <div className="ilha-pops" {...atributosDoFundo(aparencia)} style={variaveisDaBorda(aparencia)}>
+        <AnimatePresence>
+          {personalizacaoAberta && estadoEfetivo === "expandida" && <Personalizacao key="personalizar" topo={ALTURA_DA_FAIXA + 36 * escala} aoFechar={() => setPersonalizacaoAberta(false)} />}
+        </AnimatePresence>
+      </div>
     </>
   );
 }

@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { Camera, Trash2 } from "lucide-react";
 import { useConfig } from "../estado/configuracoes";
+import { otimizarImagem, removerFotoDoBlob, uploadarFoto } from "../servicos/fotos";
 import { T } from "../textos/textos";
 
 const TIPOS = ["image/png", "image/jpeg", "image/webp", "image/gif"];
@@ -8,24 +9,7 @@ const LIMITE = 8 * 1024 * 1024;
 
 export async function prepararFoto(arquivo: File): Promise<string> {
   if (!TIPOS.includes(arquivo.type) || arquivo.size > LIMITE) throw new Error("invalida");
-  const url = URL.createObjectURL(arquivo);
-  try {
-    const img = await new Promise<HTMLImageElement>((resolver, rejeitar) => {
-      const i = new Image();
-      i.onload = () => resolver(i);
-      i.onerror = rejeitar;
-      i.src = url;
-    });
-    const lado = Math.min(img.naturalWidth, img.naturalHeight);
-    const canvas = document.createElement("canvas");
-    canvas.width = canvas.height = 256;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) throw new Error("invalida");
-    ctx.drawImage(img, (img.naturalWidth - lado) / 2, (img.naturalHeight - lado) / 2, lado, lado, 0, 0, 256, 256);
-    return canvas.toDataURL("image/jpeg", 0.86);
-  } finally {
-    URL.revokeObjectURL(url);
-  }
+  return (await otimizarImagem(arquivo, { larguraMaxima: 256, alturaMaxima: 256, recortarQuadrado: true, qualidade: 0.86 })).dataUrl;
 }
 
 export function Avatar({ tamanho = 28, className = "" }: { tamanho?: number; className?: string }) {
@@ -44,15 +28,29 @@ export function EditorFoto({ tamanho = 88, children }: { tamanho?: number; child
   const entrada = useRef<HTMLInputElement>(null);
   const [erro, setErro] = useState("");
   const [arrastando, setArrastando] = useState(false);
+  const [salvando, setSalvando] = useState(false);
 
   const usar = async (arquivo?: File) => {
     if (!arquivo) return;
+    setSalvando(true);
     try {
-      definir({ foto: await prepararFoto(arquivo) });
+      const otimizada = await otimizarImagem(arquivo, { larguraMaxima: 256, alturaMaxima: 256, recortarQuadrado: true, qualidade: 0.86 });
+      const fotoAnterior = foto;
+      const fotoRemota = await uploadarFoto(otimizada.blob, "perfil");
+      definir({ foto: fotoRemota ?? otimizada.dataUrl });
+      if (fotoRemota && fotoAnterior && fotoAnterior !== fotoRemota) void removerFotoDoBlob(fotoAnterior);
       setErro("");
     } catch {
       setErro(T.perfil.fotoInvalida);
+    } finally {
+      setSalvando(false);
     }
+  };
+
+  const remover = () => {
+    const fotoAnterior = foto;
+    definir({ foto: null });
+    void removerFotoDoBlob(fotoAnterior);
   };
 
   return (
@@ -63,6 +61,7 @@ export function EditorFoto({ tamanho = 88, children }: { tamanho?: number; child
         data-arrastando={arrastando ? "sim" : "nao"}
         style={{ width: tamanho, height: tamanho }}
         aria-label={T.perfil.trocarFoto}
+        disabled={salvando}
         onClick={() => entrada.current?.click()}
         onDragOver={(e) => {
           e.preventDefault();
@@ -81,12 +80,12 @@ export function EditorFoto({ tamanho = 88, children }: { tamanho?: number; child
       <div className="coluna editor-foto-lado" style={{ gap: 6 }}>
         {children}
         <span className="linha" style={{ gap: 6 }}>
-          <button type="button" className="botao botao-secundario botao-pequeno" onClick={() => entrada.current?.click()}>
+          <button type="button" className="botao botao-secundario botao-pequeno" disabled={salvando} onClick={() => entrada.current?.click()}>
             <Camera size={13} />
-            {foto ? T.perfil.trocarFoto : T.perfil.escolherFoto}
+            {salvando ? "Salvando foto..." : foto ? T.perfil.trocarFoto : T.perfil.escolherFoto}
           </button>
           {foto && (
-            <button type="button" className="botao botao-fantasma botao-pequeno botao-icone" aria-label={T.perfil.removerFoto} title={T.perfil.removerFoto} onClick={() => definir({ foto: null })}>
+            <button type="button" className="botao botao-fantasma botao-pequeno botao-icone" aria-label={T.perfil.removerFoto} title={T.perfil.removerFoto} onClick={remover} disabled={salvando}>
               <Trash2 size={13} />
             </button>
           )}

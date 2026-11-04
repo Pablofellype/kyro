@@ -1,8 +1,7 @@
 import { useTour } from "../../estado/tour";
 import { useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { ArrowRight, BrainCircuit } from "lucide-react";
-import { useInterface } from "../../estado/interface";
+import { ArrowRight } from "lucide-react";
 import { useConfig, type ModoBorda, type Tema } from "../../estado/configuracoes";
 import { PersonagemKyro } from "../../personagens/PersonagemKyro";
 import { Botao, Campo, Segmentado } from "../../componentes/basicos";
@@ -22,8 +21,8 @@ function PreviaDoModo({ modo }: { modo: ModoBorda }) {
   );
 }
 
-const TITULOS = [T.primeira.boasVindas, T.primeira.perfil, T.primeira.ilha, T.primeira.ia, T.primeira.pronto];
-const TEXTOS = [T.primeira.boasVindasTexto, "", T.primeira.ilhaTexto, T.primeira.iaTexto, T.primeira.prontoTexto];
+const TITULOS = [T.primeira.boasVindas, T.primeira.perfil, T.primeira.ilha, T.primeira.dadosTitulo, T.primeira.pronto];
+const TEXTOS = [T.primeira.boasVindasTexto, "", T.primeira.ilhaTexto, "", T.primeira.prontoTexto];
 
 export function PrimeiraExecucao() {
   const cfg = useConfig();
@@ -115,23 +114,10 @@ export function PrimeiraExecucao() {
                 </div>
               )}
               {passo === 3 && (
-                <>
-                  <div>
-                    <Botao
-                      icone={<BrainCircuit size={13} />}
-                      onClick={() => {
-                        concluir();
-                        useInterface.getState().irPara("ia");
-                      }}
-                    >
-                      {T.primeira.configurarIa}
-                    </Botao>
-                  </div>
-                  <div className="boas-vindas-bloco">
-                    <h3 className="boas-vindas-subtitulo">{T.primeira.dados}</h3>
-                    <p className="boas-vindas-texto">{T.primeira.dadosTexto}</p>
-                  </div>
-                </>
+                <div className="boas-vindas-bloco">
+                  <h3 className="boas-vindas-subtitulo">{T.primeira.dados}</h3>
+                  <p className="boas-vindas-texto">{T.primeira.dadosTexto}</p>
+                </div>
               )}
               {passo === 4 && (
                 <div className="boas-vindas-teclas">

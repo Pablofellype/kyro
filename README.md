@@ -10,7 +10,7 @@ Rotina, estudos, finanças, metas e os serviços que você acompanha, reunidos e
 
 ![Windows 10 e 11](https://img.shields.io/badge/Windows-10%20%7C%2011-0b0d10?style=flat-square)
 ![Linux](https://img.shields.io/badge/Linux-Ubuntu%20%7C%20Fedora%20(GNOME)-0b0d10?style=flat-square)
-![Versão](https://img.shields.io/badge/versão-0.2.33-0b0d10?style=flat-square)
+![Versão](https://img.shields.io/badge/versão-0.2.34-0b0d10?style=flat-square)
 ![Licença](https://img.shields.io/badge/licença-proprietária-b42318?style=flat-square)
 
 <br />
@@ -357,6 +357,12 @@ O resultado esperado do health check contém `"api":"ok"` e `"banco":"ok"`. A `D
 ### Sincronização remota sem polling agressivo
 
 O navegador mantém uma conexão WebSocket autenticada com o gateway. O gateway envia dados e estado do WhatsApp somente quando há mudança; não use timers de 1 ou 5 segundos para consultar o Neon. Se o WebSocket cair, o cliente usa apenas o fallback HTTP espaçado. Para o aviso de dados funcionar, `KYRO_GATEWAY_URL` e `KYRO_GATEWAY_SECRET` precisam estar na Vercel, e `NIKO_GATEWAY_SECRET` no gateway deve ter o mesmo valor de `KYRO_GATEWAY_SECRET`. O agendador do VPS continua independente do navegador e segue executando mensagens e prints mesmo com o computador desligado.
+
+### Armazenamento de fotos na Vercel
+
+O Kyro usa Vercel Blob para as fotos de perfil e do catálogo de materiais. No projeto da Vercel, crie um Blob Store público, por exemplo `kyro-fotos`, e conecte-o aos ambientes Production e Preview do projeto Kyro. A Vercel deve adicionar a variável `BLOB_READ_WRITE_TOKEN`; depois do primeiro deploy, confirme essa variável em Settings > Environment Variables e faça um redeploy.
+
+O arquivo da foto fica no Blob e o Kyro salva apenas a URL junto dos dados do usuário/material. Se o Blob ainda não estiver configurado, a interface continua funcionando e usa a cópia local até o armazenamento ser conectado.
 
 ## Estrutura
 

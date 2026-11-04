@@ -1601,6 +1601,49 @@
   gap: 8px;
 }
 
+.estilo-sistema .admin-usuarios-convite-pendente {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 11px;
+  padding: 11px 12px;
+  border: 1px solid color-mix(in srgb, var(--destaque) 24%, var(--linha));
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--destaque) 5%, var(--superficie));
+}
+
+.estilo-sistema .admin-usuarios-convite-pendente-identidade {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  gap: 2px;
+}
+
+.estilo-sistema .admin-usuarios-convite-pendente-identidade strong,
+.estilo-sistema .admin-usuarios-convite-pendente-identidade span,
+.estilo-sistema .admin-usuarios-convite-pendente-identidade small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.estilo-sistema .admin-usuarios-convite-pendente-identidade strong {
+  color: var(--texto);
+  font-size: 12px;
+}
+
+.estilo-sistema .admin-usuarios-convite-pendente-identidade span,
+.estilo-sistema .admin-usuarios-convite-pendente-identidade small,
+.estilo-sistema .admin-usuarios-convite-expira {
+  color: var(--texto-3);
+  font-size: 10px;
+}
+
+.estilo-sistema .admin-usuarios-convite-expira {
+  flex: 0 0 auto;
+  font-family: var(--fonte-mono);
+}
+
 .estilo-sistema .admin-usuarios-lista-cabecalho {
   padding: 0 2px 4px;
   color: var(--texto);
@@ -1614,12 +1657,21 @@
 }
 
 .estilo-sistema .admin-usuarios-item {
+  display: grid;
+  align-items: stretch;
+  gap: 10px;
   min-width: 0;
-  gap: 11px;
   padding: 11px 12px;
   border: 1px solid var(--linha);
   border-radius: 11px;
   background: var(--superficie);
+}
+
+.estilo-sistema .admin-usuarios-item-principal {
+  display: flex;
+  min-width: 0;
+  gap: 11px;
+  align-items: center;
 }
 
 .estilo-sistema .admin-usuarios-avatar {
@@ -1658,6 +1710,45 @@
 .estilo-sistema .admin-usuarios-identidade span {
   color: var(--texto-3);
   font-size: 11px;
+}
+
+.estilo-sistema .admin-usuarios-identidade small {
+  overflow: hidden;
+  color: var(--texto-3);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.estilo-sistema .admin-usuarios-edicao {
+  display: grid;
+  gap: 12px;
+  margin: 0 0 0 42px;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--destaque) 25%, var(--linha));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--destaque) 4%, var(--superficie-2));
+}
+
+.estilo-sistema .admin-usuarios-edicao-cabecalho {
+  display: grid;
+  gap: 3px;
+}
+
+.estilo-sistema .admin-usuarios-edicao-cabecalho strong {
+  color: var(--texto);
+  font-size: 12px;
+}
+
+.estilo-sistema .admin-usuarios-edicao-cabecalho span {
+  color: var(--texto-3);
+  font-size: 10px;
+}
+
+.estilo-sistema .admin-usuarios-edicao-acoes {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 .estilo-sistema .admin-usuarios-status,
@@ -1877,8 +1968,26 @@
   }
 
   .estilo-sistema .admin-usuarios-item {
+    gap: 12px;
+  }
+
+  .estilo-sistema .admin-usuarios-item-principal {
     align-items: flex-start;
     flex-wrap: wrap;
+  }
+
+  .estilo-sistema .admin-usuarios-convite-pendente {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .estilo-sistema .admin-usuarios-convite-expira {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .estilo-sistema .admin-usuarios-edicao {
+    margin-left: 0;
   }
 
   .estilo-sistema .admin-usuarios-status,

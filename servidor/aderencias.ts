@@ -42,8 +42,7 @@ function idSeguro(valor: string) {
 
 function arquivoDeConfiguracao(usuarioId?: number | string) {
   const id = usuarioId === undefined || usuarioId === null ? "local" : String(usuarioId);
-  if (process.env.NIKO_GOWA_URL?.trim() && id !== "local") return join(pastaDados(), "usuarios", idSeguro(id), "aderencias.json");
-  return "";
+  return id !== "local" ? join(pastaDados(), "usuarios", idSeguro(id), "aderencias.json") : "";
 }
 
 function configuracaoDoArquivo(caminho: string): ConfiguracaoAderencias | null {
@@ -56,12 +55,12 @@ function configuracaoDoArquivo(caminho: string): ConfiguracaoAderencias | null {
 }
 
 function usuariosComConfiguracao() {
-  if (!process.env.NIKO_GOWA_URL?.trim()) return ["local"];
   const pasta = join(pastaDados(), "usuarios");
-  if (!existsSync(pasta)) return lerTudo()["niko:aderencias"] ? ["1"] : [];
-  const ids = readdirSync(pasta, { withFileTypes: true }).filter((item) => item.isDirectory() && existsSync(join(pasta, item.name, "aderencias.json"))).map((item) => item.name);
-  if (ids.length > 0) return ids;
-  return lerTudo()["niko:aderencias"] ? ["1"] : [];
+  const ids = existsSync(pasta)
+    ? readdirSync(pasta, { withFileTypes: true }).filter((item) => item.isDirectory() && existsSync(join(pasta, item.name, "aderencias.json"))).map((item) => item.name)
+    : [];
+  if (lerTudo()["niko:aderencias"]) ids.push("1");
+  return [...new Set(ids)];
 }
 
 function portaLivre(): Promise<number> {

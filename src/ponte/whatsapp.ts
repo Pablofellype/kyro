@@ -113,9 +113,9 @@ export function whatsappRemotoAtivo(usuario: Pick<UsuarioAutenticado, "perfil" |
 export const whatsappRemoto = !NATIVO;
 
 function cabecalhosDaPonte(): Record<string, string> {
-  if (!whatsappRemotoAtivo()) return { "x-niko": "1", "content-type": "application/json" };
   const token = typeof localStorage !== "undefined" ? localStorage.getItem("kyro_token") : null;
   const usuario = useAuth.getState().usuario;
+  if (!whatsappRemotoAtivo()) return { ...cabecalhosNiko(), "content-type": "application/json", ...(usuario ? { "x-kyro-user-id": String(usuario.id) } : {}) };
   return { ...cabecalhosNiko(), "content-type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(usuario ? { "x-kyro-user-id": String(usuario.id) } : {}) };
 }
 

@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { alterarAtivoUsuario, alterarPermissaoAderencias, criarConviteUsuario, loginUsuario, listarUsuarios, redefinirSenhaComToken, solicitarRedefinicaoSenha, urlPublicaDoAmbiente, validarSessao, logoutSessao, validarTokenAcesso } from "../src/servicos/autenticacao.js";
+import { alterarAtivoUsuario, alterarPermissaoAderencias, alterarPerfilProfissional, cancelarConviteUsuario, criarConviteUsuario, loginUsuario, listarConvitesPendentes, listarUsuarios, reenviarConviteUsuario, redefinirSenhaComToken, solicitarRedefinicaoSenha, urlPublicaDoAmbiente, validarSessao, logoutSessao, validarTokenAcesso } from "../src/servicos/autenticacao.js";
 import { configurarCors } from "./cors.js";
 
 function origemDaRequisicao(req: VercelRequest): string {
@@ -94,8 +94,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!usuarioAtual || usuarioAtual.perfil !== "dono") return res.status(403).json({ erro: "permissao_negada" });
     const email = typeof req.body?.email === "string" ? req.body.email : "";
     const nome = typeof req.body?.nome === "string" ? req.body.nome : "";
+    const operacao = req.body?.operacao;
+    if (operacao === "reenviar" || operacao === "cancelar") {
+      try {
+        if (operacao === "reenviar") await reenviarConviteUsuario(usuarioAtual, email, urlPublicaDaRequisicao(req));
+        else await cancelarConviteUsuario(usuarioAtual, email);
+        return res.status(200).json({ sucesso: true, mensagem: operacao === "reenviar" ? "Convite reenviado." : "Convite cancelado." });
+      } catch (erro) {
+        return res.status(400).json({ sucesso: false, erro: (erro as Error).message });
+      }
+    }
+    const cargo = typeof req.body?.cargo === "string" ? req.body.cargo : "";
+    const setor = typeof req.body?.setor === "string" ? req.body.setor : "";
+    const telefone = typeof req.body?.telefone === "string" ? req.body.telefone : "";
     try {
-      await criarConviteUsuario(usuarioAtual, email, nome, urlPublicaDaRequisicao(req));
+      await criarConviteUsuario(usuarioAtual, email, nome, urlPublicaDaRequisicao(req), { cargo, setor, telefone });
       return res.status(200).json({ sucesso: true, mensagem: "Convite enviado." });
     } catch (erro) {
       return res.status(400).json({ sucesso: false, erro: (erro as Error).message });
@@ -111,11 +124,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
   }
 
+  if (req.method === "GET" && acao === "convites") {
+    if (!usuarioAtual || usuarioAtual.perfil !== "dono") return res.status(403).json({ erro: "permissao_negada" });
+    try {
+      return res.status(200).json({ convites: await listarConvitesPendentes(usuarioAtual) });
+    } catch (erro) {
+      return res.status(400).json({ erro: (erro as Error).message });
+    }
+  }
+
   if (req.method === "POST" && acao === "usuario") {
     if (!usuarioAtual || usuarioAtual.perfil !== "dono") return res.status(403).json({ erro: "permissao_negada" });
     const id = Number(req.body?.id);
     const ativo = req.body?.ativo === true;
     try {
+      if (req.body?.perfilProfissional === true) {
+        return res.status(200).json({ sucesso: true, usuario: await alterarPerfilProfissional(usuarioAtual, id, {
+          cargo: typeof req.body?.cargo === "string" ? req.body.cargo : "",
+          setor: typeof req.body?.setor === "string" ? req.body.setor : "",
+          telefone: typeof req.body?.telefone === "string" ? req.body.telefone : "",
+        }) });
+      }
       if (typeof req.body?.roboAderencias === "boolean") {
         return res.status(200).json({ sucesso: true, usuario: await alterarPermissaoAderencias(usuarioAtual, id, req.body.roboAderencias === true) });
       }

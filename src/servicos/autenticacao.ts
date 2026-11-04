@@ -16,6 +16,20 @@ export interface UsuarioAutenticadoServidor {
   roboAderencias: boolean;
 }
 
+export interface PerfilProfissional {
+  cargo: string;
+  setor: string;
+  telefone: string;
+}
+
+function normalizarPerfilProfissional(perfil: Partial<PerfilProfissional> = {}): PerfilProfissional {
+  return {
+    cargo: typeof perfil.cargo === "string" ? perfil.cargo.trim().slice(0, 120) : "",
+    setor: typeof perfil.setor === "string" ? perfil.setor.trim().slice(0, 120) : "",
+    telefone: typeof perfil.telefone === "string" ? perfil.telefone.trim().slice(0, 40) : "",
+  };
+}
+
 export function getDb() {
   const databaseUrl = (process.env.DATABASE_URL || process.env.POSTGRES_URL || "").trim();
   if (!databaseUrl) throw new Error("DATABASE_URL ou POSTGRES_URL não definida");
@@ -183,7 +197,7 @@ export async function solicitarRedefinicaoSenha(emailRecebido: string, urlBase: 
   `;
   if (usuarios.length === 0) {
     const convites = await sql`
-      SELECT email, nome
+      SELECT email, nome, cargo, setor, telefone
       FROM tokens_acesso
       WHERE email = ${email}
         AND tipo = 'convite'
@@ -198,8 +212,8 @@ export async function solicitarRedefinicaoSenha(emailRecebido: string, urlBase: 
     const tokenHash = hashToken(token);
     await sql`UPDATE tokens_acesso SET usado_em = CURRENT_TIMESTAMP WHERE email = ${email} AND tipo = 'convite' AND usado_em IS NULL`;
     await sql`
-      INSERT INTO tokens_acesso (token_hash, tipo, email, nome, expira_em)
-      VALUES (${tokenHash}, 'convite', ${email}, ${convite.nome ?? ""}, CURRENT_TIMESTAMP + (${EXPIRACAO_CONVITE_HORAS} * INTERVAL '1 hour'))
+      INSERT INTO tokens_acesso (token_hash, tipo, email, nome, cargo, setor, telefone, expira_em)
+      VALUES (${tokenHash}, 'convite', ${email}, ${convite.nome ?? ""}, ${convite.cargo ?? ""}, ${convite.setor ?? ""}, ${convite.telefone ?? ""}, CURRENT_TIMESTAMP + (${EXPIRACAO_CONVITE_HORAS} * INTERVAL '1 hour'))
     `;
     try {
       await enviarEmailDeAcesso({
@@ -251,11 +265,12 @@ export async function validarTokenAcesso(tokenRecebido: string) {
   return { tipo: acesso.tipo === "convite" ? "convite" as const : "recuperar" as const, email: acesso.email, nome: acesso.nome ?? "" };
 }
 
-export async function criarConviteUsuario(dono: UsuarioAutenticadoServidor, emailRecebido: string, nomeRecebido: string, urlBase: string) {
+export async function criarConviteUsuario(dono: UsuarioAutenticadoServidor, emailRecebido: string, nomeRecebido: string, urlBase: string, perfilRecebido: Partial<PerfilProfissional> = {}) {
   if (dono.perfil !== "dono") throw new Error("permissao_negada");
   const sql = getDb();
   const email = emailNormalizado(emailRecebido);
   const nome = nomeRecebido.trim().slice(0, 160);
+  const perfil = normalizarPerfilProfissional(perfilRecebido);
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("email_invalido");
   if (!nome) throw new Error("nome_obrigatorio");
   const existentes = await sql`SELECT id FROM usuarios WHERE email = ${email} LIMIT 1`;
@@ -264,8 +279,8 @@ export async function criarConviteUsuario(dono: UsuarioAutenticadoServidor, emai
   const tokenHash = hashToken(token);
   await sql`UPDATE tokens_acesso SET usado_em = CURRENT_TIMESTAMP WHERE email = ${email} AND tipo = 'convite' AND usado_em IS NULL`;
   await sql`
-    INSERT INTO tokens_acesso (token_hash, tipo, email, nome, expira_em)
-    VALUES (${tokenHash}, 'convite', ${email}, ${nome}, CURRENT_TIMESTAMP + (${EXPIRACAO_CONVITE_HORAS} * INTERVAL '1 hour'))
+    INSERT INTO tokens_acesso (token_hash, tipo, email, nome, cargo, setor, telefone, expira_em)
+    VALUES (${tokenHash}, 'convite', ${email}, ${nome}, ${perfil.cargo}, ${perfil.setor}, ${perfil.telefone}, CURRENT_TIMESTAMP + (${EXPIRACAO_CONVITE_HORAS} * INTERVAL '1 hour'))
   `;
   try {
     await enviarEmailDeAcesso({
@@ -281,6 +296,50 @@ export async function criarConviteUsuario(dono: UsuarioAutenticadoServidor, emai
   }
 }
 
+export async function listarConvitesPendentes(dono: UsuarioAutenticadoServidor) {
+  if (dono.perfil !== "dono") throw new Error("permissao_negada");
+  const sql = getDb();
+  return sql`
+    SELECT email, nome, cargo, setor, telefone, expira_em, criado_em
+    FROM tokens_acesso
+    WHERE tipo = 'convite' AND usado_em IS NULL AND expira_em > CURRENT_TIMESTAMP
+    ORDER BY criado_em DESC
+  `;
+}
+
+export async function reenviarConviteUsuario(dono: UsuarioAutenticadoServidor, emailRecebido: string, urlBase: string) {
+  if (dono.perfil !== "dono") throw new Error("permissao_negada");
+  const sql = getDb();
+  const email = emailNormalizado(emailRecebido);
+  const convites = await sql`
+    SELECT email, nome, cargo, setor, telefone
+    FROM tokens_acesso
+    WHERE email = ${email} AND tipo = 'convite' AND usado_em IS NULL AND expira_em > CURRENT_TIMESTAMP
+    ORDER BY criado_em DESC
+    LIMIT 1
+  `;
+  if (convites.length === 0) throw new Error("convite_nao_encontrado");
+  const convite = convites[0];
+  await criarConviteUsuario(dono, convite.email, convite.nome ?? "", urlBase, {
+    cargo: convite.cargo ?? "",
+    setor: convite.setor ?? "",
+    telefone: convite.telefone ?? "",
+  });
+}
+
+export async function cancelarConviteUsuario(dono: UsuarioAutenticadoServidor, emailRecebido: string) {
+  if (dono.perfil !== "dono") throw new Error("permissao_negada");
+  const sql = getDb();
+  const email = emailNormalizado(emailRecebido);
+  const resultado = await sql`
+    UPDATE tokens_acesso
+    SET usado_em = CURRENT_TIMESTAMP
+    WHERE email = ${email} AND tipo = 'convite' AND usado_em IS NULL
+    RETURNING email
+  `;
+  if (resultado.length === 0) throw new Error("convite_nao_encontrado");
+}
+
 export async function redefinirSenhaComToken(tokenRecebido: string, senha: string) {
   const erroSenha = validarSenhaNova(senha);
   if (erroSenha) throw new Error(erroSenha);
@@ -288,7 +347,7 @@ export async function redefinirSenhaComToken(tokenRecebido: string, senha: strin
   const sql = getDb();
   const tokenHash = hashToken(tokenRecebido);
   const tokens = await sql`
-    SELECT token_hash, tipo, usuario_id, email, nome, expira_em, usado_em
+    SELECT token_hash, tipo, usuario_id, email, nome, cargo, setor, telefone, expira_em, usado_em
     FROM tokens_acesso
     WHERE token_hash = ${tokenHash}
     LIMIT 1
@@ -301,8 +360,8 @@ export async function redefinirSenhaComToken(tokenRecebido: string, senha: strin
     const existentes = await sql`SELECT id FROM usuarios WHERE email = ${convite.email} LIMIT 1`;
     if (existentes.length > 0) throw new Error("usuario_ja_cadastrado");
     const criados = await sql`
-      INSERT INTO usuarios (email, nome, senha_hash, ativo, perfil)
-      VALUES (${convite.email}, ${convite.nome}, ${hash}, TRUE, 'usuario')
+      INSERT INTO usuarios (email, nome, senha_hash, ativo, perfil, cargo, setor, telefone)
+      VALUES (${convite.email}, ${convite.nome}, ${hash}, TRUE, 'usuario', ${convite.cargo ?? ""}, ${convite.setor ?? ""}, ${convite.telefone ?? ""})
       RETURNING id, email, nome, perfil
     `;
     usuario = criados[0] as typeof usuario;
@@ -326,7 +385,7 @@ export async function listarUsuarios(dono: UsuarioAutenticadoServidor) {
   if (dono.perfil !== "dono") throw new Error("permissao_negada");
   const sql = getDb();
   return sql`
-    SELECT id, email, nome, ativo, perfil, robo_aderencias
+    SELECT id, email, nome, ativo, perfil, robo_aderencias, cargo, setor, telefone
     FROM usuarios
     ORDER BY CASE WHEN perfil = 'dono' THEN 0 ELSE 1 END, nome, email
   `;
@@ -340,7 +399,7 @@ export async function alterarAtivoUsuario(dono: UsuarioAutenticadoServidor, usua
     UPDATE usuarios
     SET ativo = ${ativo}
     WHERE id = ${usuarioId} AND perfil <> 'dono'
-    RETURNING id, email, nome, ativo, perfil, robo_aderencias
+    RETURNING id, email, nome, ativo, perfil, robo_aderencias, cargo, setor, telefone
   `;
   if (resultado.length === 0) throw new Error("usuario_nao_encontrado");
   if (!ativo) await sql`DELETE FROM sessoes WHERE usuario_id = ${usuarioId}`;
@@ -355,7 +414,22 @@ export async function alterarPermissaoAderencias(dono: UsuarioAutenticadoServido
     UPDATE usuarios
     SET robo_aderencias = ${permitido}
     WHERE id = ${usuarioId} AND perfil <> 'dono'
-    RETURNING id, email, nome, ativo, perfil, robo_aderencias
+    RETURNING id, email, nome, ativo, perfil, robo_aderencias, cargo, setor, telefone
+  `;
+  if (resultado.length === 0) throw new Error("usuario_nao_encontrado");
+  return resultado[0];
+}
+
+export async function alterarPerfilProfissional(dono: UsuarioAutenticadoServidor, usuarioId: number, perfilRecebido: Partial<PerfilProfissional>) {
+  if (dono.perfil !== "dono") throw new Error("permissao_negada");
+  if (!Number.isSafeInteger(usuarioId) || usuarioId <= 0) throw new Error("usuario_invalido");
+  const perfil = normalizarPerfilProfissional(perfilRecebido);
+  const sql = getDb();
+  const resultado = await sql`
+    UPDATE usuarios
+    SET cargo = ${perfil.cargo}, setor = ${perfil.setor}, telefone = ${perfil.telefone}
+    WHERE id = ${usuarioId}
+    RETURNING id, email, nome, ativo, perfil, robo_aderencias, cargo, setor, telefone
   `;
   if (resultado.length === 0) throw new Error("usuario_nao_encontrado");
   return resultado[0];

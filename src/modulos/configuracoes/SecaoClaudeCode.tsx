@@ -25,8 +25,6 @@ function situacao(e: EstadoDaInstalacao | null): { rotulo: string; tipo: "ok" | 
 
 export function SecaoClaudeCode() {
   const avisar = useInterface((s) => s.avisar);
-  const ilha = useConfig((s) => s.ilha);
-  const definirIlha = useConfig((s) => s.definirIlha);
   const definir = useConfig((s) => s.definir);
   const notificar = useConfig((s) => s.notificarClaude);
   const silenciarComTerminal = useConfig((s) => s.silenciarComTerminalNaFrente);
@@ -59,7 +57,6 @@ export function SecaoClaudeCode() {
     const acao = previa.acao;
     (acao === "instalar" ? claudeCode.instalar() : claudeCode.remover())
       .then((r) => {
-        if (acao === "instalar") definirIlha({ blocos: { ...useConfig.getState().ilha.blocos, claude: true } });
         definir({ claudeInstalado: acao === "instalar" });
         avisar(acao === "instalar" ? C.conectadoAviso(r.copia) : C.removidoAviso(r.copia));
         void tocarSom(acao === "instalar" ? "approve" : "close", "interface");
@@ -116,7 +113,6 @@ export function SecaoClaudeCode() {
         </Botao>
       </LinhaAjuste>
 
-      <AlternadorAjuste rotulo={C.mostrarAba} dica={C.mostrarAbaDica} ligado={ilha.blocos.claude} aoMudar={(v) => definirIlha({ blocos: { ...ilha.blocos, claude: v } })} />
       <AlternadorAjuste rotulo={C.silenciarComTerminal} dica={C.silenciarComTerminalDica} ligado={silenciarComTerminal} aoMudar={(v) => definir({ silenciarComTerminalNaFrente: v })} />
       <AlternadorAjuste
         rotulo={C.notificar}

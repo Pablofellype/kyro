@@ -1,21 +1,16 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { ChevronUp, LayoutGrid, ListTodo, Package, Palette, SlidersHorizontal } from "lucide-react";
-import { useConfig, type AbaIlha, type SecaoHoje } from "../../../estado/configuracoes";
-import { funcaoLigada } from "../../../utilitarios/funcoes";
-import { useRotina, tarefasDoDia } from "../../../estado/rotina";
+import { ChevronUp, Package, SlidersHorizontal } from "lucide-react";
+import { useConfig } from "../../../estado/configuracoes";
 import { useMateriais } from "../../../estado/materiais";
 import { useControleRapido, usarAudio, usarRede } from "../../../estado/controleRapido";
 import { T } from "../../../textos/textos";
 import { tocarSom } from "../../../ponte/sons";
 import { usarCursorFora } from "../../../desktop/desktop";
-import { hojeISO } from "../../../utilitarios/datas";
-import { controle, type EstadoSistema } from "../../../ponte/ponteLocal";
+import { type EstadoSistema } from "../../../ponte/ponteLocal";
 import { PainelRapido } from "./PainelRapido";
 import { Bandeja } from "./Bandeja";
-import { Personalizacao } from "./Personalizacao";
 import { MateriaisNaBarra } from "./MateriaisNaBarra";
-import { criarAlternadorDoIniciar } from "./acoesDaBarra";
 import { useIlha } from "../../../estado/ilha";
 import { BateriaDesenhada, IconeDeRede, IconeDeVolume, situacaoDaRede, wifiLigado } from "./IconesDeStatus";
 import { atributosDoFundo, variaveisDaBorda } from "../../aparencia";
@@ -27,16 +22,14 @@ const ALTURA_DA_ABA = 30;
 const RAIO_DAS_ORELHAS = 10;
 const PASSO_DA_RODA = 2;
 const MARGEM_DOS_POPS = 6;
-const INTERVALO_LEITURA_INICIAR_MS = 400;
 
-type Pop = { tipo: "painel" } | { tipo: "personalizar" } | { tipo: "materiais" } | { tipo: "bandeja"; direita: number } | null;
+type Pop = { tipo: "painel" } | { tipo: "materiais" } | { tipo: "bandeja"; direita: number } | null;
 
 interface PropsBarra {
   visivel: boolean;
   escala: number;
   larguraDaIlha: number;
   aparencia: AparenciaDeBorda;
-  aoAbrirAba: (aba: AbaIlha, secao?: SecaoHoje) => void;
   aoUsar: (emUso: boolean) => void;
 }
 
@@ -51,76 +44,15 @@ function rotuloDaRede(rede: EstadoSistema) {
 
 function LadoEsquerdo({
   pop,
-  alternarPersonalizacao,
   alternarMateriais,
-  aoAbrirAba,
 }: {
   pop: Pop;
-  alternarPersonalizacao: () => void;
   alternarMateriais: () => void;
-  aoAbrirAba: (aba: AbaIlha, secao?: SecaoHoje) => void;
 }) {
-  const estadoIlha = useIlha((s) => s.estado);
-  const abaIlha = useIlha((s) => s.aba);
-  const secaoHoje = useIlha((s) => s.secaoHoje);
-  const tarefasAbertas = estadoIlha === "expandida" && abaIlha === "hoje" && secaoHoje === "tarefas";
-  const iniciar = useRef(criarAlternadorDoIniciar(controle.iniciar, controle.alternarIniciar));
-  const relogioIniciar = useRef<number | undefined>(undefined);
-  const [iniciarOcupado, setIniciarOcupado] = useState(false);
-  useEffect(() => () => window.clearInterval(relogioIniciar.current), []);
-  const prepararIniciar = () => {
-    iniciar.current.preparar();
-    window.clearInterval(relogioIniciar.current);
-    relogioIniciar.current = window.setInterval(() => iniciar.current.preparar(), INTERVALO_LEITURA_INICIAR_MS);
-  };
-  const tarefas = useRotina((s) => s.tarefas);
   const totalMateriais = useMateriais((s) => s.materiais.length);
-  const comTarefas = useConfig((s) => funcaoLigada("journal", s.funcoesDesligadas));
-  const doDia = tarefasDoDia(tarefas, hojeISO()).filter((t) => t.status !== "cancelada");
-  const feitas = doDia.filter((t) => t.status === "concluida").length;
-  const rotuloTarefas = doDia.length ? T.ilha.barra.tarefasHojeDica(feitas, doDia.length) : T.ilha.barra.semTarefas;
 
   return (
     <div className="ilha-barra-lado">
-      <button
-        type="button"
-        className="ilha-barra-botao"
-        data-ativo={pop?.tipo === "personalizar" || undefined}
-        aria-label={T.ilha.barra.personalizar}
-        aria-expanded={pop?.tipo === "personalizar"}
-        title={T.ilha.barra.personalizar}
-        onClick={alternarPersonalizacao}
-      >
-        <Palette size={14} />
-      </button>
-      <button
-        type="button"
-        className="ilha-barra-botao"
-        aria-label={T.ilha.barra.iniciar}
-        title={T.ilha.barra.iniciar}
-        aria-busy={iniciarOcupado}
-        onPointerEnter={prepararIniciar}
-        onPointerLeave={() => {
-          window.clearInterval(relogioIniciar.current);
-          iniciar.current.limpar();
-        }}
-        onFocus={() => iniciar.current.preparar()}
-        onPointerDown={(e) => e.preventDefault()}
-        onClick={() => {
-          if (iniciarOcupado) return;
-          void tocarSom("blip");
-          setIniciarOcupado(true);
-          void iniciar.current.alternar().catch(() => useIlha.getState().avisarFalha(T.ilha.barra.indisponivel)).finally(() => setIniciarOcupado(false));
-        }}
-      >
-        <LayoutGrid size={14} />
-      </button>
-      {comTarefas && (
-        <button type="button" className="ilha-barra-botao ilha-barra-texto" title={rotuloTarefas} aria-label={rotuloTarefas} aria-expanded={tarefasAbertas} data-ativo={tarefasAbertas || undefined} onClick={() => aoAbrirAba("hoje", "tarefas")}>
-          <ListTodo size={13} />
-          <span className="numero">{doDia.length ? T.ilha.barra.tarefasHoje(feitas, doDia.length) : "0"}</span>
-        </button>
-      )}
       <button
         type="button"
         className="ilha-barra-botao ilha-barra-texto"
@@ -185,7 +117,7 @@ function LadoDireito({ pop, alternarPainel, alternarBandeja }: { pop: Pop; alter
   );
 }
 
-export function BarraDoTopo({ visivel, escala, larguraDaIlha, aparencia, aoAbrirAba, aoUsar }: PropsBarra) {
+export function BarraDoTopo({ visivel, escala, larguraDaIlha, aparencia, aoUsar }: PropsBarra) {
   const [pop, setPop] = useState<Pop>(null);
   const [sobre, setSobre] = useState(false);
   const playerAberto = useIlha((s) => s.estado === "expandida" && s.aba === "midia");
@@ -233,11 +165,6 @@ export function BarraDoTopo({ visivel, escala, larguraDaIlha, aparencia, aoAbrir
     setPop((atual) => (atual?.tipo === "painel" ? null : { tipo: "painel" }));
   };
 
-  const alternarPersonalizacao = () => {
-    void tocarSom(pop?.tipo === "personalizar" ? "close" : "open");
-    setPop((atual) => (atual?.tipo === "personalizar" ? null : { tipo: "personalizar" }));
-  };
-
   const alternarMateriais = () => {
     void tocarSom(pop?.tipo === "materiais" ? "close" : "open");
     setPop((atual) => (atual?.tipo === "materiais" ? null : { tipo: "materiais" }));
@@ -276,14 +203,7 @@ export function BarraDoTopo({ visivel, escala, larguraDaIlha, aparencia, aoAbrir
             <div className="ilha-barra-aba ilha-barra-aba-esquerda" onPointerEnter={aoEntrar} onPointerLeave={aoSair}>
               <LadoEsquerdo
                 pop={pop}
-                alternarPersonalizacao={alternarPersonalizacao}
                 alternarMateriais={alternarMateriais}
-                aoAbrirAba={(aba, secao) => {
-                  const ilha = useIlha.getState();
-                  setPop(null);
-                  void tocarSom(ilha.estado === "expandida" && ilha.aba === aba && (!secao || ilha.secaoHoje === secao) ? "close" : "open");
-                  aoAbrirAba(aba, secao);
-                }}
               />
             </div>
             <div className="ilha-barra-aba ilha-barra-aba-direita" onPointerEnter={aoEntrar} onPointerLeave={aoSair}>
@@ -294,7 +214,6 @@ export function BarraDoTopo({ visivel, escala, larguraDaIlha, aparencia, aoAbrir
       </AnimatePresence>
       <div className="ilha-pops" {...atributosDoFundo(aparencia)} style={variaveis}>
         <AnimatePresence>
-          {visivel && pop?.tipo === "personalizar" && <Personalizacao key="personalizar" topo={topoDosPops} aoFechar={() => setPop(null)} />}
           {visivel && pop?.tipo === "materiais" && <MateriaisNaBarra key="materiais" topo={topoDosPops} aoFechar={() => setPop(null)} />}
           {visivel && pop?.tipo === "painel" && <PainelRapido key="painel" topo={topoDosPops} aoFechar={() => setPop(null)} />}
           {visivel && pop?.tipo === "bandeja" && <Bandeja key="bandeja" topo={topoDosPops} direita={pop.direita} aoFechar={() => setPop(null)} />}

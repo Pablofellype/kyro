@@ -55,10 +55,20 @@ export function urlApi(caminho: string): string {
 }
 
 export function cabecalhosNiko(): Record<string, string> {
-  const token = typeof document !== "undefined" ? document.querySelector('meta[name="niko-token"]')?.getAttribute("content") : null;
+  const token = typeof document !== "undefined" && typeof document.querySelector === "function"
+    ? document.querySelector('meta[name="niko-token"]')?.getAttribute("content")
+    : null;
+  let usuarioId = "";
+  try {
+    const usuario = JSON.parse(localStorage.getItem("kyro_usuario") ?? "null") as { id?: unknown } | null;
+    if (typeof usuario?.id === "number" && Number.isSafeInteger(usuario.id) && usuario.id > 0) usuarioId = String(usuario.id);
+  } catch {
+    usuarioId = "";
+  }
   return {
     "x-niko": "1",
     ...(token ? { "x-niko-token": token } : {}),
+    ...(usuarioId ? { "x-kyro-user-id": usuarioId } : {}),
   };
 }
 

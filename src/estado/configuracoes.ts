@@ -22,7 +22,9 @@ export type AbaIlha = "hoje" | "midia" | "foco" | "chat" | "conexoes" | "avisos"
 export type VisaoIlha = AbaIlha | "captura";
 export type SecaoHoje = "agenda" | "tarefas" | "habitos";
 
-export const ABAS_ILHA: AbaIlha[] = ["hoje", "time", "claude", "conexoes", "whatsapp", "midia", "foco", "avisos"];
+// Código continua disponível nas ferramentas do sistema, mas não é uma aba da ilha.
+// Manter o id no tipo preserva configurações antigas sem deixar a opção reaparecer.
+export const ABAS_ILHA: AbaIlha[] = ["hoje", "time", "conexoes", "whatsapp", "midia", "foco", "avisos"];
 const ABAS_JUNTADAS_NO_HOJE = ["hoje", "calendario", "habitos"];
 
 export function juntarAbasNoHoje(ordem: string[], blocos: Record<string, boolean>) {
@@ -206,7 +208,7 @@ export const CONFIG_PADRAO: Configuracoes = {
   ilha: {
     ativa: true,
     modo: "inteligente",
-    blocos: { hoje: true, midia: true, foco: true, chat: false, conexoes: true, avisos: true, claude: true, time: true, whatsapp: true },
+    blocos: { hoje: true, midia: true, foco: true, chat: false, conexoes: true, avisos: true, claude: false, time: true, whatsapp: true },
     ordemAbas: ABAS_ILHA,
     repouso: "agente",
     tamanho: "media",
@@ -329,7 +331,7 @@ export const useConfig = create<Configuracoes & AcoesConfig>()(
             s.ilha = { ...s.ilha, ordemAbas: ((s.ilha.ordemAbas as string[] | undefined) ?? []).filter((a) => a !== "sistema") as AbaIlha[], blocos: blocos as Configuracoes["ilha"]["blocos"] };
           }
         }
-        if (versao < 8 && s.ilha) s.ilha = { ...s.ilha, blocos: { ...(s.ilha.blocos ?? {}), claude: true } as Configuracoes["ilha"]["blocos"] };
+        if (versao < 8 && s.ilha) s.ilha = { ...s.ilha, blocos: { ...(s.ilha.blocos ?? {}), claude: false } as Configuracoes["ilha"]["blocos"] };
         if (versao < 9 && s.ilha) {
           const { agenda: _agenda, ...blocos } = (s.ilha.blocos ?? {}) as Record<string, boolean>;
           s.ilha = { ...s.ilha, ordemAbas: ((s.ilha.ordemAbas as string[] | undefined) ?? []).filter((a) => a !== "agenda") as AbaIlha[], blocos: blocos as Configuracoes["ilha"]["blocos"] };

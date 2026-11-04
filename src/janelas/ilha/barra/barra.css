@@ -1242,6 +1242,23 @@ button.ilha-rapido-icone:hover:not(:disabled),
   gap: 8px;
 }
 
+.ilha-material-identidade {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 8px;
+}
+
+.ilha-material-imagem {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid var(--borda);
+  background: var(--superficie);
+}
+
 .ilha-material-nome {
   font-size: 12.5px;
   font-weight: 600;
@@ -1325,8 +1342,297 @@ button.ilha-rapido-icone:hover:not(:disabled),
   flex-shrink: 0;
 }
 
+.ilha-materiais-foto {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+
+.ilha-materiais-foto-botao {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 5px 9px;
+  border: 1px dashed var(--borda-controle);
+  border-radius: 8px;
+  color: var(--texto-2);
+  font-size: 11px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.ilha-materiais-foto-botao:hover {
+  color: var(--texto);
+  border-color: var(--destaque);
+  background: var(--destaque-suave);
+}
+
+.ilha-materiais-foto-previa {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 4px 3px 3px;
+  border: 1px solid var(--borda);
+  border-radius: 9px;
+  background: var(--superficie);
+}
+
+.ilha-materiais-foto-previa img {
+  width: 32px;
+  height: 32px;
+  object-fit: cover;
+  border-radius: 6px;
+}
+
 .ilha-material-pilula:hover .ilha-material-icone-copia {
   opacity: 0.9;
+}
+
+/* O catálogo usa a mesma linguagem visual das telas principais do Kyro. */
+.ilha-pop.estilo-sistema.ilha-materiais {
+  --i-tinta: var(--texto);
+  --i-dim: var(--texto-2);
+  --i-dim-3: var(--texto-3);
+  --i-cartao: var(--superficie);
+  --i-elevado: var(--superficie-2);
+  --i-elevado-2: var(--superficie-2);
+  --i-elevado-3: var(--superficie-alta);
+  --i-linha: var(--borda);
+  --i-ligado: var(--destaque);
+  --i-tinta-ligado: var(--destaque-sobre);
+  --i-vermelho: var(--erro);
+  width: 452px;
+  max-width: calc(100vw - 20px);
+  padding: 18px;
+  gap: 14px;
+  border: 1px solid var(--borda);
+  border-radius: 18px;
+  background: var(--superficie);
+  color: var(--texto);
+  box-shadow: var(--sombra-menu);
+  font-size: 12px;
+}
+
+.ilha-materiais-cabecalho {
+  align-items: flex-start;
+}
+
+.ilha-materiais-identidade {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.ilha-materiais-titulo {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+.ilha-materiais-titulo-icone {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 28px;
+  border-radius: 9px;
+  background: var(--destaque-suave);
+  color: var(--destaque);
+}
+
+.ilha-materiais-contagem {
+  display: inline-grid;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--superficie-2);
+  color: var(--texto-2);
+  font-size: 10px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+.ilha-materiais-subtitulo {
+  padding-left: 36px;
+  color: var(--texto-3);
+  font-size: 10.5px;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+
+.ilha-materiais-acoes-topo {
+  flex: 0 0 auto;
+  padding-top: 1px;
+}
+
+.ilha-materiais-btn {
+  height: 30px;
+  border: 1px solid var(--borda);
+  background: var(--superficie-2);
+  color: var(--texto-2);
+  font-weight: 600;
+}
+
+.ilha-materiais-btn:hover:not(:disabled) {
+  border-color: var(--borda-forte);
+  background: var(--superficie-ativa);
+  color: var(--texto);
+}
+
+.ilha-materiais-btn-principal {
+  border-color: transparent;
+  background: var(--destaque);
+  color: var(--destaque-sobre);
+}
+
+.ilha-materiais-btn-principal:hover:not(:disabled),
+.ilha-materiais-btn[data-ativo] {
+  border-color: transparent;
+  background: var(--destaque-claro);
+  color: var(--destaque-sobre);
+}
+
+.ilha-materiais-busca input {
+  height: 36px;
+  border-color: var(--borda-controle);
+  border-radius: var(--raio-campo);
+  background: var(--superficie-2);
+  color: var(--texto);
+}
+
+.ilha-materiais-busca input:focus {
+  border-color: var(--destaque);
+  box-shadow: 0 0 0 3px var(--foco);
+  outline: none;
+}
+
+.ilha-materiais-busca-icone,
+.ilha-materiais-limpar {
+  color: var(--texto-3);
+}
+
+.ilha-materiais-aviso {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 9px;
+  align-self: flex-start;
+  border-radius: 999px;
+  background: var(--sucesso-suave);
+  color: var(--sucesso);
+  font-size: 10.5px;
+  font-weight: 600;
+}
+
+.ilha-materiais-lista {
+  gap: 10px;
+  max-height: 440px;
+  padding: 2px;
+  margin: 0 -2px -2px;
+}
+
+.ilha-material-card {
+  gap: 10px;
+  padding: 13px 14px;
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-cartao);
+  background: var(--superficie-2);
+  box-shadow: none;
+}
+
+.ilha-material-card:hover {
+  border-color: var(--borda-forte);
+}
+
+.ilha-material-nome {
+  font-size: 13px;
+  letter-spacing: 0;
+}
+
+.ilha-material-grade {
+  gap: 6px;
+}
+
+.ilha-material-pilula {
+  min-height: 30px;
+  padding: 4px 9px;
+  border-color: var(--borda);
+  border-radius: 9px;
+  background: var(--superficie);
+  color: var(--texto);
+}
+
+.ilha-material-pilula:hover {
+  border-color: var(--destaque-borda);
+  background: var(--destaque-suave);
+}
+
+.ilha-material-pilula[data-destacado] {
+  border-color: var(--destaque);
+  box-shadow: 0 0 0 1px var(--destaque-borda);
+}
+
+.ilha-material-tam {
+  color: var(--texto-2);
+}
+
+.ilha-material-codigo {
+  color: var(--texto);
+  font-size: 11.5px;
+}
+
+.ilha-materiais-form {
+  border: 1px solid var(--borda);
+  background: var(--superficie-2);
+}
+
+.ilha-materiais-input,
+.ilha-materiais-textarea {
+  border-color: var(--borda-controle);
+  background: var(--superficie);
+  color: var(--texto);
+}
+
+.ilha-materiais-input:focus,
+.ilha-materiais-textarea:focus {
+  border-color: var(--destaque);
+  box-shadow: 0 0 0 3px var(--foco);
+  outline: none;
+}
+
+@media (max-width: 520px) {
+  .ilha-pop.estilo-sistema.ilha-materiais {
+    left: 8px;
+    right: 8px;
+    width: auto;
+    padding: 14px;
+  }
+
+  .ilha-materiais-cabecalho {
+    flex-direction: column;
+  }
+
+  .ilha-materiais-acoes-topo {
+    width: 100%;
+  }
+
+  .ilha-materiais-btn {
+    flex: 1 1 0;
+  }
+
+  .ilha-materiais-subtitulo {
+    white-space: normal;
+  }
 }
 
 

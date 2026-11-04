@@ -1,3 +1,5 @@
+import { cabecalhosNiko } from "../estado/autenticacao";
+
 export type TipoProvedor = "anthropic" | "openai_compativel";
 
 export interface Provedor {
@@ -82,22 +84,34 @@ export interface EventoIa {
   provedor?: string;
 }
 
-const CABECALHOS = { "x-niko": "1", "content-type": "application/json" };
+function cabecalhos(): Record<string, string> {
+  return { ...cabecalhosNiko(), "content-type": "application/json" };
+}
 
 async function pedir<T>(caminho: string, opcoes: RequestInit = {}): Promise<T> {
-  const r = await fetch(`/ponte${caminho}`, { ...opcoes, headers: { ...CABECALHOS, ...(opcoes.headers ?? {}) } });
+  const r = await fetch(`/ponte${caminho}`, { ...opcoes, headers: { ...cabecalhos(), ...(opcoes.headers ?? {}) } });
   const json = (await r.json().catch(() => ({}))) as T & { erro?: string };
   if (!r.ok) throw new Error(json.erro ?? `http_${r.status}`);
   return json;
 }
 
-let estadoEmCache: Promise<EstadoPonte> | null = null;
+let estadoEmCache: { escopo: string; valor: Promise<EstadoPonte> } | null = null;
+
+function escopoDaSessao(): string {
+  try {
+    const usuario = JSON.parse(localStorage.getItem("kyro_usuario") ?? "null") as { id?: unknown } | null;
+    return typeof usuario?.id === "number" && Number.isSafeInteger(usuario.id) && usuario.id > 0 ? String(usuario.id) : "local";
+  } catch {
+    return "local";
+  }
+}
 
 export function estadoDaPonte(forcar = false): Promise<EstadoPonte> {
-  if (!estadoEmCache || forcar) {
-    estadoEmCache = pedir<EstadoPonte>("/estado").catch(() => ({ disponivel: false, provedores: [] }));
+  const escopo = escopoDaSessao();
+  if (!estadoEmCache || forcar || estadoEmCache.escopo !== escopo) {
+    estadoEmCache = { escopo, valor: pedir<EstadoPonte>("/estado").catch(() => ({ disponivel: false, provedores: [] })) };
   }
-  return estadoEmCache;
+  return estadoEmCache.valor;
 }
 
 export async function salvarProvedor(dados: { id?: string; tipo: TipoProvedor; nome: string; urlBase?: string; modelo?: string; chave?: string; catalogo?: string }) {
@@ -241,7 +255,7 @@ export async function* conversarIa(
   dados: { provedorId: string; sistema: string; mensagens: MensagemPonteIa[]; modelo?: string; ferramentas?: FerramentaIa[] },
   sinal?: AbortSignal,
 ): AsyncGenerator<EventoIa> {
-  const r = await fetch("/ponte/ia", { method: "POST", headers: CABECALHOS, body: JSON.stringify(dados), signal: sinal });
+  const r = await fetch("/ponte/ia", { method: "POST", headers: cabecalhos(), body: JSON.stringify(dados), signal: sinal });
   if (!r.ok || !r.body) {
     yield { tipo: "erro", texto: `http_${r.status}` };
     return;

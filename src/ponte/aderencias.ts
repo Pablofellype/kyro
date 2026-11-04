@@ -24,7 +24,7 @@ export function aderenciasRemotas(usuario: Pick<UsuarioAutenticado, "perfil" | "
 }
 
 function cabecalhosDaExecucao(usuario = useAuth.getState().usuario): Record<string, string> {
-  if (!aderenciasRemotas(usuario)) return CABECALHOS;
+  if (!aderenciasRemotas(usuario)) return { ...CABECALHOS, ...cabecalhosNiko() };
   const token = typeof localStorage !== "undefined" ? localStorage.getItem("kyro_token") : null;
   return {
     ...cabecalhosNiko(),

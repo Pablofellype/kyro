@@ -5,6 +5,7 @@ import { lerSegredo, gravarSegredo, apagarSegredo } from "./segredos.ts";
 import { plataforma } from "./plataforma/index.ts";
 import { criarFiltroDePensamento } from "./pensamento.ts";
 import { situacaoDoEndereco } from "../src/utilitarios/enderecoDoProvedor.ts";
+import { pastaDoUsuario, segredoDoUsuario } from "./escopoUsuario.ts";
 
 export type TipoProvedor = "anthropic" | "openai_compativel";
 
@@ -74,16 +75,20 @@ export function validarMensagens(valor: unknown): MensagemIa[] {
 }
 
 const PASTA = join(plataforma.pastaBaseDeDados(), "com.niko.empresa");
-const ARQUIVO = join(PASTA, "provedores.json");
+
+function arquivoDeProvedores() {
+  return join(pastaDoUsuario(PASTA), "provedores.json");
+}
 
 export function pastaDados() {
   return PASTA;
 }
 
 export function listarProvedores(): Provedor[] {
+  const arquivo = arquivoDeProvedores();
   try {
-    if (!existsSync(ARQUIVO)) return [];
-    const dados = JSON.parse(readFileSync(ARQUIVO, "utf8")) as Provedor[];
+    if (!existsSync(arquivo)) return [];
+    const dados = JSON.parse(readFileSync(arquivo, "utf8")) as Provedor[];
     return Array.isArray(dados) ? dados : [];
   } catch {
     return [];
@@ -91,10 +96,11 @@ export function listarProvedores(): Provedor[] {
 }
 
 function salvarLista(lista: Provedor[]) {
-  mkdirSync(PASTA, { recursive: true });
-  const temporario = `${ARQUIVO}.${process.pid}.tmp`;
+  const arquivo = arquivoDeProvedores();
+  mkdirSync(pastaDoUsuario(PASTA), { recursive: true });
+  const temporario = `${arquivo}.${process.pid}.tmp`;
   writeFileSync(temporario, JSON.stringify(lista, null, 2), "utf8");
-  renameSync(temporario, ARQUIVO);
+  renameSync(temporario, arquivo);
 }
 
 export function validarUrlBase(texto: string, comChave: boolean): string {
@@ -112,7 +118,7 @@ export async function salvarProvedor(dados: { id?: string; tipo: TipoProvedor; n
   const urlBase = dados.tipo === "anthropic" ? "https://api.anthropic.com" : validarUrlBase(dados.urlBase ?? "", Boolean(dados.chave?.trim()));
   const lista = listarProvedores();
   const id = dados.id && lista.some((p) => p.id === dados.id) ? dados.id : `ia-${randomUUID().slice(0, 8)}`;
-  if (dados.chave) await gravarSegredo(id, dados.chave.trim());
+  if (dados.chave) await gravarSegredo(segredoDoUsuario(id), dados.chave.trim());
   const anterior = lista.find((p) => p.id === id);
   const provedor: Provedor = { id, tipo: dados.tipo, nome, urlBase, modelo, temChave: Boolean(dados.chave) || Boolean(anterior?.temChave), catalogo: catalogo ?? anterior?.catalogo };
   salvarLista([...lista.filter((p) => p.id !== id), provedor]);
@@ -120,12 +126,12 @@ export async function salvarProvedor(dados: { id?: string; tipo: TipoProvedor; n
 }
 
 export async function removerProvedor(id: string) {
-  await apagarSegredo(id).catch(() => undefined);
+  await apagarSegredo(segredoDoUsuario(id)).catch(() => undefined);
   salvarLista(listarProvedores().filter((p) => p.id !== id));
 }
 
 async function cabecalhos(p: Provedor): Promise<Record<string, string>> {
-  const chave = p.temChave ? await lerSegredo(p.id) : null;
+  const chave = p.temChave ? await lerSegredo(segredoDoUsuario(p.id)) : null;
   if (p.tipo === "anthropic") {
     if (!chave) throw new Error("sem_chave");
     return { "x-api-key": chave, "anthropic-version": "2023-06-01", "content-type": "application/json" };
