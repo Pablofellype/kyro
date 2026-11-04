@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { alterarAtivoUsuario, alterarPermissaoAderencias, criarConviteUsuario, loginUsuario, listarUsuarios, redefinirSenhaComToken, solicitarRedefinicaoSenha, urlPublicaDoAmbiente, validarSessao, logoutSessao } from "../src/servicos/autenticacao.js";
+import { alterarAtivoUsuario, alterarPermissaoAderencias, criarConviteUsuario, loginUsuario, listarUsuarios, redefinirSenhaComToken, solicitarRedefinicaoSenha, urlPublicaDoAmbiente, validarSessao, logoutSessao, validarTokenAcesso } from "../src/servicos/autenticacao.js";
 import { configurarCors } from "./cors.js";
 
 function origemDaRequisicao(req: VercelRequest): string {
@@ -19,7 +19,13 @@ function urlPublicaDaRequisicao(req: VercelRequest): string {
   if (configurada) return configurada;
   const host = req.headers["x-forwarded-host"] ?? req.headers.host;
   const protocolo = req.headers["x-forwarded-proto"] ?? "https";
-  return typeof host === "string" && host ? `${protocolo}://${host}` : "";
+  if (typeof host !== "string" || !host.trim()) return "";
+  const hostLimpo = host.trim().toLowerCase().replace(/^\[|\]$/g, "");
+  const hostname = hostLimpo.replace(/:\d+$/, "");
+  const ipPrivado = /^(10\.|127\.|192\.168\.|169\.254\.|0\.0\.0\.0$|::1$|fc|fd)/i.test(hostname)
+    || (/^172\.(?:1[6-9]|2\d|3[0-1])\./.test(hostname));
+  if (hostname === "localhost" || ipPrivado) return "";
+  return `${protocolo}://${host.trim()}`;
 }
 
 function definirCookieSessao(res: VercelResponse, token: string) {
@@ -55,8 +61,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     try {
       await solicitarRedefinicaoSenha(email, urlPublicaDaRequisicao(req));
       return res.status(200).json({ sucesso: true, mensagem: "Se o e-mail estiver autorizado, enviaremos um link para redefinir a senha." });
-    } catch {
-      return res.status(200).json({ sucesso: true, mensagem: "Se o e-mail estiver autorizado, enviaremos um link para redefinir a senha." });
+    } catch (erro) {
+      return res.status(503).json({ sucesso: false, erro: (erro as Error).message || "email_nao_enviado" });
+    }
+  }
+
+  if (req.method === "GET" && acao === "validar-acesso") {
+    const token = typeof req.query.token === "string" ? req.query.token : "";
+    try {
+      return res.status(200).json({ sucesso: true, acesso: await validarTokenAcesso(token) });
+    } catch (erro) {
+      return res.status(400).json({ sucesso: false, erro: (erro as Error).message });
     }
   }
 

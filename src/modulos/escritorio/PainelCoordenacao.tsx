@@ -32,17 +32,19 @@ export function PainelCoordenacao() {
   const alertas = useAgentes((s) => s.alertas);
   const atividades = useAgentes((s) => s.atividades);
   const naoLidas = useWhatsapp((s) => s.estado?.naoLidas ?? 0);
+  const eventosDaEmpresa = useMemo(() => eventos.filter((evento) => evento.area === "empresa"), [eventos]);
+  const tarefasDaEmpresa = useMemo(() => tarefas.filter((tarefa) => tarefa.area === "empresa"), [tarefas]);
   const [usuarios, setUsuarios] = useState<UsuarioEquipe[]>([]);
   const [carregando, setCarregando] = useState(false);
 
   const hoje = hojeISO();
-  const agenda = useMemo(() => eventos
+  const agenda = useMemo(() => eventosDaEmpresa
     .filter((evento) => ocorrencias(evento, hoje, hoje).length > 0)
     .sort((a, b) => (a.hora ?? "99:99").localeCompare(b.hora ?? "99:99"))
-    .slice(0, 6), [eventos, hoje]);
-  const pendencias = useMemo(() => tarefasDoDia(tarefas, hoje)
+    .slice(0, 6), [eventosDaEmpresa, hoje]);
+  const pendencias = useMemo(() => tarefasDoDia(tarefasDaEmpresa, hoje)
     .filter((tarefa) => tarefa.status !== "concluida" && tarefa.status !== "cancelada")
-    .slice(0, 6), [tarefas, hoje]);
+    .slice(0, 6), [tarefasDaEmpresa, hoje]);
   const avisos = alertas.filter((alerta) => !alerta.visto).slice(-5).reverse();
   const membrosAtivos = usuarios.filter((item) => item.ativo);
   const quantidadeMembros = usuarios.length || (usuario ? 1 : 0);
@@ -67,7 +69,7 @@ export function PainelCoordenacao() {
   return (
     <>
       <CabecalhoAba
-        titulo="Coordenação"
+        titulo="Escritório"
         subtitulo="Equipe, agenda, pendências e avisos da empresa em um só lugar."
         acoes={
           <>
@@ -109,7 +111,7 @@ export function PainelCoordenacao() {
           <section className="coordenacao-cartao">
             <header className="coordenacao-cartao-cabecalho">
               <div><span className="coordenacao-rotulo">Acompanhar</span><h2>Pendências</h2></div>
-              <Botao pequeno variante="fantasma" onClick={() => irPara("chat")}>Distribuir</Botao>
+              <Botao pequeno variante="fantasma" onClick={() => irPara("calendario")}>Adicionar atividade</Botao>
             </header>
             {pendencias.length === 0 ? (
               <div className="coordenacao-vazio"><CheckCircle2 size={18} /><span>Nenhuma pendência para hoje.</span></div>

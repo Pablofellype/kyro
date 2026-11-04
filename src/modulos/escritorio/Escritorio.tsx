@@ -16,7 +16,7 @@ export default function Escritorio({ tipoInicial = "coordenacao" }: { tipoInicia
   }, [podeAderencias, tipo]);
 
   const abas = [
-    ["coordenacao", Users, "Coordenação", "Equipe, agenda e pendências da empresa"] as const,
+    ["coordenacao", Users, "Escritório", "Equipe, agenda e pendências da empresa"] as const,
     ...(podeAderencias ? [["aderencias", FileSpreadsheet, "Aderências", "Registros e acompanhamento operacional"] as const] : []),
   ];
 

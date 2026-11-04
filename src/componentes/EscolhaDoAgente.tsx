@@ -26,7 +26,7 @@ export function Digitando() {
   );
 }
 
-export function EscolhaDoAgente({ tamanho = 30 }: { tamanho?: number }) {
+export function EscolhaDoAgente({ tamanho = 30, ocultarNome = false }: { tamanho?: number; ocultarNome?: boolean }) {
   const fase = useConversando((s) => s.fase);
   const agente = useConversando((s) => s.agente);
   const nomes = useConfig((s) => s.agentes.nomes);
@@ -77,7 +77,7 @@ export function EscolhaDoAgente({ tamanho = 30 }: { tamanho?: number }) {
           <>{T.chat.escolhendo}</>
         ) : (
           <>
-            <b>{nomes[agente]}</b> {fase === "respondendo" ? T.chat.pensandoCurto : T.chat.vaiResponder}
+            <b>{ocultarNome ? "Kyro" : nomes[agente]}</b> {fase === "respondendo" ? T.chat.pensandoCurto : T.chat.vaiResponder}
             <Digitando />
           </>
         )}

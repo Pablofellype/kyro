@@ -56,6 +56,7 @@ export interface Tarefa {
   criadaEm: string;
   concluidaEm?: string;
   ordem: number;
+  area?: AreaSistema;
 }
 
 export type TipoHabito = "sim_nao" | "quantidade";
@@ -347,6 +348,7 @@ export interface Evento {
   excecoes?: string[];
   feitos?: string[];
   metaId?: string;
+  area?: AreaSistema;
 }
 
 export interface CartaoConfirmacao {
@@ -400,7 +402,7 @@ export interface Memoria {
 
 export type ServicoId =
   | "stripe" | "github" | "vercel" | "resend" | "notion" | "calcom" | "n8n" | "google" | "supabase" | "cloudflare"
-  | "linear" | "jira" | "trello" | "railway" | "discord" | "reddit" | "strava" | "email" | "calendario" | "cripto";
+  | "linear" | "jira" | "trello" | "railway" | "discord" | "reddit" | "strava" | "email" | "calendario" | "cripto" | "outlook";
 
 export type StatusConexao = "conectado" | "sem_chave" | "erro" | "pausado" | "sem_internet";
 

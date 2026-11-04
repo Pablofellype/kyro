@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { KeyRound, Plug, Trash2, CheckCircle2, ShieldCheck, BrainCircuit, RefreshCw, ExternalLink, LifeBuoy, Cpu, Zap, Globe, ChevronDown, Lock, LockOpen, Eye } from "lucide-react";
+import { KeyRound, Plug, Trash2, CheckCircle2, ShieldCheck, BrainCircuit, RefreshCw, ExternalLink, LifeBuoy, Cpu, Zap, Globe, ChevronDown, Lock, LockOpen, Eye, Search } from "lucide-react";
 import { Botao, Campo, AvisoFaixa, ConfirmarModal, Vazio, Modal, Pilulas } from "../../componentes/basicos";
 import { Marca, type MarcaId } from "../../marcas/Marca";
 import { useConfig } from "../../estado/configuracoes";
@@ -8,6 +8,7 @@ import { T } from "../../textos/textos";
 import { estadoDaPonte, salvarProvedor, removerProvedor, testarProvedor, type Provedor, type EstadoPonte } from "../../ponte/ponteLocal";
 import { CATALOGO_IA, itemDoCatalogo, catalogoPelaUrl, provedorEntendeImagens, type ItemCatalogo, type CustoProvedor } from "../../dados/provedoresIa";
 import { situacaoDoEndereco } from "../../utilitarios/enderecoDoProvedor";
+import { normalizarTexto } from "../../utilitarios/basicos";
 
 type Filtro = "todos" | "gratis" | "local" | "pago";
 type Grupo = keyof typeof T.provedoresIa.grupos;
@@ -86,6 +87,7 @@ export function SecaoIa() {
   const avisar = useInterface((s) => s.avisar);
   const [ponte, setPonte] = useState<EstadoPonte | null>(null);
   const [filtro, setFiltro] = useState<Filtro>("todos");
+  const [busca, setBusca] = useState("");
   const [escolhido, setEscolhido] = useState<ItemCatalogo | null>(null);
   const [nome, setNome] = useState("");
   const [urlBase, setUrlBase] = useState("");
@@ -105,7 +107,12 @@ export function SecaoIa() {
 
   const catalogoDe = (p: Provedor) => p.catalogo ?? catalogoPelaUrl(p.urlBase)?.id;
   const usados = useMemo(() => new Set((ponte?.provedores ?? []).map((p) => p.catalogo ?? catalogoPelaUrl(p.urlBase)?.id)), [ponte]);
-  const visiveis = CATALOGO_IA.filter((c) => passaNoFiltro(c.custo, filtro) || c.id === "personalizado");
+  const termoBusca = normalizarTexto(busca);
+  const visiveis = CATALOGO_IA.filter((c) => {
+    if (!(passaNoFiltro(c.custo, filtro) || c.id === "personalizado")) return false;
+    if (!termoBusca) return true;
+    return normalizarTexto(`${c.nome} ${C.descricoes[c.id]}`).includes(termoBusca);
+  });
   const grupos = (Object.keys(P.grupos) as Grupo[]).map((g) => ({ id: g, itens: visiveis.filter((c) => grupoDoCusto(c.custo) === g) })).filter((g) => g.itens.length > 0);
 
   const escolher = (item: ItemCatalogo) => {
@@ -130,10 +137,25 @@ export function SecaoIa() {
   const testar = async (p: Provedor, sugerido = "") => {
     setTestes((t) => ({ ...t, [p.id]: "testando" }));
     const r = await testarProvedor(p.id).catch((e) => ({ ok: false, modelos: [] as string[], erro: (e as Error).message }));
-    const modelos = r.ok ? ordenarModelos(r.modelos, sugerido || p.modelo) : r.modelos;
+    const iaAtual = useConfig.getState().ia;
+    const modeloAtual = iaAtual.modelos[p.id] || (iaAtual.provedorId === p.id ? iaAtual.modelo : "") || p.modelo;
+    const catalogo = p.catalogo ?? catalogoPelaUrl(p.urlBase)?.id;
+    const geminiAtualizado = catalogo === "gemini" && /^gemini-2\.5(?:-|$)/i.test(modeloAtual)
+      ? r.modelos.find((m) => /^gemini-3\.1-flash-lite$/i.test(m))
+        ?? r.modelos.find((m) => /^gemini-3(?:\.|-).*flash-lite$/i.test(m) && !/preview|image/i.test(m))
+      : undefined;
+    const modeloPreferido = geminiAtualizado ?? (sugerido || modeloAtual);
+    const modelos = r.ok ? ordenarModelos(r.modelos, modeloPreferido) : r.modelos;
     setTestes((t) => ({ ...t, [p.id]: { ...r, modelos } }));
-    if (r.ok && !p.modelo && modelos[0]) {
-      await salvarProvedor({ id: p.id, tipo: p.tipo, nome: p.nome, urlBase: p.urlBase, modelo: modelos[0] }).catch(() => undefined);
+    const modeloValido = modeloPreferido && modelos.includes(modeloPreferido) ? modeloPreferido : modelos[0];
+    if (r.ok && modeloValido && modeloValido !== modeloAtual) {
+      await salvarProvedor({ id: p.id, tipo: p.tipo, nome: p.nome, urlBase: p.urlBase, modelo: modeloValido }).catch(() => undefined);
+      const iaDepois = useConfig.getState().ia;
+      definir({ ia: {
+        ...iaDepois,
+        modelo: iaDepois.provedorId === p.id ? modeloValido : iaDepois.modelo,
+        modelos: { ...iaDepois.modelos, [p.id]: modeloValido },
+      } });
       await recarregar();
     }
   };
@@ -205,8 +227,13 @@ export function SecaoIa() {
             <b>{C.titulo}</b>
             <span>{C.dica}</span>
           </div>
+          <label className="ia-busca">
+            <Search size={14} />
+            <input value={busca} maxLength={60} placeholder="Buscar provedor" aria-label="Buscar provedor" onChange={(e) => setBusca(e.target.value)} />
+          </label>
           <Pilulas<Filtro> rotulo={C.titulo} valor={filtro} aoMudar={setFiltro} opcoes={(Object.keys(C.filtros) as Filtro[]).map((f) => ({ valor: f, rotulo: C.filtros[f] }))} />
         </div>
+        {grupos.length === 0 && <div className="ia-sem-resultados">Nenhum provedor encontrado. Tente outro nome ou limpe a busca.</div>}
         {grupos.map((g) => (
           <div key={g.id} className="ia-grupo">
             <span className="ia-grupo-rotulo">{P.grupos[g.id]}</span>

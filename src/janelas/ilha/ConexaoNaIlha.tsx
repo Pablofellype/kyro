@@ -202,6 +202,21 @@ export function montarResumo(servico: ServicoId, dados: DadosServico[ServicoId])
           : eventos.slice(0, 6).map((e) => ({ chave: e.id, principal: e.titulo, secundario: [formatar(e.data, "EEE, d 'de' MMM"), e.hora].filter(Boolean).join(" . "), estado: "" })),
       };
     }
+    case "outlook": {
+      const d = dados as DadosServico["outlook"];
+      const emails = d.importantes.length ? d.importantes : d.recentes;
+      return {
+        numeros: [
+          { rotulo: M.naoLidos, valor: d.naoLidos, tom: d.naoLidos ? "alerta" : "" },
+          { rotulo: M.hoje, valor: d.agenda.hoje, tom: d.agenda.hoje ? "sucesso" : "" },
+          { rotulo: M.totalEmails, valor: d.total },
+        ],
+        tituloDaLista: emails.length ? (d.importantes.length ? M.importantes : I.recentes) : M.proximos,
+        linhas: emails.length
+          ? emails.slice(0, 6).map((e) => ({ chave: e.id, principal: e.assunto, secundario: e.de, estado: e.naoLido ? "pendente" : "", quando: e.data }))
+          : d.agenda.proximos.slice(0, 6).map((e) => ({ chave: e.id, principal: e.titulo, secundario: [formatar(e.data, "EEE, d 'de' MMM"), e.hora].filter(Boolean).join(" . ") })),
+      };
+    }
     case "supabase": {
       const d = dados as DadosServico["supabase"];
       const fora = d.projetos.flatMap((p) => p.servicos.filter((s) => !s.saudavel).map((s) => `${p.nome}: ${s.nome}`));

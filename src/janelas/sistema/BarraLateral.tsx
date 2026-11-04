@@ -22,10 +22,11 @@ import { Marca } from "../../marcas/Marca";
 
 function useContadores(): Partial<Record<Rota, { n: number; alerta?: boolean }>> {
   const hoje = hojeISO();
-  const tarefas = useRotina((s) => tarefasDoDia(s.tarefas, hoje).filter((t) => t.status !== "concluida" && t.status !== "cancelada").length);
+  const area = useInterface((s) => s.area);
+  const tarefas = useRotina((s) => tarefasDoDia(s.tarefas.filter((t) => area === "empresa" ? t.area === "empresa" : t.area !== "empresa"), hoje).filter((t) => t.status !== "concluida" && t.status !== "cancelada").length);
   const revisoes = useEstudos((s) => revisoesParaHoje(s));
   const falhas = useAgentes((s) => s.alertas.filter((a) => a.servico).length);
-  const eventos = useOrganizacao((s) => s.eventos.filter((e) => e.data === hoje).length);
+  const eventos = useOrganizacao((s) => s.eventos.filter((e) => e.data === hoje && (area === "empresa" ? e.area === "empresa" : e.area !== "empresa")).length);
   return {
     journal: { n: tarefas },
     estudos: { n: revisoes },
@@ -168,7 +169,7 @@ export function BarraLateral({ recolhida }: { recolhida: boolean }) {
   const nomeExibido = nome || usuario?.nome || T.barraLateral.perfil;
   const [fade, setFade] = useState({ topo: false, base: false });
   const desligadas = useConfig((s) => s.funcoesDesligadas);
-  const hoje = tarefasDoDia(tarefas, hojeISO()).filter((t) => t.status !== "cancelada").slice(0, 5);
+  const hoje = tarefasDoDia(tarefas.filter((t) => area === "empresa" ? t.area === "empresa" : t.area !== "empresa"), hojeISO()).filter((t) => t.status !== "cancelada").slice(0, 5);
   const visiveis = barra.filter((i) => i.visivel && rotaLigada(i.rota, desligadas) && rotaVisivelNaArea(i.rota, area));
   const mostrarHoje = funcaoLigada("journal", desligadas);
 

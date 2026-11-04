@@ -41,6 +41,7 @@ export function validarEvento(dados: Omit<Evento, "id">) {
     exigir(lista === undefined || (Array.isArray(lista) && lista.every((d) => typeof d === "string" && dataValida(d))));
   }
   exigir(dados.metaId === undefined || (typeof dados.metaId === "string" && dados.metaId.length > 0));
+  exigir(dados.area === undefined || dados.area === "pessoal" || dados.area === "empresa");
 }
 
 export function validarPaiPagina(pagina: Pick<Pagina, "id" | "materiaId" | "paiId">, paginas: Pagina[]) {

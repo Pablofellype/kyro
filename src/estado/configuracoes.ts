@@ -22,7 +22,7 @@ export type AbaIlha = "hoje" | "midia" | "foco" | "chat" | "conexoes" | "avisos"
 export type VisaoIlha = AbaIlha | "captura";
 export type SecaoHoje = "agenda" | "tarefas" | "habitos";
 
-export const ABAS_ILHA: AbaIlha[] = ["hoje", "time", "claude", "conexoes", "chat", "whatsapp", "midia", "foco", "avisos"];
+export const ABAS_ILHA: AbaIlha[] = ["hoje", "time", "claude", "conexoes", "whatsapp", "midia", "foco", "avisos"];
 const ABAS_JUNTADAS_NO_HOJE = ["hoje", "calendario", "habitos"];
 
 export function juntarAbasNoHoje(ordem: string[], blocos: Record<string, boolean>) {
@@ -206,7 +206,7 @@ export const CONFIG_PADRAO: Configuracoes = {
   ilha: {
     ativa: true,
     modo: "inteligente",
-    blocos: { hoje: true, midia: true, foco: true, chat: true, conexoes: true, avisos: true, claude: true, time: true, whatsapp: true },
+    blocos: { hoje: true, midia: true, foco: true, chat: false, conexoes: true, avisos: true, claude: true, time: true, whatsapp: true },
     ordemAbas: ABAS_ILHA,
     repouso: "agente",
     tamanho: "media",

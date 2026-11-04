@@ -206,7 +206,7 @@ export async function perguntarAssistente(opcoes: {
         ultimoErro = erro;
         const tipo = classificarErroIa(erro).tipo;
         const feitas = tentativas.get(indice) ?? 0;
-        if (tipo === "cota" && feitas < 2) {
+        if ((tipo === "cota" || tipo === "modelo") && feitas < 2) {
           tentativas.set(indice, feitas + 1);
           const irmao = await modeloIrmao(provedor, modelo, usados);
           if (irmao) {
@@ -307,6 +307,7 @@ export function classificarErroIa(erro: string): { tipo: TipoErroIa; status: num
   if (status === 503 || status === 502 || status === 500 || status === 529 || /overloaded|high demand|unavailable/.test(texto)) return { tipo: "sobrecarga", status };
   if (status === 401 || status === 403 || /sem_chave|api key|unauthorized|invalid.*key|permission/.test(texto)) return { tipo: "chave", status };
   if (status === 404 || /sem_modelo|model.*not.*found|does not exist|provedor_nao_encontrado/.test(texto)) return { tipo: "modelo", status };
+  if ((status === 400 || status === 422) && /model|modelo|not available|not found|does not exist|unavailable/i.test(texto)) return { tipo: "modelo", status };
   if (status === 400 || status === 422) return { tipo: "recusado", status };
   if (texto.startsWith("rede") || /fetch failed|econnrefused|enotfound|network/.test(texto)) return { tipo: "rede", status };
   return { tipo: "outro", status };

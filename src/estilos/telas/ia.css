@@ -14,11 +14,18 @@
 }
 
 .estilo-sistema .ia-catalogo-topo {
+  position: sticky;
+  top: 0;
+  z-index: 4;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 10px 16px;
+  padding: 10px 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--borda) 75%, transparent);
+  background: color-mix(in srgb, var(--fundo) 92%, transparent);
+  backdrop-filter: blur(12px);
 }
 
 .estilo-sistema .ia-catalogo-texto {
@@ -38,6 +45,49 @@
   font-size: 11.5px;
   line-height: 1.5;
   color: var(--texto-3);
+}
+
+.estilo-sistema .ia-busca {
+  display: flex;
+  flex: 1 1 190px;
+  align-items: center;
+  gap: 8px;
+  min-width: 170px;
+  max-width: 250px;
+  height: 36px;
+  padding: 0 11px;
+  border: 1px solid var(--borda-controle);
+  border-radius: 9px;
+  background: var(--superficie);
+  color: var(--texto-3);
+}
+
+.estilo-sistema .ia-busca:focus-within {
+  border-color: var(--destaque);
+  box-shadow: 0 0 0 3px var(--destaque-suave);
+}
+
+.estilo-sistema .ia-busca input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--texto);
+  font: inherit;
+  font-size: 12px;
+}
+
+.estilo-sistema .ia-busca input::placeholder {
+  color: var(--texto-3);
+}
+
+.estilo-sistema .ia-sem-resultados {
+  padding: 18px;
+  border: 1px dashed var(--borda);
+  border-radius: 12px;
+  color: var(--texto-3);
+  font-size: 12.5px;
 }
 
 .estilo-sistema .ia-grupo {
@@ -176,6 +226,8 @@
 .estilo-sistema .ia-custo-pago { background: var(--borda-suave); color: var(--texto-2); }
 
 .estilo-sistema .ia-lado {
+  position: sticky;
+  top: 10px;
   flex: 1 1 320px;
   display: flex;
   flex-direction: column;
@@ -463,4 +515,24 @@
 
 .estilo-sistema .ia-avancado[aria-expanded="true"] svg {
   transform: rotate(180deg);
+}
+
+@container conteudo (max-width: 900px) {
+  .estilo-sistema .ia-lado {
+    position: static;
+  }
+}
+
+@container conteudo (max-width: 560px) {
+  .estilo-sistema .ia-catalogo-topo {
+    position: static;
+    padding-top: 0;
+    background: transparent;
+    backdrop-filter: none;
+  }
+
+  .estilo-sistema .ia-busca {
+    flex-basis: 100%;
+    max-width: none;
+  }
 }

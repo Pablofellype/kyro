@@ -18,6 +18,18 @@ async function respostaJson(res: Response): Promise<Record<string, unknown>> {
   return dados as Record<string, unknown>;
 }
 
+function mensagemDoConvite(erro: string) {
+  const mensagens: Record<string, string> = {
+    email_nao_configurado: "O envio de e-mail ainda não está configurado no servidor.",
+    email_nao_enviado: "O convite não foi enviado. Confira o remetente e a configuração do serviço de e-mail.",
+    url_publica_nao_configurada: "A URL pública do Kyro não está configurada no servidor.",
+    email_invalido: "Informe um e-mail válido.",
+    nome_obrigatorio: "Informe o nome da pessoa.",
+    usuario_ja_cadastrado: "Esse e-mail já possui uma conta no Kyro.",
+  };
+  return mensagens[erro] ?? erro;
+}
+
 export function AdministracaoUsuarios() {
   const token = useAuth((s) => s.token);
   const usuario = useAuth((s) => s.usuario);
@@ -63,7 +75,7 @@ export function AdministracaoUsuarios() {
       setNome("");
       setEmail("");
     } catch (e) {
-      setErro(e instanceof Error ? e.message : "Não foi possível enviar o convite.");
+      setErro(mensagemDoConvite(e instanceof Error ? e.message : "Não foi possível enviar o convite."));
     } finally {
       setEnviando(false);
     }

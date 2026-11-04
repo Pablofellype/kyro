@@ -49,12 +49,13 @@ export function marcaDoApp(app: string): MarcaDeMidia | null {
   return PADROES_DE_MIDIA.find(([padrao]) => padrao.test(app))?.[1] ?? null;
 }
 
-type MarcaGenerica = "email" | "calendario" | "cripto";
+type MarcaGenerica = "email" | "calendario" | "cripto" | "outlook";
 
 const ICONES_GENERICOS: Record<MarcaGenerica, { title: string; hex: string; Icone: typeof Mail }> = {
   email: { title: "E-mail", hex: "4F8EF7", Icone: Mail },
   calendario: { title: "Agendas", hex: "E5484D", Icone: CalendarDays },
   cripto: { title: "Cripto", hex: "F7931A", Icone: Bitcoin },
+  outlook: { title: "Outlook", hex: "0078D4", Icone: Mail },
 };
 
 function ehGenerica(marca: MarcaId): marca is MarcaGenerica {

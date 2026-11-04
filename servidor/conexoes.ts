@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { lerSegredo, gravarSegredo, apagarSegredo } from "./segredos.ts";
 import { pastaDados, validarUrlBase } from "./ia.ts";
 import { autorizarWorkspace, lerGoogle } from "./google.ts";
+import { autorizarOutlook, lerOutlook } from "./outlook.ts";
 import { lerContribuicoesGithub, lerCommitsGithub } from "./github.ts";
 import { exigirConexaoDisponivel } from "../src/utilitarios/disponibilidadeConexoes.ts";
 import { autorizarStrava, lerJson, lerCalendarios, lerDiscord, lerEmail, lerJira, lerLinear, lerRailway, lerReddit, lerStrava, lerTrello, urlPublicaSegura } from "./conexoesExtras.ts";
@@ -10,7 +11,7 @@ import { configDaCripto, enderecoValido, lerCripto } from "./cripto.ts";
 
 export const SERVICOS = [
   "stripe", "github", "vercel", "resend", "notion", "calcom", "n8n", "google", "supabase", "cloudflare",
-  "linear", "jira", "trello", "railway", "discord", "reddit", "strava", "email", "calendario", "cripto",
+  "linear", "jira", "trello", "railway", "discord", "reddit", "strava", "email", "calendario", "cripto", "outlook",
 ] as const;
 const SERVICOS_ANTIGOS_DO_GOOGLE = ["gmail", "agenda"];
 export type Servico = (typeof SERVICOS)[number];
@@ -339,6 +340,7 @@ const LEITORES: Record<Servico, Leitor> = {
   email: (chave) => lerEmail(chave),
   calendario: (chave) => lerCalendarios(chave),
   cripto: (chave) => lerCripto(chave),
+  outlook: (chave) => lerOutlook(chave),
 };
 
 const PRESETS_DE_EMAIL: Record<string, { servidor: string; porta: number }> = {
@@ -472,6 +474,18 @@ export async function salvarChaveConexao(servico: Servico, dados: Record<string,
     leiturasEmAndamento.delete(servico);
     return { ok: true };
   }
+  if (servico === "outlook") {
+    const credencial = await autorizarOutlook(String(dados.clienteId ?? "").trim());
+    const texto = JSON.stringify(credencial);
+    await LEITORES[servico](texto);
+    await gravarSegredo(`conexao-${servico}`, texto);
+    const c = lerConfig();
+    c[servico] = { temChave: true };
+    salvarConfig(c);
+    cacheDados.delete(servico);
+    leiturasEmAndamento.delete(servico);
+    return { ok: true };
+  }
   const url = servico === "n8n" ? validarUrlBase(String(dados.url ?? ""), true) : undefined;
   const guardada = lerConfig()[servico]?.temChave ? await lerSegredo(`conexao-${servico}`) : null;
   const chave = await credencialDoServico(servico, dados, guardada);
@@ -504,6 +518,8 @@ export async function configPublica(servico: Servico): Promise<Record<string, un
       return { usuario: typeof c.feed === "string" ? new URL(c.feed).searchParams.get("user") : null, temToken: Boolean(c.feed) };
     case "strava":
       return { clienteId: c.clienteId, temToken: Boolean(c.segredo) };
+    case "outlook":
+      return { clienteId: c.clienteId, email: c.email, temToken: Boolean(c.refresh) };
     case "email":
       return { servidor: c.servidor, porta: c.porta, usuario: c.usuario, temToken: Boolean(c.senha) };
     case "calendario":

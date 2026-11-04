@@ -331,6 +331,41 @@ function ConteudoServico({ servico, aba, filtro, dados }: { servico: ServicoId; 
     );
   }
 
+  if (servico === "outlook") {
+    const d = dados as DadosServico["outlook"];
+    const emails = (linhas: DadosServico["outlook"]["recentes"]) => (
+      <Tabela filtro={filtro} linhas={linhas} colunas={[
+        { titulo: C.de, render: (l) => <span className="privado" style={{ fontWeight: l.naoLido ? 600 : 400 }}>{l.de}</span>, texto: (l) => l.de },
+        { titulo: C.assunto, render: (l) => <span className="privado" style={{ fontWeight: l.naoLido ? 600 : 400 }}>{l.assunto}</span>, texto: (l) => l.assunto },
+        { titulo: C.trecho, render: (l) => <span className="privado texto-3 cortar" style={{ maxWidth: 280, display: "inline-block" }}>{l.trecho}</span>, texto: (l) => l.trecho },
+        { titulo: C.data, render: (l) => data(l.data), direita: true },
+      ]} />
+    );
+    const agenda = (linhas: DadosServico["outlook"]["agenda"]["proximos"]) => (
+      <Tabela filtro={filtro} linhas={linhas} colunas={[
+        { titulo: C.data, render: (l) => formatar(l.data, "EEE, d 'de' MMM"), texto: (l) => l.data },
+        { titulo: C.inicio, render: (l) => l.hora ?? "" },
+        { titulo: C.titulo, render: (l) => (l.link ? <a className="privado" href={l.link} target="_blank" rel="noopener noreferrer">{l.titulo}</a> : <span className="privado">{l.titulo}</span>), texto: (l) => l.titulo },
+      ]} />
+    );
+    const vazio = <Vazio titulo={T.janelaConexao.semResultados} />;
+    if (aba === "importantes") return d.importantes.length ? emails(d.importantes) : vazio;
+    if (aba === "recentes") return d.recentes.length ? emails(d.recentes) : vazio;
+    if (aba === "agenda") return d.agenda.proximos.length ? agenda(d.agenda.proximos) : vazio;
+    return (
+      <div className="coluna">
+        <div className="conexao-metricas">
+          <Metrica rotulo={T.janelaConexao.metricas.naoLidos} valor={d.naoLidos} />
+          <Metrica rotulo={T.janelaConexao.metricas.importantes} valor={d.importantes.length} />
+          <Metrica rotulo={T.janelaConexao.metricas.hoje} valor={d.agenda.hoje} />
+          <Metrica rotulo={T.janelaConexao.metricas.totalEmails} valor={d.total} />
+        </div>
+        {d.email && <span className="texto-3 privado">{d.email}</span>}
+        {d.recentes.length ? <><h3 className="conexao-bloco-titulo">{T.janelaConexao.ultimas}</h3>{emails(d.importantes.length ? d.importantes : d.recentes.slice(0, 8))}</> : vazio}
+      </div>
+    );
+  }
+
   if (servico === "supabase") {
     const d = dados as DadosServico["supabase"];
     const tamanho = (b: number) => (b >= 1e9 ? `${(b / 1e9).toFixed(1)} GB` : b >= 1e6 ? `${(b / 1e6).toFixed(1)} MB` : `${Math.round(b / 1e3)} KB`);

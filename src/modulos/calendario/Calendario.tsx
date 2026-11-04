@@ -43,6 +43,7 @@ const COR_FONTE: Record<Fonte, string> = {
 };
 
 const FONTES = Object.keys(T.calendario.fontes) as Fonte[];
+const fontesIniciais = (area: "pessoal" | "empresa"): Record<Fonte, boolean> => Object.fromEntries(FONTES.map((fonte) => [fonte, area === "empresa" ? fonte === "eventos" : true])) as Record<Fonte, boolean>;
 const FUNCAO_DA_FONTE: Record<Fonte, Funcao> = { eventos: "calendario", tarefas: "journal", habitos: "journal", estudos: "estudos", financas: "financas", metas: "metas", google: "calendario", agendas: "calendario" };
 const ROTA_DA_FONTE: Record<Exclude<Fonte, "eventos" | "google" | "agendas">, Rota> = { tarefas: "journal", habitos: "journal", estudos: "estudos", financas: "financas", metas: "metas" };
 const DISTANCIA_PARA_ARRASTAR = 6;
@@ -237,6 +238,7 @@ export default function Calendario() {
   const parametros = useInterface((s) => s.parametros);
   const avisar = useInterface((s) => s.avisar);
   const irPara = useInterface((s) => s.irPara);
+  const area = useInterface((s) => s.area);
   const eventos = useOrganizacao((s) => s.eventos);
   const metas = useOrganizacao((s) => s.metas);
   const criarEvento = useOrganizacao((s) => s.criarEvento);
@@ -252,7 +254,7 @@ export default function Calendario() {
   const contasFinanceiras = useFinancas((s) => s.contas);
   const [vista, setVista] = useState<Vista>("mes");
   const [foco, setFoco] = useState(parametros.data && dataValida(parametros.data) ? parametros.data : hojeISO());
-  const [fontes, setFontes] = useState<Record<Fonte, boolean>>({ eventos: true, tarefas: true, habitos: true, estudos: true, financas: true, metas: true, google: true, agendas: true });
+  const [fontes, setFontes] = useState<Record<Fonte, boolean>>(() => fontesIniciais(area));
   const [novo, setNovo] = useState(false);
   const [edicao, setEdicao] = useState<Edicao | null>(null);
   const [escopo, setEscopo] = useState<PedidoDeEscopo | null>(null);
@@ -262,6 +264,11 @@ export default function Calendario() {
   const [agora, setAgora] = useState(minutosDeAgora);
   const acabouDeArrastar = useRef(false);
   const arrasteAtual = useRef<Arraste | null>(null);
+
+  const eventosDoEscopo = useMemo(() => area === "empresa" ? eventos.filter((evento) => evento.area === "empresa") : eventos.filter((evento) => evento.area !== "empresa"), [area, eventos]);
+  const tarefasDoEscopo = useMemo(() => area === "empresa" ? tarefas.filter((tarefa) => tarefa.area === "empresa") : tarefas.filter((tarefa) => tarefa.area !== "empresa"), [area, tarefas]);
+
+  useEffect(() => { setFontes(fontesIniciais(area)); }, [area]);
 
   useEffect(() => {
     if (parametros.data && dataValida(parametros.data)) {
@@ -303,15 +310,24 @@ export default function Calendario() {
   const sugestaoGoogle = useConfig((s) => s.sugestaoAgendaGoogle);
   const definirConfig = useConfig((s) => s.definir);
   const agendaConectada = useComunicacao((s) => Boolean(s.conexoes.find((c) => c.id === "google")?.chaveSalva));
-  const sugerirGoogle = sugestaoGoogle && !agendaConectada && funcaoLigada("calendario", desligadas);
-  const agendaGoogle = usarAgendaGoogle(funcaoLigada("calendario", desligadas) ? [[inicioISO, fimISO], [hoje, fimProximos]] : []);
-  const agendasPorLink = usarAgendasPorLink(funcaoLigada("calendario", desligadas));
+  const sugerirGoogle = area !== "empresa" && sugestaoGoogle && !agendaConectada && funcaoLigada("calendario", desligadas);
+  const agendaGoogle = usarAgendaGoogle(area === "empresa" || !funcaoLigada("calendario", desligadas) ? [] : [[inicioISO, fimISO], [hoje, fimProximos]]);
+  const agendasPorLink = usarAgendasPorLink(area !== "empresa" && funcaoLigada("calendario", desligadas));
   const gerar = useMemo(() => (de: string, ate: string) => {
-    const locais = itensDoCalendario({ eventos, tarefas, habitos, datas, revisoes, metas, recorrentes, contas: contasFinanceiras }, de, ate);
+    const locais = itensDoCalendario({
+      eventos: eventosDoEscopo,
+      tarefas: tarefasDoEscopo,
+      habitos: area === "empresa" ? [] : habitos,
+      datas: area === "empresa" ? [] : datas,
+      revisoes: area === "empresa" ? [] : revisoes,
+      metas: area === "empresa" ? [] : metas,
+      recorrentes: area === "empresa" ? [] : recorrentes,
+      contas: area === "empresa" ? [] : contasFinanceiras,
+    }, de, ate);
     const google: Item[] = agendaGoogle.eventos.filter((e) => e.data >= de && e.data <= ate).map((e) => ({ id: `google-${e.id}`, titulo: e.titulo, data: e.data, hora: e.hora, fonte: "google", link: e.link }));
     const porLink: Item[] = agendasPorLink.eventos.filter((e) => e.data >= de && e.data <= ate).map((e) => ({ id: `agenda-${e.id}`, titulo: e.titulo, data: e.data, hora: e.hora, fonte: "agendas" }));
     return [...locais, ...google, ...porLink].filter((i) => fontes[i.fonte]).sort((a, b) => `${a.data}${a.hora ?? "99"}`.localeCompare(`${b.data}${b.hora ?? "99"}`));
-  }, [eventos, tarefas, habitos, datas, revisoes, metas, recorrentes, contasFinanceiras, fontes, desligadas, agendaGoogle.eventos, agendasPorLink.eventos]);
+  }, [area, eventosDoEscopo, tarefasDoEscopo, habitos, datas, revisoes, metas, recorrentes, contasFinanceiras, fontes, desligadas, agendaGoogle.eventos, agendasPorLink.eventos]);
   const itens = useMemo(() => gerar(inicioISO, fimISO), [gerar, inicioISO, fimISO]);
   const proximosTodos = useMemo(() => gerar(hoje, fimProximos), [gerar, hoje, fimProximos]);
   const proximos = proximosTodos.filter((i) => !repeteTodoDia(i));
@@ -343,7 +359,7 @@ export default function Calendario() {
   const exportarIcs = () => {
     const agoraIcs = new Date().toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
     const regra: Record<Repeticao, string> = { nenhuma: "", diaria: "RRULE:FREQ=DAILY", semanal: "RRULE:FREQ=WEEKLY", mensal: "RRULE:FREQ=MONTHLY" };
-    const corpo = eventos.map((e) => {
+    const corpo = eventosDoEscopo.map((e) => {
       const data = e.data.replace(/-/g, "");
       const inicio = e.hora ? `DTSTART:${data}T${e.hora.replace(":", "")}00` : `DTSTART;VALUE=DATE:${data}`;
       const excecoes = e.repeticao !== "nenhuma" ? (e.excecoes ?? []).map((x) => (e.hora ? `EXDATE:${x.replace(/-/g, "")}T${e.hora.replace(":", "")}00` : `EXDATE;VALUE=DATE:${x.replace(/-/g, "")}`)) : [];
@@ -358,7 +374,7 @@ export default function Calendario() {
       const eventosImportados = lerEventosIcs(texto);
       let n = 0;
       for (const { excecoes, ...evento } of eventosImportados) {
-        const criado = criarEvento(evento);
+        const criado = criarEvento({ ...evento, area });
         if (evento.repeticao !== "nenhuma" && excecoes.length) atualizarEvento(criado.id, { excecoes });
         n++;
       }
@@ -371,7 +387,7 @@ export default function Calendario() {
   const criarRapido = () => {
     const { titulo, hora, repeticao } = lerEventoRapido(rapido);
     if (!titulo) return;
-    criarEvento({ titulo: titulo.slice(0, 120), data: diaSelecionado, hora, tipo: "evento", repeticao });
+    criarEvento({ titulo: titulo.slice(0, 120), data: diaSelecionado, hora, tipo: "evento", repeticao, area });
     setRapido("");
     avisar(T.calendario.criado(titulo));
   };
@@ -381,7 +397,7 @@ export default function Calendario() {
     if (!atual) return;
     const r = editarEvento(atual, alvo.ocorrencia, novos, escolha);
     atualizarEvento(atual.id, r.atualizar);
-    if (r.criar) criarEvento(r.criar);
+    if (r.criar) criarEvento({ ...r.criar, area: r.criar.area ?? atual.area });
     avisar(aviso);
   };
 
@@ -399,7 +415,7 @@ export default function Calendario() {
     const alvo = edicao;
     fecharForm();
     if (!alvo) {
-      criarEvento(novos);
+      criarEvento({ ...novos, area });
       return;
     }
     if (!mudouAlgo(alvo.evento, alvo.ocorrencia, novos)) return;
@@ -415,7 +431,7 @@ export default function Calendario() {
   const moverPara = (i: Item, destino: string) => {
     if (!i.evento || destino === i.data) return;
     const e = i.evento;
-    pedirOuAplicar({ evento: e, ocorrencia: i.data }, { titulo: e.titulo, data: destino, hora: e.hora, tipo: e.tipo, repeticao: e.repeticao }, T.calendario.escopoMover(e.titulo), T.calendario.movido(e.titulo));
+    pedirOuAplicar({ evento: e, ocorrencia: i.data }, { titulo: e.titulo, data: destino, hora: e.hora, tipo: e.tipo, repeticao: e.repeticao, area: e.area }, T.calendario.escopoMover(e.titulo), T.calendario.movido(e.titulo));
     setDiaSelecionado(destino);
   };
 
@@ -540,7 +556,7 @@ export default function Calendario() {
     <>
       <CabecalhoAba
         titulo={titulo}
-        subtitulo={T.calendario.subtitulo}
+        subtitulo={area === "empresa" ? T.calendario.subtituloEmpresa : T.calendario.subtitulo}
         acoes={
           <div className="cl-acoes">
             <div className="cl-acoes-linha">
@@ -549,7 +565,7 @@ export default function Calendario() {
                 {T.calendario.importarIcs}
                 <input type="file" accept=".ics,text/calendar" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) void importarIcs(f); e.target.value = ""; }} />
               </label>
-              <button type="button" className="cl-botao-ics" onClick={exportarIcs} disabled={eventos.length === 0}>
+              <button type="button" className="cl-botao-ics" onClick={exportarIcs} disabled={eventosDoEscopo.length === 0}>
                 <Download size={12} />
                 {T.calendario.exportarIcs}
               </button>
@@ -569,7 +585,7 @@ export default function Calendario() {
 
       <section className="cl-fontes" role="group" aria-label={T.calendario.mostrar}>
         <span className="cl-fontes-rotulo">{T.calendario.mostrar}</span>
-        {FONTES.filter((f) => funcaoLigada(FUNCAO_DA_FONTE[f], desligadas)).filter((f) => f !== "habitos" || habitos.some((h) => !h.arquivado && h.hora)).filter((f) => f !== "google" || agendaGoogle.situacao !== "desligada").filter((f) => f !== "agendas" || agendasPorLink.ligada).map((f) => (
+        {FONTES.filter((f) => area === "empresa" ? f === "eventos" : funcaoLigada(FUNCAO_DA_FONTE[f], desligadas)).filter((f) => f !== "habitos" || habitos.some((h) => !h.arquivado && h.hora)).filter((f) => f !== "google" || agendaGoogle.situacao !== "desligada").filter((f) => f !== "agendas" || agendasPorLink.ligada).map((f) => (
           <button key={f} type="button" className="cl-fonte" style={corDa(f)} aria-pressed={fontes[f]} onClick={() => setFontes({ ...fontes, [f]: !fontes[f] })}>
             <span className="cl-ponto" />
             {T.calendario.fontes[f]}

@@ -7,7 +7,7 @@ import { conexaoEmTestes } from "../utilitarios/disponibilidadeConexoes";
 
 export const SERVICOS: ServicoId[] = [
   "stripe", "github", "vercel", "google", "supabase", "cloudflare", "resend", "notion", "calcom", "n8n",
-  "email", "calendario", "linear", "jira", "trello", "railway", "discord", "reddit", "strava", "cripto",
+  "email", "calendario", "outlook", "linear", "jira", "trello", "railway", "discord", "reddit", "strava", "cripto",
 ];
 
 export type CategoriaServico = "pagamentos" | "codigo" | "deploy" | "produtividade" | "comunicacao" | "pessoal";
@@ -33,6 +33,7 @@ export const CATEGORIA_SERVICO: Record<ServicoId, CategoriaServico> = {
   calendario: "pessoal",
   strava: "pessoal",
   cripto: "pagamentos",
+  outlook: "comunicacao",
 };
 
 export const INTERVALO_PADRAO: Record<ServicoId, number> = {
@@ -56,6 +57,7 @@ export const INTERVALO_PADRAO: Record<ServicoId, number> = {
   email: 120,
   calendario: 900,
   cripto: 60,
+  outlook: 120,
 };
 
 function conexaoInicial(id: ServicoId): Conexao {

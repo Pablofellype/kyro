@@ -8,7 +8,7 @@ import { useInterface } from "../../estado/interface";
 import { useConfig } from "../../estado/configuracoes";
 import { T } from "../../textos/textos";
 import { horarioRelativo } from "../../utilitarios/datas";
-import { conexoesPonte, resumoDe, LINKS_DO_GUIA, SERVICOS_DO_GOOGLE } from "../../ponte/conexoesReais";
+import { conexoesPonte, resumoDe, LINKS_DO_GUIA, SERVICOS_DO_GOOGLE, SERVICOS_DO_MICROSOFT } from "../../ponte/conexoesReais";
 import { atualizarConexaoAgora } from "../../servicos/servicos";
 import { tocarSom } from "../../ponte/sons";
 import type { NivelDeAvisosDaConexao, ServicoId } from "../../tipos";
@@ -98,6 +98,7 @@ function Configurar({ servico, aoFechar }: { servico: ServicoId | null; aoFechar
   const nome = T.conexoes.servicos[servico].nome;
   if (conexaoEmTestes(servico)) return <Modal aberto titulo={nome} aoFechar={aoFechar}><AvisoFaixa>{T.conexoes.emTestesDica}</AvisoFaixa></Modal>;
   const doGoogle = SERVICOS_DO_GOOGLE.includes(servico);
+  const doMicrosoft = SERVICOS_DO_MICROSOFT.includes(servico);
   const loginSimples = servico === "google" && loginDisponivel && !clienteProprio;
   const fixadas = conexoes.filter((c) => c.fixadaNaIlha).length;
 
@@ -107,7 +108,11 @@ function Configurar({ servico, aoFechar }: { servico: ServicoId | null; aoFechar
       setErro(T.conexoes.clienteIdInvalido);
       return;
     }
-    if (!comCampos && !loginSimples && chave.trim().length < 8) {
+    if (doMicrosoft && !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(clienteId.trim())) {
+      setErro(T.conexoes.clienteIdMicrosoftInvalido);
+      return;
+    }
+    if (!comCampos && !loginSimples && !doMicrosoft && chave.trim().length < 8) {
       setErro(T.conexoes.chaveCurta);
       return;
     }
@@ -116,11 +121,11 @@ function Configurar({ servico, aoFechar }: { servico: ServicoId | null; aoFechar
     setErro("");
     try {
       if (comCampos) await conexoesPonte.salvarChave(servico, String(valores.chave ?? "").trim(), valores);
-      else await conexoesPonte.salvarChave(servico, loginSimples ? "" : chave.trim(), loginSimples ? {} : servico === "n8n" ? { url: url.trim() } : doGoogle ? { clienteId: clienteId.trim(), segredo: chave.trim() } : {});
+      else await conexoesPonte.salvarChave(servico, loginSimples || doMicrosoft ? "" : chave.trim(), loginSimples ? {} : servico === "n8n" ? { url: url.trim() } : doGoogle ? { clienteId: clienteId.trim(), segredo: chave.trim() } : doMicrosoft ? { clienteId: clienteId.trim() } : {});
       setChave("");
       const dados = await conexoesPonte.ler(servico, true);
       atualizar(servico, { chaveSalva: true, ligada: true, status: "conectado", ultimaAtualizacao: new Date().toISOString(), resumo: resumoDe(servico, dados) });
-      avisar(doGoogle ? T.conexoes.googleConectado : T.conexoes.chaveSalva);
+      avisar(doGoogle ? T.conexoes.googleConectado : doMicrosoft ? T.conexoes.microsoftConectado : T.conexoes.chaveSalva);
       void tocarSom("approve");
     } catch (e) {
       setErro(doGoogle ? T.conexoes.falhaLoginGoogle((e as Error).message) : T.conexoes.falhaChave(mensagemDeErroDaConexao((e as Error).message)));
@@ -139,9 +144,9 @@ function Configurar({ servico, aoFechar }: { servico: ServicoId | null; aoFechar
           <span>{T.conexoes.permissoes[servico]}</span>
         </AvisoFaixa>
         {!loginSimples && !verificandoLogin && <GuiaConexao servico={servico} />}
-        {doGoogle && !loginSimples && !verificandoLogin && (
+        {(doGoogle || doMicrosoft) && !loginSimples && !verificandoLogin && (
           <>
-            <Campo id="cx-cliente" rotulo={T.conexoes.clienteId} dica={T.conexoes.clienteIdDica}>
+            <Campo id="cx-cliente" rotulo={T.conexoes.clienteId} dica={doMicrosoft ? T.conexoes.clienteIdMicrosoftDica : T.conexoes.clienteIdDica}>
               <input id="cx-cliente" className="campo" autoComplete="off" spellCheck={false} value={clienteId} onChange={(e) => setClienteId(e.target.value)} />
             </Campo>
           </>
@@ -153,7 +158,7 @@ function Configurar({ servico, aoFechar }: { servico: ServicoId | null; aoFechar
         )}
         {comCampos && <CamposDaConexao servico={servico} salva={salva} valores={valores} mudar={(parcial) => { setValores((v) => ({ ...v, ...parcial })); setErro(""); }} />}
         {comCampos && erro && <AvisoFaixa tipo="erro"><span role="alert">{erro}</span></AvisoFaixa>}
-        {!comCampos && !loginSimples && !verificandoLogin && <Campo id="cx-chave" rotulo={doGoogle ? T.conexoes.segredoCliente : T.conexoes.chave} erro={erro} dica={doGoogle ? T.conexoes.gmailDica : T.conexoes.chaveDica}>
+        {!comCampos && !loginSimples && !doMicrosoft && !verificandoLogin && <Campo id="cx-chave" rotulo={doGoogle ? T.conexoes.segredoCliente : T.conexoes.chave} erro={erro} dica={doGoogle ? T.conexoes.gmailDica : T.conexoes.chaveDica}>
           <input
             id="cx-chave"
             className="campo"
@@ -170,9 +175,10 @@ function Configurar({ servico, aoFechar }: { servico: ServicoId | null; aoFechar
           />
         </Campo>}
         {loginSimples && erro && <AvisoFaixa tipo="erro"><span role="alert">{erro}</span></AvisoFaixa>}
+        {doMicrosoft && erro && <AvisoFaixa tipo="erro"><span role="alert">{erro}</span></AvisoFaixa>}
         <div className="linha">
-          <Botao type="submit" variante="primario" icone={loginSimples ? <Marca marca="google" tamanho={14} /> : servico === "strava" ? <Marca marca="strava" tamanho={14} /> : <KeyRound size={14} />} disabled={testando || verificandoLogin || (!comCampos && !loginSimples && !chave.trim())}>
-            {verificandoLogin ? T.conexoes.verificandoLoginGoogle : testando ? (doGoogle || servico === "strava" ? T.conexoes.aguardandoGoogle : T.conexoes.testando) : loginSimples ? T.conexoes.entrarGoogle : doGoogle ? T.conexoes.conectarGoogle : servico === "strava" ? T.conexoes.campos.conectarStrava : T.conexoes.salvarChave}
+          <Botao type="submit" variante="primario" icone={loginSimples ? <Marca marca="google" tamanho={14} /> : doMicrosoft ? <Marca marca="outlook" tamanho={14} /> : servico === "strava" ? <Marca marca="strava" tamanho={14} /> : <KeyRound size={14} />} disabled={testando || verificandoLogin || (!comCampos && !loginSimples && ((doMicrosoft && !clienteId.trim()) || (!doMicrosoft && !chave.trim())))}>
+            {verificandoLogin ? T.conexoes.verificandoLoginGoogle : testando ? (doGoogle || doMicrosoft || servico === "strava" ? T.conexoes.aguardandoGoogle : T.conexoes.testando) : loginSimples ? T.conexoes.entrarGoogle : doGoogle ? T.conexoes.conectarGoogle : doMicrosoft ? T.conexoes.conectarMicrosoft : servico === "strava" ? T.conexoes.campos.conectarStrava : T.conexoes.salvarChave}
           </Botao>
           {conexao.chaveSalva && (
             <Botao

@@ -221,8 +221,8 @@ export function Ilha() {
 
   const desligadas = useConfig((s) => s.funcoesDesligadas);
   const comAvisos = agentes.alertas.length > 0 || (estado === "expandida" && aba === "avisos");
-  const whatsappLigado = usarAvisosDoWhatsapp();
-  const abas = cfg.ordemAbas.filter((a) => cfg.blocos[a] && (a !== "avisos" || comAvisos) && (a !== "whatsapp" || whatsappLigado) && abaLigada(a, desligadas));
+  usarAvisosDoWhatsapp();
+  const abas = cfg.ordemAbas.filter((a) => cfg.blocos[a] && (a !== "avisos" || comAvisos) && abaLigada(a, desligadas));
   const capturaDisponivel = tiposDeCapturaLigados(desligadas).length > 0;
   const abaAtual: VisaoIlha = aba === "captura" && capturaDisponivel ? "captura" : abas.includes(aba as AbaIlha) ? aba : abas[0] ?? "hoje";
   const abaAntesDaCaptura = useRef<AbaIlha>("hoje");

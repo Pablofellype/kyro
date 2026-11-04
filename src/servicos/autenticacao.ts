@@ -203,6 +203,21 @@ export async function solicitarRedefinicaoSenha(emailRecebido: string, urlBase: 
   }
 }
 
+export async function validarTokenAcesso(tokenRecebido: string) {
+  if (!/^[a-f0-9]{64}$/i.test(tokenRecebido)) throw new Error("token_invalido");
+  const sql = getDb();
+  const tokenHash = hashToken(tokenRecebido);
+  const tokens = await sql`
+    SELECT tipo, email, nome, expira_em, usado_em
+    FROM tokens_acesso
+    WHERE token_hash = ${tokenHash}
+    LIMIT 1
+  `;
+  const acesso = tokens[0];
+  if (!acesso || acesso.usado_em || new Date(acesso.expira_em).getTime() <= Date.now()) throw new Error("token_expirado");
+  return { tipo: acesso.tipo === "convite" ? "convite" as const : "recuperar" as const, email: acesso.email, nome: acesso.nome ?? "" };
+}
+
 export async function criarConviteUsuario(dono: UsuarioAutenticadoServidor, emailRecebido: string, nomeRecebido: string, urlBase: string) {
   if (dono.perfil !== "dono") throw new Error("permissao_negada");
   const sql = getDb();

@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Mail, Lock, Eye, EyeOff, LoaderCircle, AlertCircle, ArrowRight, ShieldCheck, Download, Activity, Check, Sparkles } from "lucide-react";
 import { cabecalhosNiko, useAuth, urlApi } from "../../estado/autenticacao";
 import { Botao, Modal } from "../../componentes/basicos";
@@ -10,6 +10,16 @@ import "./login.css";
 
 interface Props {
   aoSucesso?: () => void;
+}
+
+function mensagemDoErroDeAcesso(erro: string) {
+  const mensagens: Record<string, string> = {
+    token_invalido: "Este link de acesso está incompleto ou inválido.",
+    token_expirado: "Este link expirou ou já foi usado. Peça ao administrador para enviar um novo convite.",
+    email_nao_configurado: "O envio de e-mail ainda não está configurado no servidor.",
+    email_nao_enviado: "Não foi possível enviar o e-mail agora. Verifique a configuração do servidor.",
+  };
+  return mensagens[erro] ?? erro;
 }
 
 export function TelaLogin({ aoSucesso }: Props) {
@@ -30,8 +40,32 @@ export function TelaLogin({ aoSucesso }: Props) {
   const [mensagemAcesso, setMensagemAcesso] = useState("");
   const [erroAcesso, setErroAcesso] = useState("");
   const [carregandoAcesso, setCarregandoAcesso] = useState(false);
+  const [validandoAcesso, setValidandoAcesso] = useState(Boolean(tokenAcesso));
+  const [acessoValido, setAcessoValido] = useState(!tokenAcesso);
 
   const definirUsuario = useAuth((s) => s.definirUsuario);
+
+  useEffect(() => {
+    if (!tokenAcesso) return;
+    let ativo = true;
+    setValidandoAcesso(true);
+    setAcessoValido(false);
+    void fetch(urlApi(`/api/auth?acao=validar-acesso&token=${encodeURIComponent(tokenAcesso)}`), { headers: cabecalhosNiko() })
+      .then(async (res) => {
+        const dados = await res.json().catch(() => ({})) as { acesso?: { email?: string }; erro?: string };
+        if (!res.ok || !dados.acesso) throw new Error(dados.erro || "token_invalido");
+        if (!ativo) return;
+        setAcessoValido(true);
+        if (dados.acesso.email && fluxoAcesso === "recuperar") setEmailAcesso(dados.acesso.email);
+      })
+      .catch((erro) => {
+        if (!ativo) return;
+        setAcessoValido(false);
+        setErroAcesso(erro instanceof Error ? erro.message : "token_invalido");
+      })
+      .finally(() => { if (ativo) setValidandoAcesso(false); });
+    return () => { ativo = false; };
+  }, [tokenAcesso, fluxoAcesso]);
 
   const testarConexao = async () => {
     setTestandoConexao(true);
@@ -86,6 +120,10 @@ export function TelaLogin({ aoSucesso }: Props) {
     e.preventDefault();
     setMensagemAcesso("");
     setErroAcesso("");
+    if (!tokenAcesso || !acessoValido) {
+      setErroAcesso("Este link de acesso não é válido. Peça um novo convite ao administrador.");
+      return;
+    }
     if (senhaNova !== senhaNovaConfirmacao) {
       setErroAcesso("As senhas não são iguais.");
       return;
@@ -655,7 +693,7 @@ export function TelaLogin({ aoSucesso }: Props) {
               />
             </label>
             {mensagemAcesso && <div className="kyro-login-acesso-mensagem" role="status">{mensagemAcesso}</div>}
-            {erroAcesso && <div className="kyro-login-acesso-erro" role="alert"><AlertCircle size={15} /> {erroAcesso}</div>}
+            {erroAcesso && <div className="kyro-login-acesso-erro" role="alert"><AlertCircle size={15} /> {mensagemDoErroDeAcesso(erroAcesso)}</div>}
             <div className="kyro-login-acesso-acoes">
               <Botao type="button" onClick={() => setFluxoAcesso(null)} disabled={carregandoAcesso}>Voltar</Botao>
               <Botao type="submit" variante="primario" disabled={carregandoAcesso || !emailAcesso.trim()}>
@@ -678,10 +716,11 @@ export function TelaLogin({ aoSucesso }: Props) {
               <input id="confirmar-senha" type="password" className="campo" value={senhaNovaConfirmacao} onChange={(e) => setSenhaNovaConfirmacao(e.target.value)} autoComplete="new-password" minLength={10} required />
             </label>
             {mensagemAcesso && <div className="kyro-login-acesso-mensagem" role="status">{mensagemAcesso}</div>}
-            {erroAcesso && <div className="kyro-login-acesso-erro" role="alert"><AlertCircle size={15} /> {erroAcesso}</div>}
+            {validandoAcesso && <div className="kyro-login-acesso-mensagem" role="status">Verificando o link de acesso...</div>}
+            {erroAcesso && <div className="kyro-login-acesso-erro" role="alert"><AlertCircle size={15} /> {mensagemDoErroDeAcesso(erroAcesso)}</div>}
             <div className="kyro-login-acesso-acoes">
               <Botao type="button" onClick={() => setFluxoAcesso(null)} disabled={carregandoAcesso}>Cancelar</Botao>
-              <Botao type="submit" variante="primario" disabled={carregandoAcesso}>
+              <Botao type="submit" variante="primario" disabled={carregandoAcesso || validandoAcesso || !acessoValido}>
                 {carregandoAcesso ? <LoaderCircle size={15} className="girando" /> : "Salvar senha"}
               </Botao>
             </div>

@@ -66,6 +66,22 @@ function comandosSugeridos(texto: string): string[] {
   return [...new Set([...texto.matchAll(COMANDO_SUGERIDO)].map((m) => m[1].trim().replace(/[.,;:]+$/, "")))].slice(0, 4);
 }
 
+function escaparRegExp(texto: string): string {
+  return texto.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function textoSemNomesDosPersonagens(texto: string, nomes: readonly string[]): string {
+  const nomesValidos = [...new Set([...nomes, "Rubi", "Nanquim", "Sol", "Java"])]
+    .filter((nome) => nome.trim())
+    .sort((a, b) => b.length - a.length)
+    .map(escaparRegExp);
+  if (nomesValidos.length === 0) return texto;
+  const prefixo = new RegExp(`^\\s*(?:\\*{1,2})?(?:${nomesValidos.join("|")})(?:\\*{1,2})?\\s*:\\s*`, "iu");
+  return texto.split("\n")
+    .map((linha) => linha.replace(prefixo, "").replace(/^\s*(?:\*{1,2}|_{2})\s+/, ""))
+    .join("\n");
+}
+
 function BotaoCopiar({ texto }: { texto: string }) {
   const [copiado, setCopiado] = useState(false);
   return (
@@ -89,11 +105,12 @@ function BotaoCopiar({ texto }: { texto: string }) {
   );
 }
 
-const MensagemChat = memo(function MensagemChat({ conversaId, m, nome, cargo, ultima, dia }: { conversaId: string; m: Mensagem; nome: string; cargo: string; ultima: boolean; dia?: string }) {
+const MensagemChat = memo(function MensagemChat({ conversaId, m, nome, cargo, ultima, dia, nomesDosPersonagens, empresa }: { conversaId: string; m: Mensagem; nome: string; cargo: string; ultima: boolean; dia?: string; nomesDosPersonagens?: readonly string[]; empresa?: boolean }) {
   const ocupado = useConversando((s) => s.fase !== null);
   const doAgente = m.autor === "agente";
   const sugeridos = doAgente ? comandosSugeridos(m.texto) : [];
   const hora = formatar(m.criadaEm, "HH:mm");
+  const textoVisivel = empresa ? textoSemNomesDosPersonagens(m.texto, nomesDosPersonagens ?? []) : m.texto;
   return (
     <motion.div className="chat-msg-bloco" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
       {dia && <div className="chat-dia"><span>{dia}</span></div>}
@@ -115,7 +132,7 @@ const MensagemChat = memo(function MensagemChat({ conversaId, m, nome, cargo, ul
           {m.texto && (
             <div className={`chat-msg-texto privado${m.erro ? " chat-msg-erro" : ""}`}>
               {m.erro && <AlertTriangle size={14} className="chat-msg-erro-icone" />}
-              {doAgente ? <TextoRico texto={m.texto} /> : m.texto}
+              {doAgente ? <TextoRico texto={textoVisivel} /> : m.texto}
             </div>
           )}
           {m.detalhe && (
@@ -163,14 +180,14 @@ const MensagemChat = memo(function MensagemChat({ conversaId, m, nome, cargo, ul
   );
 });
 
-function RespostaAoVivo({ conversaId }: { conversaId: string }) {
+function RespostaAoVivo({ conversaId, empresa }: { conversaId: string; empresa?: boolean }) {
   const doChat = useConversando((s) => s.conversaId === conversaId);
   const parcial = useConversando((s) => s.parcial);
   const agente = useConversando((s) => s.agente);
   const fase = useConversando((s) => s.fase);
   const nomes = useConfig((s) => s.agentes.nomes);
   if (!doChat || !agente) return null;
-  if (!parcial || fase !== "respondendo") return <div className="chat-msg-roleta"><EscolhaDoAgente /></div>;
+  if (!parcial || fase !== "respondendo") return <div className="chat-msg-roleta"><EscolhaDoAgente ocultarNome={empresa} /></div>;
   return (
     <div className="chat-msg chat-msg-agente chat-msg-viva" data-agente={agente}>
       <span className="chat-msg-avatar">
@@ -178,7 +195,7 @@ function RespostaAoVivo({ conversaId }: { conversaId: string }) {
       </span>
       <div className="chat-msg-corpo">
         <div className="chat-msg-cabeca">
-          <b>{nomes[agente]}</b>
+          <b>{empresa ? NOME_KYRO : nomes[agente]}</b>
           <span className="chat-msg-cargo chat-msg-respondendo">{T.chat.estaRespondendo}</span>
         </div>
         <div className="chat-msg-texto"><TextoRico texto={parcial} /></div>
@@ -200,11 +217,12 @@ function RolarParaFim({ alvo, conversaId, quantidade }: { alvo: React.RefObject<
   return null;
 }
 
-function previaDaConversa(c: Conversa): string {
+function previaDaConversa(c: Conversa, empresa = false, nomesDosPersonagens: readonly string[] = []): string {
   const ultima = c.mensagens[c.mensagens.length - 1];
   if (!ultima) return "";
-  const texto = (ultima.texto || ultima.anexos?.map((a) => a.nome).join(", ") || "").replace(/\s+/g, " ").trim();
-  return ultima.autor === "agente" ? `${NOME_KYRO}: ${texto}` : texto;
+  const textoBruto = ultima.texto || ultima.anexos?.map((a) => a.nome).join(", ") || "";
+  const textoVisivel = (empresa ? textoSemNomesDosPersonagens(textoBruto, nomesDosPersonagens) : textoBruto).replace(/\s+/g, " ").trim();
+  return ultima.autor === "agente" ? `${NOME_KYRO}: ${textoVisivel}` : textoVisivel;
 }
 
 export default function Chat() {
@@ -237,6 +255,9 @@ export default function Chat() {
   const anexos = useAnexos(avisar);
   const arrastando = useArrastarArquivos(principal, anexos.adicionar);
   const mascote = texto.trim() ? escolherAgente(texto) : favorito;
+  const empresa = area === "empresa";
+  const nomesDosPersonagens = useMemo(() => [...new Set([...Object.values(nomes), "Rubi", "Nanquim", "Sol", "Java"])], [nomes]);
+  const cargoDoChat = empresa ? "Coordenação da empresa" : CARGO_KYRO;
 
   useEffect(() => {
     void provedoresEmOrdem().then(setFila);
@@ -273,17 +294,19 @@ export default function Chat() {
 
   const digitandoAlgo = texto.length > 0;
   useEffect(() => {
+    if (empresa) return;
     AGENTES.forEach((a) => ouvir(a, digitandoAlgo));
     return () => AGENTES.forEach((a) => ouvir(a, false));
-  }, [digitandoAlgo, ouvir]);
+  }, [digitandoAlgo, empresa, ouvir]);
 
   const [ativoMencao, setAtivoMencao] = useState(0);
   const mencoes = useMemo(() => {
+    if (empresa) return [];
     const m = /(^|\s)@([\p{L}\d]*)$/u.exec(texto);
     if (!m) return [];
     const alvo = normalizarTexto(m[2]);
     return AGENTES.filter((a) => normalizarTexto(nomes[a]).startsWith(alvo) || normalizarTexto(cargos[a]).includes(alvo));
-  }, [texto, nomes, cargos]);
+  }, [empresa, texto, nomes, cargos]);
 
   useEffect(() => setAtivoMencao(0), [mencoes.length]);
 
@@ -322,7 +345,10 @@ export default function Chat() {
 
   const exportar = () => {
     if (!atual) return;
-    const md = [`# ${atual.titulo || T.chat.novaConversa}`, "", ...atual.mensagens.map((m) => `**${m.autor === "usuario" ? T.barraLateral.perfil : nomes[m.agenteId]}** (${formatar(m.criadaEm, "dd/MM HH:mm")})\n\n${m.texto}\n`)].join("\n");
+    const md = [`# ${atual.titulo || T.chat.novaConversa}`, "", ...atual.mensagens.map((m) => {
+      const texto = empresa ? textoSemNomesDosPersonagens(m.texto, nomesDosPersonagens) : m.texto;
+      return `**${m.autor === "usuario" ? T.barraLateral.perfil : empresa ? NOME_KYRO : nomes[m.agenteId]}** (${formatar(m.criadaEm, "dd/MM HH:mm")})\n\n${texto}\n`;
+    })].join("\n");
     void exportarArquivo(`conversa-${atual.id.slice(0, 8)}.md`, md, { tipo: "text/markdown" });
   };
 
@@ -390,7 +416,7 @@ export default function Chat() {
                         <span className="chat-conversa-titulo">{c.titulo || T.chat.novaConversa}</span>
                         <span className="chat-conversa-hora">{horaDaConversa(c.atualizadaEm)}</span>
                       </span>
-                      <span className="chat-conversa-previa privado">{previaDaConversa(c)}</span>
+                    <span className="chat-conversa-previa privado">{previaDaConversa(c, empresa, nomesDosPersonagens)}</span>
                     </span>
                   </button>
                 ))}
@@ -415,7 +441,7 @@ export default function Chat() {
             </div>
             <div className="chat-cabecalho-texto">
               <b className="cortar">{atual?.titulo || T.chat.tituloTime}</b>
-              <span className="chat-cabecalho-sub">{area === "pessoal" ? "Seu assistente para organizar a rotina." : `${NOME_KYRO} · ${T.chat.funcionaSemIa}`}</span>
+              <span className="chat-cabecalho-sub">{empresa ? `Coordenação da empresa · ${T.chat.funcionaSemIa}` : "Seu assistente para organizar a rotina."}</span>
             </div>
           </div>
           {atual && (
@@ -470,7 +496,7 @@ export default function Chat() {
                   <motion.div className="chat-inicio-agente" data-agente={mascote} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
                     <PersonagemKyro tamanho={84} />
                     <b>{NOME_KYRO}</b>
-                    <span>{CARGO_KYRO}</span>
+                    <span>{empresa ? "Coordenação da empresa" : CARGO_KYRO}</span>
                   </motion.div>
                 </div>
                 <p className="chat-inicio-texto">{provedor ? T.chat.boasVindasIa : T.chat.boasVindasSemIa}</p>
@@ -494,7 +520,9 @@ export default function Chat() {
                       conversaId={atual.id}
                       m={m}
                       nome={NOME_KYRO}
-                      cargo={CARGO_KYRO}
+                      cargo={cargoDoChat}
+                      empresa={empresa}
+                      nomesDosPersonagens={nomesDosPersonagens}
                       ultima={i === atual.mensagens.length - 1}
                       dia={novoDia ? formatar(m.criadaEm, "EEEE, d 'de' MMMM") : undefined}
                     />
@@ -502,7 +530,7 @@ export default function Chat() {
                 })}
               </AnimatePresence>
             )}
-            {atual && <RespostaAoVivo conversaId={atual.id} />}
+            {atual && <RespostaAoVivo conversaId={atual.id} empresa={empresa} />}
             <div ref={fim} />
             <RolarParaFim alvo={fim} conversaId={atualId} quantidade={atual?.mensagens.length ?? 0} />
           </div>
@@ -612,7 +640,7 @@ export default function Chat() {
                   <Paperclip size={14} />
                 </button>
                 <button type="button" className="chat-barra-botao" title={T.chat.comandos} onClick={() => inserirNoCampo("/")}>{T.chat.botaoComandos}</button>
-                <button type="button" className="chat-barra-botao" title={T.chat.mencionar} onClick={() => inserirNoCampo("@")}>{T.chat.botaoAgente}</button>
+                {!empresa && <button type="button" className="chat-barra-botao" title={T.chat.mencionar} onClick={() => inserirNoCampo("@")}>{T.chat.botaoAgente}</button>}
                 {!provedor && (
                   <>
                     <span className="chat-barra-divisor" />

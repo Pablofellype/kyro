@@ -93,6 +93,15 @@ export interface DadosGoogle {
   falhas: Partial<Record<"gmail" | "agenda" | "drive" | "tarefas", FalhaGoogle>>;
 }
 
+export interface DadosOutlook {
+  email: string;
+  naoLidos: number;
+  total: number;
+  importantes: EmailResumo[];
+  recentes: EmailResumo[];
+  agenda: DadosAgenda;
+}
+
 export interface EventoGoogle {
   id: string;
   titulo: string;
@@ -248,6 +257,7 @@ export type DadosServico = {
   calendario: DadosCalendario;
   cripto: DadosCripto;
   google: DadosGoogle;
+  outlook: DadosOutlook;
   supabase: DadosSupabase;
   cloudflare: DadosCloudflare;
   stripe: DadosStripe;
@@ -303,6 +313,10 @@ export function resumoDe<S extends ServicoId>(servico: S, dados: DadosServico[S]
     case "google": {
       const g = d as DadosGoogle;
       return R.google(g.gmail?.naoLidos ?? null, g.agenda?.hoje ?? null, g.tarefas?.length ?? null);
+    }
+    case "outlook": {
+      const o = d as DadosOutlook;
+      return R.outlook(o.naoLidos, o.agenda.hoje);
     }
     case "supabase":
       return R.supabase((d as DadosSupabase).projetos.length, (d as DadosSupabase).projetos.reduce((a, p) => a + p.usuarios, 0));
@@ -387,6 +401,8 @@ export function ocorrenciasDe<S extends ServicoId>(servico: S, dados: DadosServi
       return (d as DadosResend).emails.filter((e) => e.estado === "devolvido" || e.estado === "spam").map((e) => ({ chave: `${e.para}-${e.data}`, texto: O.emailFalhou(e.para), tipo: "falha", data: e.data }));
     case "google":
       return ((d as DadosGoogle).gmail?.importantes ?? []).map((e) => ({ chave: e.id, texto: O.emailImportante(e.de, e.assunto), tipo: "sucesso" as const, data: e.data, aviso: "importante" as const }));
+    case "outlook":
+      return (d as DadosOutlook).importantes.map((e) => ({ chave: e.id, texto: O.emailImportante(e.de, e.assunto), tipo: "sucesso" as const, data: e.data, aviso: "importante" as const }));
     case "supabase":
       return (d as DadosSupabase).projetos.flatMap((p) => p.servicos.filter((x) => !x.saudavel).map((x) => ({ chave: `${p.ref}-${x.nome}-${new Date().toISOString().slice(0, 13)}`, texto: O.supabaseServico(p.nome, x.nome), tipo: "falha" as const, data: new Date().toISOString() })));
     case "cloudflare":
@@ -440,6 +456,7 @@ export function ocorrenciasDe<S extends ServicoId>(servico: S, dados: DadosServi
   }
 }
 export const SERVICOS_DO_GOOGLE: ServicoId[] = ["google"];
+export const SERVICOS_DO_MICROSOFT: ServicoId[] = ["outlook"];
 
 export const LINKS_DO_GUIA: Record<ServicoId, (string | null)[]> = {
   stripe: ["https://dashboard.stripe.com/apikeys", null, null, null],
@@ -457,6 +474,7 @@ export const LINKS_DO_GUIA: Record<ServicoId, (string | null)[]> = {
     "https://console.cloud.google.com/auth/clients",
     null,
   ],
+  outlook: ["https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade", "https://learn.microsoft.com/entra/identity-platform/scenario-desktop-app-registration", null, null],
   supabase: ["https://supabase.com/dashboard/account/tokens", null, null],
   cloudflare: ["https://dash.cloudflare.com/profile/api-tokens", null, null, null],
   linear: ["https://linear.app/settings/account/security", null, null],
@@ -480,6 +498,7 @@ export const PAINEL_OFICIAL: Record<ServicoId, string> = {
   calcom: "https://app.cal.com/bookings/upcoming",
   n8n: "https://n8n.io",
   google: "https://myaccount.google.com/",
+  outlook: "https://outlook.office.com/mail/",
   supabase: "https://supabase.com/dashboard/projects",
   cloudflare: "https://dash.cloudflare.com",
   linear: "https://linear.app",
