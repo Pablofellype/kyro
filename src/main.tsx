@@ -32,7 +32,6 @@ import "./estilos/telas/metas.css";
 import "./estilos/telas/calendario.css";
 import "./estilos/telas/atualizacao.css";
 import "./estilos/telas/ia.css";
-import "./estilos/telas/consumo.css";
 import "./estilos/telas/conquistas.css";
 import "./estilos/telas/configuracoes.css";
 import "./estilos/telas/busca.css";

@@ -1,10 +1,8 @@
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { PainelFuncoes } from "./PainelFuncoes";
 import { blocoLigado, conquistaLigada, funcaoLigada } from "../../utilitarios/funcoes";
-import { Plus, Timer, Wallet, Plug, Layers, Gauge, Trophy, CalendarDays, Users, ListTodo, SlidersHorizontal, ToggleRight, GripVertical, ArrowUpRight, Cpu, Play, Pause, RotateCcw, SkipForward } from "lucide-react";
+import { Plus, Timer, Wallet, Plug, Layers, Trophy, CalendarDays, Users, ListTodo, SlidersHorizontal, ToggleRight, GripVertical, ArrowUpRight, Play, Pause, RotateCcw, SkipForward } from "lucide-react";
 import { useMosaico } from "../../componentes/useMosaico";
-import { lerConsumo, type Consumo } from "../../ponte/ponteLocal";
-import { faltaPara, nivelDoUso, rotuloJanela } from "../../utilitarios/consumo";
 import { DndContext, closestCenter, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -36,9 +34,6 @@ function extra(i: number, base: number) {
   return i >= base ? "inicio-item-extra" : "";
 }
 
-const numeroCurto = new Intl.NumberFormat("pt-BR", { notation: "compact", maximumFractionDigits: 1 });
-const dolar = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "USD" });
-
 const ICONES: Record<BlocoInicio, ReactNode> = {
   time: <Users size={15} />,
   hoje: <ListTodo size={15} />,
@@ -46,7 +41,6 @@ const ICONES: Record<BlocoInicio, ReactNode> = {
   financas: <Wallet size={15} />,
   conexoes: <Plug size={15} />,
   revisoes: <Layers size={15} />,
-  consumo: <Gauge size={15} />,
   mapa: <CalendarDays size={15} />,
   conquistas: <Trophy size={15} />,
 };
@@ -58,7 +52,6 @@ const TITULO: Record<BlocoInicio, string> = {
   financas: T.inicio.financas,
   conexoes: T.inicio.conexoes,
   revisoes: T.inicio.revisoes,
-  consumo: T.inicio.consumo,
   mapa: T.inicio.mapa,
   conquistas: T.inicio.conquistas,
 };
@@ -491,127 +484,6 @@ function BlocoRevisoes({ numero }: { numero: string }) {
   );
 }
 
-function LimitesDosPlanos() {
-  const [dados, setDados] = useState<Consumo | null>(null);
-  const [falhou, setFalhou] = useState(false);
-
-  useEffect(() => {
-    let vivo = true;
-    const ler = () => {
-      if (document.hidden) return;
-      lerConsumo()
-        .then((d) => vivo && (setDados(d), setFalhou(false)))
-        .catch(() => vivo && setFalhou(true));
-    };
-    ler();
-    const t = window.setInterval(ler, 5 * 60000);
-    return () => {
-      vivo = false;
-      window.clearInterval(t);
-    };
-  }, []);
-
-  if (falhou && !dados) return <span className="inicio-nota">{T.consumo.ponteFora}</span>;
-  if (!dados) return <span className="inicio-nota">{T.geral.carregando}</span>;
-  const ferramentas = dados.ferramentas.filter((f) => f.situacao === "ok" && f.janelas.length > 0);
-
-  return (
-    <>
-      {dados.sessao && <span className="inicio-nota cortar">{T.inicio.sessaoAgora(dados.sessao.projeto, dados.sessao.mensagens)}</span>}
-      {ferramentas.map((f) => (
-        <div key={f.id} className="inicio-plano">
-          <div className="inicio-plano-topo">
-            <span className="inicio-plano-nome">{f.id === "claude" ? <Marca marca="anthropic" tamanho={14} /> : <Cpu size={14} />}<b>{f.nome}</b></span>
-            {f.plano && <span className="etiqueta">{f.plano}</span>}
-          </div>
-          {f.janelas.slice(0, 2).map((j) => (
-            <div key={j.id} className="inicio-plano-janela">
-              <div className="inicio-plano-linha">
-                <span className="cortar">{rotuloJanela(j.rotulo)}</span>
-                <b>{Math.round(j.usado)}%</b>
-              </div>
-              <Progresso valor={j.usado / 100} nivel={nivelDoUso(j.usado)} rotulo={rotuloJanela(j.rotulo)} />
-              <span className="inicio-legenda">{faltaPara(j.reiniciaEm)}</span>
-            </div>
-          ))}
-        </div>
-      ))}
-      {ferramentas.length === 0 && <span className="inicio-nota">{T.consumo.semJanelas}</span>}
-    </>
-  );
-}
-
-function BlocoConsumo({ numero }: { numero: string }) {
-  const uso = useComunicacao((s) => s.usoIa);
-  const consumo = useConfig((s) => s.consumo);
-  const nomes = useConfig((s) => s.agentes.nomes);
-  const irPara = useInterface((s) => s.irPara);
-  const mes = hojeISO().slice(0, 7);
-  const doMes = uso.filter((u) => u.data.startsWith(mes));
-  const tokens = somar(doMes, (u) => u.entrada + u.saida);
-  const temPreco = consumo.precoEntrada + consumo.precoSaida > 0;
-  const custo = somar(doMes, (u) => (u.entrada * consumo.precoEntrada + u.saida * consumo.precoSaida) / 1e6);
-  const porModeloMapa = new Map<string, number>();
-  for (const u of doMes) porModeloMapa.set(u.modelo, (porModeloMapa.get(u.modelo) ?? 0) + u.entrada + u.saida);
-  const porModelo = [...porModeloMapa].sort((a, b) => b[1] - a[1]).slice(0, 8);
-  const porAgente = AGENTES.map((a) => ({ rotulo: nomes[a], valor: somar(doMes.filter((u) => u.agenteId === a), (u) => u.entrada + u.saida) })).filter((b) => b.valor > 0);
-
-  return (
-    <>
-      <CabecalhoBloco numero={numero} id="consumo" />
-      {consumo.lerPlanos ? (
-        <div className="inicio-grupo inicio-planos">
-          <span className="rotulo-secao">{T.inicio.limitesPlanos}</span>
-          <LimitesDosPlanos />
-        </div>
-      ) : (
-        <div className="inicio-plano">
-          <span className="inicio-nota">{T.inicio.limitesDesligados}</span>
-          <Botao pequeno onClick={() => irPara("consumo")}>{T.consumo.ligarParte2}</Botao>
-        </div>
-      )}
-      {doMes.length > 0 ? (
-        <>
-          <div className="inicio-par">
-            <div className="inicio-numero">
-              <span className="numero-grande">{numeroCurto.format(tokens)}</span>
-              <span className="inicio-legenda">{T.inicio.tokensMes}</span>
-            </div>
-            {temPreco && (
-              <div className="inicio-numero">
-                <span className="numero-grande">{dolar.format(custo)}</span>
-                <span className="inicio-legenda">{T.inicio.custoMes}</span>
-              </div>
-            )}
-          </div>
-          {porAgente.length > 0 && (
-            <div className="inicio-grupo">
-              <span className="rotulo-secao">{T.inicio.porAgente}</span>
-              <BarrasHorizontais formatar={(v) => numeroCurto.format(v)} barras={porAgente} />
-            </div>
-          )}
-          {porModelo.length > 0 && (
-            <div className="inicio-grupo inicio-secao-extra">
-              <span className="rotulo-secao">{T.inicio.porModelo}</span>
-              {porModelo.map(([m, v]) => (
-                <div key={m} className="inicio-linha inicio-item-extra">
-                  <span className="cortar">{m}</span>
-                  <span className="inicio-valor-apagado">{numeroCurto.format(v)}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </>
-      ) : (
-        <span className="inicio-nota">{T.inicio.semUsoInicio}</span>
-      )}
-      <div className="inicio-rodape">
-        <BotaoIrPara rotulo={T.rotas.consumo} aoClicar={() => irPara("consumo")} />
-      </div>
-    </>
-  );
-}
-
 function BlocoMapa({ numero }: { numero: string }) {
   return (
     <>
@@ -667,7 +539,6 @@ const COMPONENTE: Record<Exclude<BlocoInicio, "time">, (p: { numero: string }) =
   financas: BlocoFinancas,
   conexoes: BlocoConexoes,
   revisoes: BlocoRevisoes,
-  consumo: BlocoConsumo,
   mapa: BlocoMapa,
   conquistas: BlocoConquistas,
 };

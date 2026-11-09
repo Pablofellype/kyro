@@ -3,14 +3,13 @@ import { DndContext, closestCenter, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
-  User, Palette, PanelTop, PanelBottom, CircleDot, Timer, Users, Volume2, Gauge, Maximize, Keyboard, EyeOff, Database, Terminal, Info, Code,
+  User, Palette, PanelTop, PanelBottom, CircleDot, Timer, Users, Volume2, Maximize, Keyboard, EyeOff, Database, Info, Code,
   GripVertical, Download, Upload, RotateCcw, Trash2, DatabaseBackup, Hand, Search, ArrowUpRight, LogOut, UserCog,
 } from "lucide-react";
 import { CabecalhoAba } from "../../componentes/CabecalhoAba";
 import { Botao, Campo, Modal, Segmentado, AvisoFaixa, LinhaAlternador, Alternador, ConfirmarModal } from "../../componentes/basicos";
-import { Personagem } from "../../personagens/Personagem";
 import { useConfig, BARRA_PADRAO, CATEGORIAS_DE_AVISO, ESCALAS_DO_DOCK, type ModoBorda, type Paleta, type Tema, type RepousoIlha, type AbaIlha, CONFIG_PADRAO } from "../../estado/configuracoes";
-import { useAgentes, AGENTES } from "../../estado/agentes";
+import { AGENTES } from "../../estado/agentes";
 import { useComunicacao } from "../../estado/comunicacao";
 import { useInterface } from "../../estado/interface";
 import { useAuth } from "../../estado/autenticacao";
@@ -29,8 +28,6 @@ import { DESTAQUE_SISTEMA } from "../../janelas/area-de-trabalho/usarTema";
 import { mudarTema } from "../../janelas/area-de-trabalho/mudarTema";
 import { EditorFoto } from "../../componentes/FotoPerfil";
 import { SeletorDeFundo } from "./SeletorDeFundo";
-import { SecaoClaudeCode } from "./SecaoClaudeCode";
-import { MapaDaIa } from "./MapaDaIa";
 import { SecaoAssistive } from "./SecaoAssistive";
 import { EditorDeAtalhos } from "./EditorDeAtalhos";
 import { HistoricoSincronia } from "./HistoricoSincronia";
@@ -43,7 +40,7 @@ import { NATIVO, usarMonitores } from "../../desktop/desktop";
 import { useTour } from "../../estado/tour";
 import { escolhaDoDock, opcoesDeMonitorDoDock } from "../../janelas/dock/monitores";
 import { pedirSaudacao } from "../../janelas/ilha/animacoes/pedirSaudacao";
-import type { EstadoAgente, Rota } from "../../tipos";
+import type { Rota } from "../../tipos";
 
 type Secao = keyof typeof T.configuracoes.secoes;
 
@@ -56,12 +53,10 @@ const ICONES: Record<Secao, React.ReactNode> = {
   pomodoro: <Timer size={13} />,
   agentes: <Users size={13} />,
   sons: <Volume2 size={13} />,
-  consumo: <Gauge size={13} />,
   tela: <Maximize size={13} />,
   atalhos: <Keyboard size={13} />,
   privacidade: <EyeOff size={13} />,
   dados: <Database size={13} />,
-  claude: <Terminal size={13} />,
   sobre: <Info size={13} />,
   desenvolvedor: <Code size={13} />,
   admin: <UserCog size={13} />,
@@ -320,7 +315,6 @@ export default function Configuracoes() {
   const monitores = usarMonitores();
   const avisar = useInterface((s) => s.avisar);
   const irPara = useInterface((s) => s.irPara);
-  const agentes = useAgentes();
   const memoria = useComunicacao((s) => s.memoria);
   const lembrar = useComunicacao((s) => s.lembrar);
   const esquecer = useComunicacao((s) => s.esquecer);
@@ -663,18 +657,6 @@ export default function Configuracoes() {
         <LinhaAjuste rotulo={T.configuracoes.inatividade} para="ag-ina">
           <input id="ag-ina" className="campo ajuste-valor ajuste-valor-numero" type="number" min={1} max={240} value={cfg.agentes.inatividadeMin} onChange={(e) => cfg.definir({ agentes: { ...cfg.agentes, inatividadeMin: numeroLimitado(e.target.value, 1, 240, 10) } })} />
         </LinhaAjuste>
-        <LinhaAjuste rotulo={T.configuracoes.semprePermitido} dica={cfg.ia.autoAprovar.length === 0 ? T.configuracoes.semprePermitidoVazio : undefined}>
-          {cfg.ia.autoAprovar.length > 0 && (
-            <div className="pilulas">
-              {cfg.ia.autoAprovar.map((tipo) => (
-                <button key={tipo} type="button" className="pilula" title={T.geral.excluir} onClick={() => cfg.definir({ ia: { ...cfg.ia, autoAprovar: cfg.ia.autoAprovar.filter((x) => x !== tipo) } })}>
-                  <code>{T.chat.permissao.acoes[tipo]}</code>
-                  <Trash2 size={12} />
-                </button>
-              ))}
-            </div>
-          )}
-        </LinhaAjuste>
         <GrupoAjuste titulo={T.configuracoes.memoria} dica={memoria.length === 0 ? T.configuracoes.semMemoria : undefined} />
         <div className="ajuste-bloco">
           {memoria.length > 0 && (
@@ -704,16 +686,6 @@ export default function Configuracoes() {
         {(Object.keys(T.configuracoes.categoriasSom) as CategoriaSom[]).map((c) => (
           <AlternadorAjuste key={c} rotulo={T.configuracoes.categoriasSom[c]} ligado={cfg.sons.categorias[c]} aoMudar={(v) => cfg.definir({ sons: { ...cfg.sons, categorias: { ...cfg.sons.categorias, [c]: v } } })} />
         ))}
-      </>
-    ),
-    consumo: (
-      <>
-        {(["precoEntrada", "precoSaida", "limiteMensal"] as const).map((k) => (
-          <LinhaAjuste key={k} rotulo={T.configuracoes[k]} para={`cs-${k}`}>
-            <input id={`cs-${k}`} className="campo ajuste-valor ajuste-valor-numero" type="number" min={0} max={10000} step="0.01" value={cfg.consumo[k]} onChange={(e) => cfg.definir({ consumo: { ...cfg.consumo, [k]: Math.max(0, Math.min(10000, Number(e.target.value) || 0)) } })} />
-          </LinhaAjuste>
-        ))}
-        <AlternadorAjuste rotulo={T.consumo.ligarParte2} dica={T.consumo.parte2Aviso.join(" ")} ligado={cfg.consumo.lerPlanos} aoMudar={(v) => cfg.definir({ consumo: { ...cfg.consumo, lerPlanos: v } })} />
       </>
     ),
     tela: (
@@ -751,15 +723,12 @@ export default function Configuracoes() {
         <AvisoFaixa>{T.configuracoes.semTelemetria}</AvisoFaixa>
         <AlternadorAjuste rotulo={T.configuracoes.privacidade} dica={T.configuracoes.privacidadeDica} ligado={cfg.privacidade} aoMudar={(v) => cfg.definir({ privacidade: v })} />
         <AlternadorAjuste rotulo={T.configuracoes.pausarConexoes} ligado={cfg.pausarConexoes} aoMudar={(v) => cfg.definir({ pausarConexoes: v })} />
-        <AlternadorAjuste rotulo={T.configuracoes.nuncaFinanceiro} ligado={cfg.nuncaFinanceiro} aoMudar={(v) => cfg.definir({ nuncaFinanceiro: v })} />
-        <AlternadorAjuste rotulo={T.configuracoes.pesquisaNaWeb} dica={T.configuracoes.pesquisaNaWebDica} ligado={cfg.pesquisaNaWeb} aoMudar={(v) => cfg.definir({ pesquisaNaWeb: v })} />
         <LinhaAjuste rotulo={T.configuracoes.limparChat}>
           <Botao variante="perigo" icone={<Trash2 size={13} />} onClick={() => setLimparChat(true)}>{T.geral.limpar}</Botao>
         </LinhaAjuste>
       </>
     ),
     dados: <SecaoDados />,
-    claude: <SecaoClaudeCode />,
     admin: <><AdministracaoUsuarios /><CustosDigitalOcean /></>,
     assistive: <SecaoAssistive />,
     sobre: (
@@ -788,16 +757,6 @@ export default function Configuracoes() {
         <NotaAjuste>
           <p className="ajuste-nota-texto">{T.configuracoes.devDica}</p>
         </NotaAjuste>
-        {AGENTES.map((a) => (
-          <LinhaAjuste key={a} rotulo={cfg.agentes.nomes[a]} inicio={<span className="ajuste-personagem"><Personagem agente={a} tamanho={32} /></span>}>
-            <select className="seletor ajuste-valor" aria-label={T.configuracoes.forcarEstado} value={agentes.forcado[a] ?? ""} onChange={(e) => agentes.forcar(a, (e.target.value || null) as EstadoAgente | null)}>
-              <option value="">{T.configuracoes.estadoReal}</option>
-              {(Object.keys(T.agentes.estados) as EstadoAgente[]).map((s) => <option key={s} value={s}>{T.agentes.estados[s]}</option>)}
-            </select>
-            <Botao pequeno onClick={() => { agentes.forcar(a, null); agentes.alertar(a, T.configuracoes.alertaTeste, "inicio"); }}>{T.configuracoes.dispararAlerta}</Botao>
-            <Botao pequeno onClick={() => { agentes.forcar(a, null); void agentes.trabalhar(a, T.configuracoes.tarefaTeste, 2500); }}>{T.configuracoes.simularTrabalho}</Botao>
-          </LinhaAjuste>
-        ))}
         <LinhaAjuste rotulo={T.configuracoes.secoes.pomodoro}>
           <Botao
             onClick={() => {
@@ -815,7 +774,6 @@ export default function Configuracoes() {
             {TODOS_OS_SONS.map((s) => <button key={s} type="button" className="pilula mono" onClick={() => void tocarSom(s)}>{s}</button>)}
           </div>
         </div>
-        <MapaDaIa />
       </>
     ),
   };

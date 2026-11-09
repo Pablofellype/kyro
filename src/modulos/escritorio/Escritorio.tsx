@@ -3,13 +3,20 @@ import { FileSpreadsheet, Users } from "lucide-react";
 import { useAuth } from "../../estado/autenticacao";
 import { Aderencias } from "./Aderencias";
 import { PainelCoordenacao } from "./PainelCoordenacao";
+import { PainelColaborador } from "./PainelColaborador";
 
 type TipoEscritorio = "coordenacao" | "aderencias";
 
 export default function Escritorio({ tipoInicial = "coordenacao" }: { tipoInicial?: "niko" | "coordenacao" | "aderencias" } = {}) {
+  const usuario = useAuth((s) => s.usuario);
+  if (usuario?.perfil === "colaborador") return <PainelColaborador />;
+  return <EscritorioAdministrativo tipoInicial={tipoInicial} />;
+}
+
+function EscritorioAdministrativo({ tipoInicial }: { tipoInicial: "niko" | "coordenacao" | "aderencias" }) {
   const [tipo, setTipo] = useState<TipoEscritorio>(tipoInicial === "niko" ? "coordenacao" : tipoInicial);
   const usuario = useAuth((s) => s.usuario);
-  const podeAderencias = usuario?.perfil === "dono" || usuario?.roboAderencias === true;
+  const podeAderencias = usuario?.perfil === "dono" || (usuario?.perfil === "adm" && usuario.roboAderencias === true);
 
   useEffect(() => {
     if (!podeAderencias && tipo === "aderencias") setTipo("coordenacao");

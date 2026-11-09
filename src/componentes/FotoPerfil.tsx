@@ -36,9 +36,15 @@ export function EditorFoto({ tamanho = 88, children }: { tamanho?: number; child
     try {
       const otimizada = await otimizarImagem(arquivo, { larguraMaxima: 256, alturaMaxima: 256, recortarQuadrado: true, qualidade: 0.86 });
       const fotoAnterior = foto;
+      // Mostra e persiste a prévia local imediatamente. O upload remoto pode
+      // demorar ou não estar configurado ainda, mas isso não pode impedir a
+      // pessoa de ver a foto que acabou de escolher.
+      definir({ foto: otimizada.dataUrl });
       const fotoRemota = await uploadarFoto(otimizada.blob, "perfil");
-      definir({ foto: fotoRemota ?? otimizada.dataUrl });
-      if (fotoRemota && fotoAnterior && fotoAnterior !== fotoRemota) void removerFotoDoBlob(fotoAnterior);
+      if (fotoRemota) {
+        definir({ foto: fotoRemota });
+        if (fotoAnterior && fotoAnterior !== fotoRemota) void removerFotoDoBlob(fotoAnterior);
+      }
       setErro("");
     } catch {
       setErro(T.perfil.fotoInvalida);

@@ -1,13 +1,12 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { Plus, Search, ArrowUp, Download, Trash2, Copy, Check, BrainCircuit, FileText, SquareSlash, Terminal, Square, Settings2, RotateCcw, Play, AlertTriangle, Paperclip, Lightbulb, ListChecks, ScanText, MessagesSquare, X, CircleCheck, type LucideIcon } from "lucide-react";
+import { Plus, Search, ArrowUp, Download, Trash2, Copy, Check, FileText, SquareSlash, Terminal, Square, RotateCcw, Play, AlertTriangle, Paperclip, Lightbulb, ListChecks, ScanText, MessagesSquare, X, CircleCheck, type LucideIcon } from "lucide-react";
 import { TextoRico } from "../../componentes/TextoRico";
 import { CartoesDaMensagem } from "../../componentes/CartaoAcao";
 import { EscolhaDoAgente } from "../../componentes/EscolhaDoAgente";
 import { AnexosDaMensagem, ChipsAnexos, ZonaDeSoltar, useAnexos, useArrastarArquivos } from "../../componentes/AnexosChat";
 import { CARGO_KYRO, NOME_KYRO, PersonagemKyro } from "../../personagens/PersonagemKyro";
 import { Botao } from "../../componentes/basicos";
-import { Marca, type MarcaId } from "../../marcas/Marca";
 import { useComunicacao } from "../../estado/comunicacao";
 import { useAgentes, AGENTES } from "../../estado/agentes";
 import { useConfig } from "../../estado/configuracoes";
@@ -18,34 +17,12 @@ import { T } from "../../textos/textos";
 import { formatar } from "../../utilitarios/datas";
 import { contem, normalizarTexto } from "../../utilitarios/basicos";
 import { exportarArquivo } from "../../ponte/exportacao";
-import { provedoresEmOrdem, escolherAgente, type ProvedorEmUso } from "../../utilitarios/assistente";
-import { catalogoPelaUrl } from "../../dados/provedoresIa";
+import { escolherAgente } from "../../utilitarios/assistente";
 import { EVENTO_NOVO } from "../../janelas/area-de-trabalho/usarAtalhos";
 import type { AgenteId, Conversa, Mensagem } from "../../tipos";
 import type { AcaoAnexo } from "../../utilitarios/recursosChat";
 
 const ICONES_ACAO_ANEXO: Record<AcaoAnexo, LucideIcon> = { resumir: FileText, explicar: Lightbulb, perguntas: ListChecks, extrair: ScanText };
-
-const MARCA_DO_CATALOGO: Partial<Record<string, MarcaId>> = {
-  anthropic: "anthropic",
-  nvidia: "nvidia",
-  opencode: "opencode",
-  qwen: "qwen",
-  gemini: "gemini",
-  openrouter: "openrouter",
-  mistral: "mistral",
-  huggingface: "huggingface",
-  github: "github",
-  deepseek: "deepseek",
-  ollama: "ollama",
-  lmstudio: "lmstudio",
-};
-
-function LogoDoProvedor({ uso }: { uso: ProvedorEmUso }) {
-  const catalogo = uso.provedor.catalogo ?? catalogoPelaUrl(uso.provedor.urlBase)?.id;
-  const marca = catalogo ? MARCA_DO_CATALOGO[catalogo] : undefined;
-  return marca ? <Marca marca={marca} tamanho={14} /> : <BrainCircuit size={14} />;
-}
 
 function grupoDaData(iso: string): string {
   const d = new Date(iso);
@@ -228,7 +205,6 @@ function previaDaConversa(c: Conversa, empresa = false, nomesDosPersonagens: rea
 export default function Chat() {
   const parametros = useInterface((s) => s.parametros);
   const avisar = useInterface((s) => s.avisar);
-  const irPara = useInterface((s) => s.irPara);
   const area = useInterface((s) => s.area);
   const conversas = useComunicacao((s) => s.conversas);
   const criar = useComunicacao((s) => s.criarConversa);
@@ -236,7 +212,6 @@ export default function Chat() {
   const restaurar = useComunicacao((s) => s.restaurarConversa);
   const nomes = useConfig((s) => s.agentes.nomes);
   const cargos = useConfig((s) => s.agentes.cargos);
-  const ia = useConfig((s) => s.ia);
   const ouvir = useAgentes((s) => s.ouvir);
   const fase = useConversando((s) => s.fase);
   const [atualId, setAtualId] = useState<string | undefined>(parametros.conversa || conversas[0]?.id);
@@ -244,11 +219,9 @@ export default function Chat() {
   const [busca, setBusca] = useState("");
   const [gavetaAberta, setGavetaAberta] = useState(false);
   const [historicoEnvio, setHistoricoEnvio] = useState<string[]>([]);
-  const [fila, setFila] = useState<ProvedorEmUso[]>([]);
   const fim = useRef<HTMLDivElement>(null);
   const campo = useRef<HTMLTextAreaElement>(null);
   const atual = conversas.find((c) => c.id === atualId);
-  const provedor = fila[0];
   const favorito = useConfig((s) => s.agentes.favorito);
   const principal = useRef<HTMLElement>(null);
   const seletorArquivo = useRef<HTMLInputElement>(null);
@@ -258,10 +231,6 @@ export default function Chat() {
   const empresa = area === "empresa";
   const nomesDosPersonagens = useMemo(() => [...new Set([...Object.values(nomes), "Rubi", "Nanquim", "Sol", "Java"])], [nomes]);
   const cargoDoChat = empresa ? "Coordenação da empresa" : CARGO_KYRO;
-
-  useEffect(() => {
-    void provedoresEmOrdem().then(setFila);
-  }, [ia]);
 
   useEffect(() => {
     if (parametros.conversa) setAtualId(parametros.conversa);
@@ -377,9 +346,6 @@ export default function Chat() {
 
   const podeAcoesDeAnexo = anexos.lista.length > 0 && anexos.lista.every((a) => a.tipo === "texto" || a.tipo === "imagem");
   const mostrarRecursos = anexos.lista.length === 0 && !atual?.mensagens.length;
-  const tituloIa = provedor ? fila.map((p) => `${p.provedor.nome} . ${p.modelo}`).join("\n") : T.chat.configurarIa;
-  const mostrarDetalhesIa = area === "empresa";
-
   return (
     <div className="chat-tela" data-gaveta={gavetaAberta ? "aberta" : "fechada"}>
       {gavetaAberta && <div className="chat-gaveta-fundo" onClick={() => setGavetaAberta(false)} />}
@@ -461,31 +427,17 @@ export default function Chat() {
               />
             </span>
           )}
-          <div className="chat-ia" data-estado={provedor ? "conectada" : "comandos"} title={mostrarDetalhesIa ? tituloIa : "Assistente pronto"}>
+          <div className="chat-ia" data-estado="comandos" title={T.chat.modoComandos}>
             <span className="chat-ia-logo">
-              {provedor && mostrarDetalhesIa ? <LogoDoProvedor uso={provedor} /> : <MessagesSquare size={13} />}
+              <MessagesSquare size={13} />
               <span className="chat-ia-ponto" />
             </span>
             <span className="chat-ia-texto">
               <span className="chat-ia-nome">
-                <span className="cortar">{mostrarDetalhesIa && provedor ? provedor.provedor.nome : area === "pessoal" ? "Assistente" : T.chat.modoComandos}</span>
-                <span className="chat-ia-estado">{area === "pessoal" ? "pronto" : provedor ? T.chat.iaConectada : T.chat.semIa}</span>
+                <span className="cortar">{T.chat.modoComandos}</span>
+                <span className="chat-ia-estado">{T.chat.semIa}</span>
               </span>
-              {provedor && mostrarDetalhesIa && (
-                <span className="chat-ia-modelo">
-                  <span className="cortar">{provedor.modelo}</span>
-                  {fila.length > 1 && <span className="chat-ia-reservas">+{fila.length - 1}</span>}
-                </span>
-              )}
             </span>
-            {mostrarDetalhesIa && (
-              <>
-                <span className="chat-ia-divisor" />
-                <button type="button" className="chat-ia-config" aria-label={T.chat.configurarIa} title={T.chat.configurarIa} onClick={() => irPara("ia")}>
-                  <Settings2 size={14} />
-                </button>
-              </>
-            )}
           </div>
         </header>
         <div className="chat-rolagem">
@@ -499,10 +451,7 @@ export default function Chat() {
                     <span>{empresa ? "Coordenação da empresa" : CARGO_KYRO}</span>
                   </motion.div>
                 </div>
-                <p className="chat-inicio-texto">{provedor ? T.chat.boasVindasIa : T.chat.boasVindasSemIa}</p>
-                {!provedor && mostrarDetalhesIa && (
-                  <Botao pequeno icone={<Settings2 size={13} />} onClick={() => irPara("ia")}>{T.chat.configurarIa}</Botao>
-                )}
+                <p className="chat-inicio-texto">{T.chat.boasVindasSemIa}</p>
                 <div className="chat-inicio-exemplos">
                   {T.chat.exemplosNaturais.map((c) => (
                     <button key={c} type="button" className="pilula" onClick={() => { setTexto(c); campo.current?.focus(); }}>{c}</button>
@@ -641,15 +590,11 @@ export default function Chat() {
                 </button>
                 <button type="button" className="chat-barra-botao" title={T.chat.comandos} onClick={() => inserirNoCampo("/")}>{T.chat.botaoComandos}</button>
                 {!empresa && <button type="button" className="chat-barra-botao" title={T.chat.mencionar} onClick={() => inserirNoCampo("@")}>{T.chat.botaoAgente}</button>}
-                {!provedor && (
-                  <>
-                    <span className="chat-barra-divisor" />
-                    <span className="chat-barra-modo">
-                      <Terminal size={12} />
-                      {T.chat.modoComandos}
-                    </span>
-                  </>
-                )}
+                <span className="chat-barra-divisor" />
+                <span className="chat-barra-modo">
+                  <Terminal size={12} />
+                  {T.chat.modoComandos}
+                </span>
                 <span className="chat-barra-dica">{T.chat.dicaEnter}</span>
                 {fase === "respondendo" ? (
                   <button type="button" className="chat-enviar chat-parar" aria-label={T.chat.parar} title={T.chat.parar} onClick={pararResposta}>

@@ -16,7 +16,7 @@ interface UsuarioEquipe {
   nome: string;
   email: string;
   ativo: boolean;
-  perfil: "dono" | "usuario";
+  perfil: "dono" | "adm" | "colaborador";
   cargo?: string | null;
   setor?: string | null;
 }
@@ -139,7 +139,7 @@ export function PainelCoordenacao() {
               {(membrosAtivos.length ? membrosAtivos : usuario ? [{ ...usuario, ativo: true }] : []).slice(0, 6).map((membro) => (
                 <div className="coordenacao-membro" key={membro.id}>
                   <span className="coordenacao-membro-avatar">{membro.nome.trim().slice(0, 1).toUpperCase() || "K"}</span>
-                  <span className="coordenacao-membro-texto"><strong>{membro.nome}</strong><small>{membro.perfil === "dono" ? "Administrador" : membro.cargo || "Membro"}{membro.setor ? ` · ${membro.setor}` : ""}</small></span>
+                  <span className="coordenacao-membro-texto"><strong>{membro.nome}</strong><small>{membro.perfil === "dono" ? "Dono" : membro.perfil === "adm" ? "Administrador" : membro.cargo || "Colaborador"}{membro.setor ? ` · ${membro.setor}` : ""}</small></span>
                   <i className="coordenacao-membro-status" title="Acesso ativo" />
                 </div>
               ))}

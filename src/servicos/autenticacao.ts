@@ -6,7 +6,8 @@ const LIMITE_TENTATIVAS = 5;
 const EXPIRACAO_RECUPERACAO_HORAS = 1;
 const EXPIRACAO_CONVITE_HORAS = 48;
 
-export type PerfilUsuario = "dono" | "usuario";
+export type PerfilUsuario = "dono" | "adm" | "colaborador";
+export type PerfilConvidado = Exclude<PerfilUsuario, "dono">;
 
 export interface UsuarioAutenticadoServidor {
   id: number;
@@ -22,6 +23,16 @@ export interface PerfilProfissional {
   telefone: string;
 }
 
+export interface DadosConvite extends Partial<PerfilProfissional> {
+  perfil?: PerfilConvidado;
+}
+
+function normalizarPerfilUsuario(perfil: unknown): PerfilUsuario {
+  if (perfil === "dono") return "dono";
+  if (perfil === "adm" || perfil === "admin" || perfil === "administrador") return "adm";
+  return "colaborador";
+}
+
 function normalizarPerfilProfissional(perfil: Partial<PerfilProfissional> = {}): PerfilProfissional {
   return {
     cargo: typeof perfil.cargo === "string" ? perfil.cargo.trim().slice(0, 120) : "",
@@ -34,6 +45,35 @@ export function getDb() {
   const databaseUrl = (process.env.DATABASE_URL || process.env.POSTGRES_URL || "").trim();
   if (!databaseUrl) throw new Error("DATABASE_URL ou POSTGRES_URL não definida");
   return neon(databaseUrl);
+}
+
+let migracaoPerfilProfissional: Promise<void> | null = null;
+
+/**
+ * Garante as colunas usadas pelo cadastro de colaboradores.
+ * A migração 013 continua sendo a forma oficial de atualizar o banco, mas
+ * esta checagem evita que uma implantação nova que ainda não executou as
+ * migrações quebre o painel de administração.
+ */
+export function garantirPerfilProfissional(): Promise<void> {
+  if (!migracaoPerfilProfissional) {
+    const sql = getDb();
+    migracaoPerfilProfissional = (async () => {
+      await sql`ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS perfil VARCHAR(20) NOT NULL DEFAULT 'colaborador'`;
+      await sql`UPDATE usuarios SET perfil = 'colaborador' WHERE perfil IS NULL OR perfil = 'usuario' OR perfil NOT IN ('dono', 'adm', 'colaborador')`;
+      await sql`ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS cargo VARCHAR(120)`;
+      await sql`ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS setor VARCHAR(120)`;
+      await sql`ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS telefone VARCHAR(40)`;
+      await sql`ALTER TABLE tokens_acesso ADD COLUMN IF NOT EXISTS perfil VARCHAR(20) NOT NULL DEFAULT 'colaborador'`;
+      await sql`ALTER TABLE tokens_acesso ADD COLUMN IF NOT EXISTS cargo VARCHAR(120)`;
+      await sql`ALTER TABLE tokens_acesso ADD COLUMN IF NOT EXISTS setor VARCHAR(120)`;
+      await sql`ALTER TABLE tokens_acesso ADD COLUMN IF NOT EXISTS telefone VARCHAR(40)`;
+    })().catch((erro) => {
+      migracaoPerfilProfissional = null;
+      throw erro;
+    });
+  }
+  return migracaoPerfilProfissional;
 }
 
 function emailNormalizado(email: string): string {
@@ -171,7 +211,7 @@ async function criarSessao(sql: ReturnType<typeof getDb>, usuario: { id: number;
       id: usuario.id,
       email: usuario.email,
       nome: usuario.nome,
-      perfil: usuario.perfil === "dono" ? "dono" as const : "usuario" as const,
+      perfil: normalizarPerfilUsuario(usuario.perfil),
       roboAderencias: usuario.perfil === "dono" || usuario.robo_aderencias === true,
     },
     token,
@@ -197,7 +237,7 @@ export async function solicitarRedefinicaoSenha(emailRecebido: string, urlBase: 
   `;
   if (usuarios.length === 0) {
     const convites = await sql`
-      SELECT email, nome, cargo, setor, telefone
+      SELECT email, nome, perfil, cargo, setor, telefone
       FROM tokens_acesso
       WHERE email = ${email}
         AND tipo = 'convite'
@@ -212,8 +252,8 @@ export async function solicitarRedefinicaoSenha(emailRecebido: string, urlBase: 
     const tokenHash = hashToken(token);
     await sql`UPDATE tokens_acesso SET usado_em = CURRENT_TIMESTAMP WHERE email = ${email} AND tipo = 'convite' AND usado_em IS NULL`;
     await sql`
-      INSERT INTO tokens_acesso (token_hash, tipo, email, nome, cargo, setor, telefone, expira_em)
-      VALUES (${tokenHash}, 'convite', ${email}, ${convite.nome ?? ""}, ${convite.cargo ?? ""}, ${convite.setor ?? ""}, ${convite.telefone ?? ""}, CURRENT_TIMESTAMP + (${EXPIRACAO_CONVITE_HORAS} * INTERVAL '1 hour'))
+      INSERT INTO tokens_acesso (token_hash, tipo, email, nome, perfil, cargo, setor, telefone, expira_em)
+      VALUES (${tokenHash}, 'convite', ${email}, ${convite.nome ?? ""}, ${normalizarPerfilUsuario(convite.perfil) === "dono" ? "colaborador" : normalizarPerfilUsuario(convite.perfil)}, ${convite.cargo ?? ""}, ${convite.setor ?? ""}, ${convite.telefone ?? ""}, CURRENT_TIMESTAMP + (${EXPIRACAO_CONVITE_HORAS} * INTERVAL '1 hour'))
     `;
     try {
       await enviarEmailDeAcesso({
@@ -265,12 +305,13 @@ export async function validarTokenAcesso(tokenRecebido: string) {
   return { tipo: acesso.tipo === "convite" ? "convite" as const : "recuperar" as const, email: acesso.email, nome: acesso.nome ?? "" };
 }
 
-export async function criarConviteUsuario(dono: UsuarioAutenticadoServidor, emailRecebido: string, nomeRecebido: string, urlBase: string, perfilRecebido: Partial<PerfilProfissional> = {}) {
+export async function criarConviteUsuario(dono: UsuarioAutenticadoServidor, emailRecebido: string, nomeRecebido: string, urlBase: string, perfilRecebido: DadosConvite = {}) {
   if (dono.perfil !== "dono") throw new Error("permissao_negada");
   const sql = getDb();
   const email = emailNormalizado(emailRecebido);
   const nome = nomeRecebido.trim().slice(0, 160);
   const perfil = normalizarPerfilProfissional(perfilRecebido);
+  const papel = perfilRecebido.perfil === "adm" ? "adm" : "colaborador";
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("email_invalido");
   if (!nome) throw new Error("nome_obrigatorio");
   const existentes = await sql`SELECT id FROM usuarios WHERE email = ${email} LIMIT 1`;
@@ -279,8 +320,8 @@ export async function criarConviteUsuario(dono: UsuarioAutenticadoServidor, emai
   const tokenHash = hashToken(token);
   await sql`UPDATE tokens_acesso SET usado_em = CURRENT_TIMESTAMP WHERE email = ${email} AND tipo = 'convite' AND usado_em IS NULL`;
   await sql`
-    INSERT INTO tokens_acesso (token_hash, tipo, email, nome, cargo, setor, telefone, expira_em)
-    VALUES (${tokenHash}, 'convite', ${email}, ${nome}, ${perfil.cargo}, ${perfil.setor}, ${perfil.telefone}, CURRENT_TIMESTAMP + (${EXPIRACAO_CONVITE_HORAS} * INTERVAL '1 hour'))
+    INSERT INTO tokens_acesso (token_hash, tipo, email, nome, perfil, cargo, setor, telefone, expira_em)
+    VALUES (${tokenHash}, 'convite', ${email}, ${nome}, ${papel}, ${perfil.cargo}, ${perfil.setor}, ${perfil.telefone}, CURRENT_TIMESTAMP + (${EXPIRACAO_CONVITE_HORAS} * INTERVAL '1 hour'))
   `;
   try {
     await enviarEmailDeAcesso({
@@ -300,7 +341,7 @@ export async function listarConvitesPendentes(dono: UsuarioAutenticadoServidor) 
   if (dono.perfil !== "dono") throw new Error("permissao_negada");
   const sql = getDb();
   return sql`
-    SELECT email, nome, cargo, setor, telefone, expira_em, criado_em
+    SELECT email, nome, perfil, cargo, setor, telefone, expira_em, criado_em
     FROM tokens_acesso
     WHERE tipo = 'convite' AND usado_em IS NULL AND expira_em > CURRENT_TIMESTAMP
     ORDER BY criado_em DESC
@@ -312,7 +353,7 @@ export async function reenviarConviteUsuario(dono: UsuarioAutenticadoServidor, e
   const sql = getDb();
   const email = emailNormalizado(emailRecebido);
   const convites = await sql`
-    SELECT email, nome, cargo, setor, telefone
+    SELECT email, nome, perfil, cargo, setor, telefone
     FROM tokens_acesso
     WHERE email = ${email} AND tipo = 'convite' AND usado_em IS NULL AND expira_em > CURRENT_TIMESTAMP
     ORDER BY criado_em DESC
@@ -321,6 +362,7 @@ export async function reenviarConviteUsuario(dono: UsuarioAutenticadoServidor, e
   if (convites.length === 0) throw new Error("convite_nao_encontrado");
   const convite = convites[0];
   await criarConviteUsuario(dono, convite.email, convite.nome ?? "", urlBase, {
+    perfil: convite.perfil === "adm" ? "adm" : "colaborador",
     cargo: convite.cargo ?? "",
     setor: convite.setor ?? "",
     telefone: convite.telefone ?? "",
@@ -347,7 +389,7 @@ export async function redefinirSenhaComToken(tokenRecebido: string, senha: strin
   const sql = getDb();
   const tokenHash = hashToken(tokenRecebido);
   const tokens = await sql`
-    SELECT token_hash, tipo, usuario_id, email, nome, cargo, setor, telefone, expira_em, usado_em
+    SELECT token_hash, tipo, usuario_id, email, nome, perfil, cargo, setor, telefone, expira_em, usado_em
     FROM tokens_acesso
     WHERE token_hash = ${tokenHash}
     LIMIT 1
@@ -361,7 +403,7 @@ export async function redefinirSenhaComToken(tokenRecebido: string, senha: strin
     if (existentes.length > 0) throw new Error("usuario_ja_cadastrado");
     const criados = await sql`
       INSERT INTO usuarios (email, nome, senha_hash, ativo, perfil, cargo, setor, telefone)
-      VALUES (${convite.email}, ${convite.nome}, ${hash}, TRUE, 'usuario', ${convite.cargo ?? ""}, ${convite.setor ?? ""}, ${convite.telefone ?? ""})
+      VALUES (${convite.email}, ${convite.nome}, ${hash}, TRUE, ${convite.perfil === "adm" ? "adm" : "colaborador"}, ${convite.cargo ?? ""}, ${convite.setor ?? ""}, ${convite.telefone ?? ""})
       RETURNING id, email, nome, perfil
     `;
     usuario = criados[0] as typeof usuario;
@@ -435,6 +477,23 @@ export async function alterarPerfilProfissional(dono: UsuarioAutenticadoServidor
   return resultado[0];
 }
 
+export async function alterarPerfilUsuario(dono: UsuarioAutenticadoServidor, usuarioId: number, perfilRecebido: unknown) {
+  if (dono.perfil !== "dono") throw new Error("permissao_negada");
+  if (!Number.isSafeInteger(usuarioId) || usuarioId <= 0 || usuarioId === dono.id) throw new Error("dono_nao_pode_ser_alterado");
+  const perfil = perfilRecebido === "adm" ? "adm" : perfilRecebido === "colaborador" ? "colaborador" : null;
+  if (!perfil) throw new Error("perfil_invalido");
+  const sql = getDb();
+  const resultado = await sql`
+    UPDATE usuarios
+    SET perfil = ${perfil}
+    WHERE id = ${usuarioId} AND perfil <> 'dono'
+    RETURNING id, email, nome, ativo, perfil, robo_aderencias, cargo, setor, telefone
+  `;
+  if (resultado.length === 0) throw new Error("usuario_nao_encontrado");
+  await sql`DELETE FROM sessoes WHERE usuario_id = ${usuarioId}`;
+  return resultado[0];
+}
+
 export async function loginUsuario(emailRecebido: string, senhaRecebida: string, origem = "desconhecida") {
   const sql = getDb();
   const emailNorm = emailNormalizado(emailRecebido);
@@ -491,7 +550,7 @@ export async function validarSessao(token: string) {
     id: s.id,
     email: s.email,
     nome: s.nome,
-    perfil: s.perfil === "dono" ? "dono" as const : "usuario" as const,
+    perfil: normalizarPerfilUsuario(s.perfil),
     roboAderencias: s.perfil === "dono" || s.robo_aderencias === true,
   };
 }

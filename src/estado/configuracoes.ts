@@ -39,7 +39,7 @@ export function juntarAbasNoHoje(ordem: string[], blocos: Record<string, boolean
 }
 export type RepousoIlha = "nada" | "relogio" | "midia" | "agente";
 export type BlocoInicio =
-  | "time" | "hoje" | "foco" | "financas" | "conexoes" | "revisoes" | "consumo" | "mapa" | "conquistas";
+  | "time" | "hoje" | "foco" | "financas" | "conexoes" | "revisoes" | "mapa" | "conquistas";
 
 export interface ItemBarra {
   rota: Rota;
@@ -49,7 +49,6 @@ export interface ItemBarra {
 
 export const BARRA_PADRAO: ItemBarra[] = [
   { rota: "inicio", visivel: true },
-  { rota: "chat", visivel: true },
   { rota: "escritorio", visivel: true },
   { rota: "conexoes", visivel: true },
   { rota: "journal", visivel: true },
@@ -57,10 +56,6 @@ export const BARRA_PADRAO: ItemBarra[] = [
   { rota: "financas", visivel: true },
   { rota: "metas", visivel: true },
   { rota: "calendario", visivel: true },
-  { rota: "atualizacao", visivel: true },
-  { rota: "ia", visivel: true },
-  { rota: "consumo", visivel: true },
-  { rota: "conquistas", visivel: true },
 ];
 
 export const GRUPO_DA_ROTA: Record<Rota, "principal" | "organizacao" | "ferramentas"> = {
@@ -89,7 +84,6 @@ export const BLOCOS_INICIO_PADRAO: { id: BlocoInicio; visivel: boolean }[] = [
   { id: "financas", visivel: true },
   { id: "revisoes", visivel: true },
   { id: "conexoes", visivel: false },
-  { id: "consumo", visivel: false },
   { id: "mapa", visivel: true },
   { id: "conquistas", visivel: false },
 ];
@@ -136,8 +130,8 @@ export interface ConfigIlha {
 export type LayoutDaMidia = "classico" | "pulso" | "vinil" | "cartaz";
 export const LAYOUTS_DA_MIDIA: LayoutDaMidia[] = ["classico", "pulso", "vinil", "cartaz"];
 
-export type CategoriaDeAviso = "lembretes" | "habitos" | "estudos" | "financas" | "conexoes" | "codigo" | "conquistas" | "consumo";
-export const CATEGORIAS_DE_AVISO: CategoriaDeAviso[] = ["lembretes", "habitos", "estudos", "financas", "conexoes", "codigo", "conquistas", "consumo"];
+export type CategoriaDeAviso = "lembretes" | "habitos" | "estudos" | "financas" | "conexoes" | "codigo" | "conquistas";
+export const CATEGORIAS_DE_AVISO: CategoriaDeAviso[] = ["lembretes", "habitos", "estudos", "financas", "conexoes", "codigo", "conquistas"];
 
 export type IconeDaBarra = "rede" | "volume" | "bateria";
 export const ICONES_DA_BARRA: IconeDaBarra[] = ["rede", "volume", "bateria"];

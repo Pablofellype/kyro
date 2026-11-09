@@ -23,6 +23,7 @@ const migracoes = [
   "migrar-dados-011.mjs",
   "migrar-dados-012.mjs",
   "migrar-dados-013.mjs",
+  "migrar-dados-014.mjs",
 ];
 
 for (const nome of migracoes) {

@@ -176,7 +176,7 @@ test("a página do time tem seleção acessível, formato, cor, nome e persona",
   assert.equal((html.match(/aria-pressed=/g) ?? []).length, 11);
   for (const rotulo of ["Nome", "Cargo", "Formato", "Cor", "Persona", "Salvar agente", "Restaurar padrão"]) assert.ok(html.includes(rotulo), rotulo);
   assert.match(html, /maxlength="2000"/i);
-  assert.match(html, /Os comandos locais continuam funcionando sem IA/);
+  assert.match(html, /Os comandos locais continuam funcionando\. A persona não altera esses comandos\./);
   assert.equal((html.match(/class="personagem"[^>]*style="width:88px;height:88px"/g) ?? []).length, 4);
   assert.match(html, /class="personagem"[^>]*style="width:208px;height:208px"/);
   assert.match(html, /time-edicao/);

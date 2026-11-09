@@ -15,6 +15,8 @@ import { rotaLigada } from "../../utilitarios/funcoes";
 import { primeiraRotaDaArea, rotaDisponivelNaArea, ROTULOS_EMPRESA, ROTULOS_PESSOAIS } from "./areas";
 import { LimiteDeErro } from "../../componentes/LimiteDeErro";
 import { NotificacoesSistema } from "../../componentes/NotificacoesSistema";
+import { podeAcessarArea, podeAcessarRota } from "../../servicos/permissoes";
+import { useAuth } from "../../estado/autenticacao";
 
 const MINIMO = { w: 960, h: 600 };
 
@@ -28,9 +30,12 @@ function geometriaPadrao(): Geometria {
 export function JanelaSistema({ mobile = false }: { mobile?: boolean } = {}) {
   const rotaPedida = useInterface((s) => s.rota);
   const area = useInterface((s) => s.area);
+  const usuario = useAuth((s) => s.usuario);
   const desligadas = useConfig((s) => s.funcoesDesligadas);
-  const rotaValida = rotaLigada(rotaPedida, desligadas) && rotaDisponivelNaArea(rotaPedida, area);
-  const rota = rotaValida ? rotaPedida : primeiraRotaDaArea(area);
+  const areaValida = podeAcessarArea(usuario, area);
+  const areaEfetiva = areaValida ? area : "empresa";
+  const rotaValida = rotaLigada(rotaPedida, desligadas) && rotaDisponivelNaArea(rotaPedida, areaEfetiva) && podeAcessarRota(usuario, rotaPedida, areaEfetiva);
+  const rota = rotaValida ? rotaPedida : primeiraRotaDaArea(areaEfetiva);
   const geometriaSalva = useInterface((s) => s.geometria);
   const maximizada = useInterface((s) => s.sistemaMaximizado);
   const definirSistema = useInterface((s) => s.definirSistema);
@@ -55,8 +60,9 @@ export function JanelaSistema({ mobile = false }: { mobile?: boolean } = {}) {
   }, [rota]);
 
   useEffect(() => {
+    if (!areaValida) useInterface.getState().definirArea("empresa");
     if (!rotaValida) useInterface.getState().irPara(rota);
-  }, [rota, rotaValida]);
+  }, [areaValida, rota, rotaValida]);
 
   const aoMudarGeometria = useCallback((g: Geometria) => definirSistema({ geometria: g }), [definirSistema]);
 
@@ -71,7 +77,7 @@ export function JanelaSistema({ mobile = false }: { mobile?: boolean } = {}) {
           <span>{T.gruposBarra[GRUPO_DA_ROTA[rota]]}</span>
           <span className="migalha-barra" aria-hidden="true">/</span>
           <span className="migalha-atual">
-            {area === "empresa" ? "Empresa" : "Pessoal"} / {numeroDaRota(rota)} {(area === "pessoal" ? ROTULOS_PESSOAIS[rota] : ROTULOS_EMPRESA[rota]) || T.rotas[rota]}
+            {areaEfetiva === "empresa" ? "Empresa" : "Pessoal"} / {numeroDaRota(rota)} {(areaEfetiva === "pessoal" ? ROTULOS_PESSOAIS[rota] : ROTULOS_EMPRESA[rota]) || T.rotas[rota]}
           </span>
         </span>
       }

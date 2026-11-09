@@ -590,7 +590,7 @@ test("configurações corrompidas caem no padrão e preservam atalhos válidos",
   assert.equal(c.ilha.opacidade, 1);
   assert.equal(c.dock.atalhos.length, 1);
   assert.equal(c.assistive.apps.length, 1);
-  const personalizados = configuracoesValidas({ ilha: { fechamentoSeg: 0 }, barraLateral: [{ rota: "chat", nome: "Conversas", visivel: false }] }, CONFIG_PADRAO);
+  const personalizados = configuracoesValidas({ ilha: { fechamentoSeg: 0 }, barraLateral: [{ rota: "escritorio", nome: "Conversas", visivel: false }] }, CONFIG_PADRAO);
   assert.equal(personalizados.ilha.fechamentoSeg, 0);
   assert.equal(personalizados.barraLateral[0].nome, "Conversas");
   useConfig.getState().definir({ dock: { ...CONFIG_PADRAO.dock, opacidade: 99 } });

@@ -349,7 +349,6 @@ export function TelaLogin({ aoSucesso }: Props) {
             <span className="kyro-login-navegacao-item"><i aria-hidden="true" />Metas</span>
             <span className="kyro-login-navegacao-item"><i aria-hidden="true" />Calendário</span>
             <span className="kyro-login-navegacao-label">FERRAMENTAS</span>
-            <span className="kyro-login-navegacao-item"><i aria-hidden="true" />Modelos de IA</span>
             <span className="kyro-login-navegacao-item"><i aria-hidden="true" />Conquistas</span>
           </nav>
 

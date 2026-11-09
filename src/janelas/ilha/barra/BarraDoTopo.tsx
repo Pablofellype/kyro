@@ -55,15 +55,16 @@ function LadoEsquerdo({
     <div className="ilha-barra-lado">
       <button
         type="button"
-        className="ilha-barra-botao ilha-barra-texto"
+        className="ilha-barra-botao ilha-barra-texto ilha-barra-materiais"
         data-ativo={pop?.tipo === "materiais" || undefined}
         aria-label="Códigos de Materiais"
         aria-expanded={pop?.tipo === "materiais"}
         title="Códigos de Materiais"
         onClick={alternarMateriais}
       >
-        <Package size={13} />
-        <span className="numero">{totalMateriais}</span>
+        <span className="ilha-barra-materiais-icone"><Package size={13} /></span>
+        <span className="ilha-barra-materiais-label">Materiais</span>
+        <span className="ilha-barra-materiais-badge">{totalMateriais}</span>
       </button>
     </div>
   );
@@ -140,11 +141,6 @@ export function BarraDoTopo({ visivel, escala, larguraDaIlha, aparencia, aoUsar 
   useEffect(() => {
     if (!pop) return;
     const fechar = () => setPop(null);
-    const fecharSeNaoEscolhendoCor = () => {
-      const ativo = document.activeElement;
-      if (ativo instanceof HTMLInputElement && ativo.type === "color") return;
-      fechar();
-    };
     const aoTeclar = (e: KeyboardEvent) => e.key === "Escape" && fechar();
     const aoClicarFora = (e: PointerEvent) => {
       const alvo = e.target as Element | null;
@@ -152,11 +148,9 @@ export function BarraDoTopo({ visivel, escala, larguraDaIlha, aparencia, aoUsar 
     };
     window.addEventListener("keydown", aoTeclar);
     window.addEventListener("pointerdown", aoClicarFora, true);
-    window.addEventListener("blur", fecharSeNaoEscolhendoCor);
     return () => {
       window.removeEventListener("keydown", aoTeclar);
       window.removeEventListener("pointerdown", aoClicarFora, true);
-      window.removeEventListener("blur", fecharSeNaoEscolhendoCor);
     };
   }, [pop]);
 

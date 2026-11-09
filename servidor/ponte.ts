@@ -1,4 +1,4 @@
-import { alterarAtivoUsuario, alterarPermissaoAderencias, criarConviteUsuario, getDb, loginUsuario, listarUsuarios, redefinirSenhaComToken, solicitarRedefinicaoSenha, urlPublicaDoAmbiente, validarSessao, logoutSessao } from "../src/servicos/autenticacao.ts";
+import { alterarAtivoUsuario, alterarPermissaoAderencias, alterarPerfilProfissional, alterarPerfilUsuario, cancelarConviteUsuario, criarConviteUsuario, garantirPerfilProfissional, getDb, loginUsuario, listarConvitesPendentes, listarUsuarios, redefinirSenhaComToken, reenviarConviteUsuario, solicitarRedefinicaoSenha, urlPublicaDoAmbiente, validarSessao, logoutSessao } from "../src/servicos/autenticacao.ts";
 import { ConflitoDadosUsuario, gravarDadosUsuario, lerBackupsDadosUsuario, lerDadosUsuarioComVersao, lerHistoricoDadosUsuario, lerVersaoDadosUsuario, restaurarBackupDadosUsuario, validarItensDadosUsuario, zerarDadosUsuario } from "../src/servicos/dadosUsuario.ts";
 import type { Plugin, Connect } from "./tiposVite.ts";
 import type { IncomingMessage, ServerResponse } from "node:http";
@@ -294,6 +294,7 @@ export const rotas: Connect.NextHandleFunction = async (req, res, proximo) => {
     if (!hostLocal(req) || !origemConfiavel(req)) return responder(res, 403, { erro: "origem_nao_permitida" });
     const acao = url.searchParams.get("acao") || "verificar";
     try {
+      if (["convite", "convites", "usuarios", "usuario"].includes(acao)) await garantirPerfilProfissional();
       if (req.method === "POST" && acao === "login") {
         const { email, senha } = (await lerCorpo(req)) as { email?: string; senha?: string };
         if (!email || !senha) return responder(res, 400, { sucesso: false, erro: "E-mail e senha são obrigatórios." });
@@ -324,7 +325,17 @@ export const rotas: Connect.NextHandleFunction = async (req, res, proximo) => {
         if (!usuarioAtual || usuarioAtual.perfil !== "dono") return responder(res, 403, { erro: "permissao_negada" });
         const corpo = await lerCorpo(req);
         try {
-          await criarConviteUsuario(usuarioAtual, typeof corpo.email === "string" ? corpo.email : "", typeof corpo.nome === "string" ? corpo.nome : "", urlPublicaDaPonte(req));
+          if (corpo.operacao === "reenviar" || corpo.operacao === "cancelar") {
+            if (corpo.operacao === "reenviar") await reenviarConviteUsuario(usuarioAtual, typeof corpo.email === "string" ? corpo.email : "", urlPublicaDaPonte(req));
+            else await cancelarConviteUsuario(usuarioAtual, typeof corpo.email === "string" ? corpo.email : "");
+          } else {
+            await criarConviteUsuario(usuarioAtual, typeof corpo.email === "string" ? corpo.email : "", typeof corpo.nome === "string" ? corpo.nome : "", urlPublicaDaPonte(req), {
+              perfil: corpo.perfil === "adm" ? "adm" : "colaborador",
+              cargo: typeof corpo.cargo === "string" ? corpo.cargo : "",
+              setor: typeof corpo.setor === "string" ? corpo.setor : "",
+              telefone: typeof corpo.telefone === "string" ? corpo.telefone : "",
+            });
+          }
           return responder(res, 200, { sucesso: true, mensagem: "Convite enviado." });
         } catch (erro) {
           return responder(res, 400, { sucesso: false, erro: (erro as Error).message });
@@ -338,10 +349,24 @@ export const rotas: Connect.NextHandleFunction = async (req, res, proximo) => {
           return responder(res, 400, { erro: (erro as Error).message });
         }
       }
+      if (req.method === "GET" && acao === "convites") {
+        if (!usuarioAtual || usuarioAtual.perfil !== "dono") return responder(res, 403, { erro: "permissao_negada" });
+        return responder(res, 200, { convites: await listarConvitesPendentes(usuarioAtual) });
+      }
       if (req.method === "POST" && acao === "usuario") {
         if (!usuarioAtual || usuarioAtual.perfil !== "dono") return responder(res, 403, { erro: "permissao_negada" });
         const corpo = await lerCorpo(req);
         try {
+          if (corpo.perfilProfissional === true) {
+            let atualizado = await alterarPerfilProfissional(usuarioAtual, Number(corpo.id), {
+              cargo: typeof corpo.cargo === "string" ? corpo.cargo : "",
+              setor: typeof corpo.setor === "string" ? corpo.setor : "",
+              telefone: typeof corpo.telefone === "string" ? corpo.telefone : "",
+            });
+            if (typeof corpo.perfil === "string") atualizado = await alterarPerfilUsuario(usuarioAtual, Number(corpo.id), corpo.perfil);
+            return responder(res, 200, { sucesso: true, usuario: atualizado });
+          }
+          if (typeof corpo.perfil === "string") return responder(res, 200, { sucesso: true, usuario: await alterarPerfilUsuario(usuarioAtual, Number(corpo.id), corpo.perfil) });
           if (typeof corpo.roboAderencias === "boolean") return responder(res, 200, { sucesso: true, usuario: await alterarPermissaoAderencias(usuarioAtual, Number(corpo.id), corpo.roboAderencias === true) });
           return responder(res, 200, { sucesso: true, usuario: await alterarAtivoUsuario(usuarioAtual, Number(corpo.id), corpo.ativo === true) });
         } catch (erro) {
@@ -365,6 +390,32 @@ export const rotas: Connect.NextHandleFunction = async (req, res, proximo) => {
       return responder(res, 500, { sucesso: false, erro: (e as Error).message });
     }
     return responder(res, 404, { erro: "Ação não encontrada." });
+  }
+
+  if (url.pathname === "/api/solicitacoes") {
+    if (!hostLocal(req) || !origemConfiavel(req)) return responder(res, 403, { erro: "origem_nao_permitida" });
+    if (req.method !== "POST") return responder(res, 405, { erro: "metodo_nao_permitido" });
+    const token = tokenDaRequisicao(req);
+    const usuario = token ? await validarSessao(token) : null;
+    if (!usuario) return responder(res, 401, { erro: "nao_autenticado" });
+    try {
+      const corpo = await lerCorpo(req);
+      const texto = (valor: unknown, limite: number) => typeof valor === "string" ? valor.trim().slice(0, limite) : "";
+      const materialId = texto(corpo.materialId, 120);
+      const materialNome = texto(corpo.materialNome, 160);
+      const variacao = texto(corpo.variacao, 160);
+      const observacao = texto(corpo.observacao, 500);
+      const quantidade = Number(corpo.quantidade);
+      if (!materialId || !materialNome) return responder(res, 400, { erro: "material_invalido" });
+      if (!Number.isInteger(quantidade) || quantidade < 1 || quantidade > 99) return responder(res, 400, { erro: "quantidade_invalida" });
+      const sql = getDb();
+      await sql`CREATE TABLE IF NOT EXISTS solicitacoes_materiais (id BIGSERIAL PRIMARY KEY, usuario_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE, material_id VARCHAR(120) NOT NULL, material_nome VARCHAR(160) NOT NULL, variacao VARCHAR(160) NOT NULL DEFAULT '', quantidade INTEGER NOT NULL CHECK (quantidade > 0 AND quantidade <= 99), observacao VARCHAR(500) NOT NULL DEFAULT '', status VARCHAR(30) NOT NULL DEFAULT 'pendente', criado_em TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP)`;
+      const inserido = await sql`INSERT INTO solicitacoes_materiais (usuario_id, material_id, material_nome, variacao, quantidade, observacao) VALUES (${usuario.id}, ${materialId}, ${materialNome}, ${variacao}, ${quantidade}, ${observacao}) RETURNING id`;
+      const id = String(inserido[0]?.id ?? "");
+      return responder(res, 201, { sucesso: true, protocolo: `MAT-${id.padStart(6, "0")}` });
+    } catch (erro) {
+      return responder(res, 503, { erro: (erro as Error).message || "banco_nao_atualizado" });
+    }
   }
 
   if (url.pathname === "/api/dados") {

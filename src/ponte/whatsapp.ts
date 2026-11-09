@@ -107,7 +107,8 @@ const NATIVO = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 export function whatsappRemotoAtivo(usuario: Pick<UsuarioAutenticado, "perfil" | "roboAderencias"> | null = useAuth.getState().usuario): boolean {
   // No navegador o gateway é sempre o serviço remoto. O modo local é uma
   // escolha exclusiva do aplicativo nativo para usuários sem a permissão.
-  return !NATIVO || (import.meta.env.VITE_ADERENCIAS_REMOTA !== "0" && (usuario?.perfil === "dono" || usuario?.roboAderencias === true));
+  if (!usuario || usuario.perfil === "colaborador") return false;
+  return !NATIVO || (import.meta.env.VITE_ADERENCIAS_REMOTA !== "0" && (usuario.perfil === "dono" || usuario.roboAderencias === true));
 }
 
 export const whatsappRemoto = !NATIVO;

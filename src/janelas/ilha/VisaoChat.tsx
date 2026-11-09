@@ -11,7 +11,6 @@ import { EscolhaDoAgente } from "../../componentes/EscolhaDoAgente";
 import { AnexosDaMensagem, ChipsAnexos, ZonaDeSoltar, useAnexos, useArrastarArquivos } from "../../componentes/AnexosChat";
 import { T } from "../../textos/textos";
 import { useArquivosSoltos } from "../../estado/arquivosSoltos";
-import { IaConectada } from "./IaConectada";
 
 let conversaRapidaId: string | null = null;
 
@@ -113,7 +112,6 @@ export function VisaoChat() {
       {aviso && <span className="ilha-erro" role="status">{aviso}</span>}
       <ChipsAnexos lista={anexos.lista} agente={favorito} aoRemover={anexos.remover} />
       <div className="ilha-chat-entrada">
-        <IaConectada />
         <div className="ilha-campo" style={{ flex: 1 }}>
           <input
             ref={campo}

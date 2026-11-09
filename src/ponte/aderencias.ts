@@ -20,7 +20,7 @@ const NATIVO = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 export function aderenciasRemotas(usuario: Pick<UsuarioAutenticado, "perfil" | "roboAderencias"> | null = useAuth.getState().usuario): boolean {
   // O navegador nunca tem a ponte local. O sinal de teste só pode desligar o
   // VPS no aplicativo nativo, para que um build web não volte a chamar /ponte.
-  return !NATIVO || (import.meta.env.VITE_ADERENCIAS_REMOTA !== "0" && (usuario?.perfil === "dono" || usuario?.roboAderencias === true));
+  return !NATIVO || (import.meta.env.VITE_ADERENCIAS_REMOTA !== "0" && (usuario?.perfil === "dono" || (usuario?.perfil === "adm" && usuario.roboAderencias === true)));
 }
 
 function cabecalhosDaExecucao(usuario = useAuth.getState().usuario): Record<string, string> {

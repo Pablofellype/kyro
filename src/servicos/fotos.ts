@@ -28,8 +28,18 @@ function usuarioIdDaSessao(): number | null {
   }
 }
 
+function ambienteLocal(): boolean {
+  const host = window.location.hostname;
+  return host === "localhost" || host === "127.0.0.1" || host === "[::1]";
+}
+
 export async function uploadarFoto(foto: Blob, categoria: CategoriaFoto): Promise<string | null> {
   if (typeof window === "undefined") return null;
+  // No Vite local não existe o endpoint do Vercel Blob. A chamada retorna
+  // null e o componente mantém a data URL otimizada, que é persistida localmente.
+  // Em desenvolvimento, inclusive pelo celular via 192.168.x.x, mantém a
+  // foto otimizada localmente e não tenta chamar o Blob da produção.
+  if (import.meta.env.DEV || ambienteLocal()) return null;
   const token = tokenDaSessao();
   const usuarioId = usuarioIdDaSessao();
   if (!token || !usuarioId) return null;

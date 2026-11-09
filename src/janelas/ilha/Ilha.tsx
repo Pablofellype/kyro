@@ -5,6 +5,7 @@ import {
   Users, Palette, type LucideIcon,
 } from "lucide-react";
 import { useConfig, ABAS_ILHA, GRUPO_DA_ROTA, type AbaIlha, type SecaoHoje, type VisaoIlha } from "../../estado/configuracoes";
+import { useAuth } from "../../estado/autenticacao";
 import { estadoComAviso, useIlha } from "../../estado/ilha";
 import { useInterface } from "../../estado/interface";
 import { useComunicacao } from "../../estado/comunicacao";
@@ -134,6 +135,7 @@ function useAgora(intervalo: number, ativo: boolean) {
 }
 
 export function Ilha() {
+  const usuario = useAuth((s) => s.usuario);
   const cfg = useConfig((s) => s.ilha);
   const somLigado = useConfig((s) => s.sons.ligado);
   const definirConfig = useConfig((s) => s.definir);
@@ -225,9 +227,11 @@ export function Ilha() {
   const desligadas = useConfig((s) => s.funcoesDesligadas);
   const comAvisos = agentes.alertas.length > 0 || (estado === "expandida" && aba === "avisos");
   usarAvisosDoWhatsapp();
-  const abas = cfg.ordemAbas.filter((a) => ABAS_ILHA.includes(a) && cfg.blocos[a] && (a !== "avisos" || comAvisos) && abaLigada(a, desligadas));
-  const capturaDisponivel = tiposDeCapturaLigados(desligadas).length > 0;
-  const abaAtual: VisaoIlha = aba === "captura" && capturaDisponivel ? "captura" : abas.includes(aba as AbaIlha) ? aba : abas[0] ?? "hoje";
+  const abasDaEmpresa = new Set<AbaIlha>(["conexoes", "whatsapp"]);
+  const abas = cfg.ordemAbas.filter((a) => ABAS_ILHA.includes(a) && cfg.blocos[a] && (usuario?.perfil === "dono" || abasDaEmpresa.has(a)) && (a !== "avisos" || comAvisos) && abaLigada(a, desligadas));
+  const capturaDisponivel = usuario?.perfil === "dono" && tiposDeCapturaLigados(desligadas).length > 0;
+  const fallback = usuario?.perfil === "adm" ? "conexoes" : "hoje";
+  const abaAtual: VisaoIlha = aba === "captura" && capturaDisponivel ? "captura" : abas.includes(aba as AbaIlha) ? aba : abas[0] ?? fallback;
   const abaAntesDaCaptura = useRef<AbaIlha>("hoje");
   const rolagemDasAbas = useRef({ acumulado: 0, ultimaTroca: 0 });
   const [destinoDoArquivo, setDestinoDoArquivo] = useState(false);
@@ -582,6 +586,8 @@ export function Ilha() {
         return null;
     }
   };
+
+  if (usuario?.perfil === "colaborador") return null;
 
   return (
     <>

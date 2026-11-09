@@ -598,3 +598,76 @@
     grid-column: auto;
   }
 }
+
+.estilo-sistema .colaborador-painel {
+  display: grid;
+  gap: 18px;
+  max-width: 920px;
+}
+
+.estilo-sistema .colaborador-boas-vindas {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 26px 28px;
+  border: 1px solid var(--borda);
+  border-radius: 16px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--destaque) 9%, var(--superficie)), var(--superficie));
+}
+
+.estilo-sistema .colaborador-boas-vindas h2 {
+  margin: 5px 0 4px;
+  font-family: var(--fonte-titulo);
+  font-size: clamp(22px, 3vw, 30px);
+  letter-spacing: -0.03em;
+}
+
+.estilo-sistema .colaborador-boas-vindas p { margin: 0; color: var(--texto-2); }
+.estilo-sistema .colaborador-boas-vindas > svg { flex: 0 0 auto; color: var(--destaque-claro); }
+.estilo-sistema .colaborador-kicker { color: var(--destaque-claro); font-family: var(--fonte-mono); font-size: 10px; letter-spacing: 0.13em; }
+
+.estilo-sistema .colaborador-acoes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+
+.estilo-sistema .colaborador-acao {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  min-height: 112px;
+  padding: 20px;
+  border: 1px solid var(--borda);
+  border-radius: 14px;
+  background: var(--superficie);
+  color: var(--texto);
+  text-align: left;
+  transition: transform 0.16s ease, border-color 0.16s ease, background 0.16s ease;
+}
+
+.estilo-sistema .colaborador-acao:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--destaque) 45%, var(--borda)); background: color-mix(in srgb, var(--destaque) 5%, var(--superficie)); }
+.estilo-sistema .colaborador-acao-icone { display: grid; place-items: center; width: 48px; height: 48px; flex: 0 0 48px; border-radius: 13px; background: var(--destaque-suave); color: var(--destaque-claro); }
+.estilo-sistema .colaborador-acao > span:last-child { display: grid; gap: 5px; }
+.estilo-sistema .colaborador-acao strong { font-size: 15px; }
+.estilo-sistema .colaborador-acao small { color: var(--texto-3); line-height: 1.4; }
+.estilo-sistema .colaborador-nota { display: flex; align-items: center; gap: 8px; color: var(--texto-3); font-size: 12px; }
+.estilo-sistema .colaborador-nota svg { color: var(--sucesso); }
+.estilo-sistema .colaborador-formulario { min-width: min(100%, 440px); }
+
+.estilo-sistema .colaborador-sucesso { display: grid; justify-items: center; gap: 10px; padding: 18px 8px 8px; text-align: center; }
+.estilo-sistema .colaborador-sucesso svg { color: var(--sucesso); }
+.estilo-sistema .colaborador-sucesso h3, .estilo-sistema .colaborador-sucesso p { margin: 0; }
+.estilo-sistema .colaborador-sucesso p { color: var(--texto-2); }
+.estilo-sistema .colaborador-sucesso code { padding: 7px 10px; border-radius: 7px; background: var(--superficie-2); color: var(--texto-2); font-family: var(--fonte-mono); font-size: 12px; }
+
+.estilo-sistema .colaborador-apps { display: grid; gap: 14px; }
+.estilo-sistema .colaborador-apps-busca { display: flex; align-items: center; gap: 8px; padding: 0 10px; border: 1px solid var(--borda); border-radius: 9px; color: var(--texto-3); }
+.estilo-sistema .colaborador-apps-busca .campo { border: 0; box-shadow: none; }
+.estilo-sistema .colaborador-apps-grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px; max-height: 52vh; overflow: auto; }
+.estilo-sistema .colaborador-app { display: flex; align-items: center; gap: 9px; min-width: 0; padding: 11px 12px; border: 1px solid var(--borda); border-radius: 9px; background: var(--superficie); color: var(--texto); text-align: left; }
+.estilo-sistema .colaborador-app:hover:not(:disabled) { border-color: var(--destaque); background: var(--superficie-2); }
+.estilo-sistema .colaborador-app span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.estilo-sistema .colaborador-vazio { padding: 18px; color: var(--texto-3); text-align: center; }
+
+@container conteudo (max-width: 640px) {
+  .estilo-sistema .colaborador-acoes { grid-template-columns: minmax(0, 1fr); }
+  .estilo-sistema .colaborador-boas-vindas { align-items: flex-start; }
+}

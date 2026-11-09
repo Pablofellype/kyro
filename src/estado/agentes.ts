@@ -7,7 +7,7 @@ import { tocarSom, type NomeSom } from "../ponte/sons";
 import { avisoLigado, useIlha } from "./ilha";
 import type { CategoriaDeAviso } from "./configuracoes";
 
-const CATEGORIA_DA_ROTA: Partial<Record<Rota, CategoriaDeAviso>> = { calendario: "lembretes", journal: "habitos", estudos: "estudos", financas: "financas", conexoes: "conexoes", consumo: "consumo" };
+const CATEGORIA_DA_ROTA: Partial<Record<Rota, CategoriaDeAviso>> = { calendario: "lembretes", journal: "habitos", estudos: "estudos", financas: "financas", conexoes: "conexoes" };
 
 export const AGENTES: AgenteId[] = ["organizador", "tutor", "operador", "java"];
 

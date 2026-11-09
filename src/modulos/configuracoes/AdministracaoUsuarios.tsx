@@ -9,7 +9,7 @@ interface UsuarioAdministrado {
   email: string;
   nome: string;
   ativo: boolean;
-  perfil: "dono" | "usuario";
+  perfil: "dono" | "adm" | "colaborador";
   robo_aderencias: boolean;
   cargo?: string | null;
   setor?: string | null;
@@ -22,6 +22,7 @@ interface ConvitePendente {
   cargo?: string | null;
   setor?: string | null;
   telefone?: string | null;
+  perfil?: "adm" | "colaborador" | null;
   expira_em: string;
 }
 
@@ -54,6 +55,8 @@ export function AdministracaoUsuarios() {
   const [cargo, setCargo] = useState("");
   const [setor, setSetor] = useState("");
   const [telefone, setTelefone] = useState("");
+  const [papel, setPapel] = useState<"adm" | "colaborador">("colaborador");
+  const [papelEdicao, setPapelEdicao] = useState<"adm" | "colaborador">("colaborador");
   const [editandoId, setEditandoId] = useState<number | null>(null);
   const [carregando, setCarregando] = useState(false);
   const [enviando, setEnviando] = useState(false);
@@ -93,7 +96,7 @@ export function AdministracaoUsuarios() {
       const dados = await respostaJson(await fetch(urlApi("/api/auth?acao=convite"), {
         method: "POST",
         headers: { ...headers, "Content-Type": "application/json" },
-        body: JSON.stringify({ nome: nome.trim(), email: email.trim(), cargo: cargo.trim(), setor: setor.trim(), telefone: telefone.trim() }),
+        body: JSON.stringify({ nome: nome.trim(), email: email.trim(), perfil: papel, cargo: cargo.trim(), setor: setor.trim(), telefone: telefone.trim() }),
       }));
       setMensagem(typeof dados.mensagem === "string" ? dados.mensagem : "Convite enviado.");
       setNome("");
@@ -101,6 +104,7 @@ export function AdministracaoUsuarios() {
       setCargo("");
       setSetor("");
       setTelefone("");
+      setPapel("colaborador");
       void carregar();
     } catch (e) {
       setErro(mensagemDoConvite(e instanceof Error ? e.message : "Não foi possível enviar o convite."));
@@ -164,6 +168,7 @@ export function AdministracaoUsuarios() {
     setCargo(alvo.cargo ?? "");
     setSetor(alvo.setor ?? "");
     setTelefone(alvo.telefone ?? "");
+    setPapelEdicao(alvo.perfil === "adm" ? "adm" : "colaborador");
     setErro("");
     setMensagem("");
   };
@@ -173,6 +178,7 @@ export function AdministracaoUsuarios() {
     setCargo("");
     setSetor("");
     setTelefone("");
+    setPapelEdicao("colaborador");
   };
 
   const salvarPerfil = async (e: FormEvent) => {
@@ -185,7 +191,7 @@ export function AdministracaoUsuarios() {
       const dados = await respostaJson(await fetch(urlApi("/api/auth?acao=usuario"), {
         method: "POST",
         headers: { ...headers, "Content-Type": "application/json" },
-        body: JSON.stringify({ id: editandoId, perfilProfissional: true, cargo: cargo.trim(), setor: setor.trim(), telefone: telefone.trim() }),
+        body: JSON.stringify({ id: editandoId, perfilProfissional: true, perfil: papelEdicao, cargo: cargo.trim(), setor: setor.trim(), telefone: telefone.trim() }),
       }));
       const atualizado = dados.usuario as UsuarioAdministrado;
       setUsuarios((atuais) => atuais.map((item) => item.id === atualizado.id ? atualizado : item));
@@ -226,6 +232,12 @@ export function AdministracaoUsuarios() {
           </Campo>
           <Campo id="admin-email" rotulo="E-mail autorizado" obrigatorio>
             <input id="admin-email" className="campo" type="email" value={email} maxLength={320} onChange={(e) => setEmail(e.target.value)} autoComplete="email" required />
+          </Campo>
+          <Campo id="admin-perfil" rotulo="Acesso">
+            <select id="admin-perfil" className="seletor campo" value={papel} onChange={(e) => setPapel(e.target.value as "adm" | "colaborador")}>
+              <option value="colaborador">Colaborador — painel da empresa</option>
+              <option value="adm">Administrador — área da empresa</option>
+            </select>
           </Campo>
           <Campo id="admin-cargo" rotulo="Cargo">
             <input id="admin-cargo" className="campo" value={cargo} maxLength={120} onChange={(e) => setCargo(e.target.value)} placeholder="Ex.: Coordenador" autoComplete="organization-title" />
@@ -283,6 +295,7 @@ export function AdministracaoUsuarios() {
                 <><span className="admin-usuarios-proprietario"><ShieldCheck size={13} /> Proprietário</span><span className="admin-usuarios-proprietario"><FileSpreadsheet size={13} /> Robô liberado</span></>
               ) : (
                 <>
+                  <span className="admin-usuarios-proprietario">{item.perfil === "adm" ? "Administrador" : "Colaborador"}</span>
                   <Botao pequeno variante={item.robo_aderencias ? "primario" : "secundario"} icone={<FileSpreadsheet size={13} />} onClick={() => void alterarAcessoAderencias(item)}>
                     {item.robo_aderencias ? "Robô liberado" : "Liberar robô"}
                   </Botao>
@@ -299,6 +312,12 @@ export function AdministracaoUsuarios() {
               <form className="admin-usuarios-edicao" onSubmit={salvarPerfil}>
                 <div className="admin-usuarios-edicao-cabecalho"><strong>Perfil profissional</strong><span>Esses dados ficam visíveis no ambiente da empresa.</span></div>
                 <div className="admin-usuarios-campos">
+                  <Campo id={`admin-editar-perfil-${item.id}`} rotulo="Acesso">
+                    <select id={`admin-editar-perfil-${item.id}`} className="seletor campo" value={papelEdicao} onChange={(e) => setPapelEdicao(e.target.value as "adm" | "colaborador")}>
+                      <option value="colaborador">Colaborador — painel da empresa</option>
+                      <option value="adm">Administrador — área da empresa</option>
+                    </select>
+                  </Campo>
                   <Campo id={`admin-editar-cargo-${item.id}`} rotulo="Cargo">
                     <input id={`admin-editar-cargo-${item.id}`} className="campo" value={cargo} maxLength={120} onChange={(e) => setCargo(e.target.value)} />
                   </Campo>

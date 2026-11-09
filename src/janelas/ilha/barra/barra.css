@@ -190,6 +190,47 @@
   font-weight: 500;
 }
 
+.ilha-barra-materiais {
+  gap: 6px;
+  padding: 0 8px 0 6px;
+  color: var(--i-tinta);
+}
+
+.ilha-barra-materiais-icone {
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border-radius: 7px;
+  background: var(--i-elevado-2);
+  color: var(--i-tinta);
+}
+
+.ilha-barra-materiais-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.ilha-barra-materiais-badge {
+  min-width: 18px;
+  height: 18px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--i-elevado-2);
+  color: var(--i-dim);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.ilha-barra-materiais:hover .ilha-barra-materiais-icone,
+.ilha-barra-materiais[data-ativo] .ilha-barra-materiais-icone {
+  background: var(--i-ligado);
+  color: var(--i-tinta-ligado);
+}
+
 .ilha-barra-chevron {
   transition: transform 0.2s;
 }
@@ -1249,13 +1290,43 @@ button.ilha-rapido-icone:hover:not(:disabled),
   gap: 8px;
 }
 
+.ilha-material-resumo {
+  min-width: 0;
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0;
+  text-align: left;
+  color: var(--i-tinta);
+}
+
+.ilha-material-resumo:hover .ilha-material-nome,
+.ilha-material-resumo:focus-visible .ilha-material-nome {
+  color: var(--destaque);
+}
+
+.ilha-material-dados {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
 .ilha-material-imagem {
-  width: 34px;
-  height: 34px;
-  flex: 0 0 34px;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
   object-fit: cover;
-  border-radius: 8px;
+  border-radius: 10px;
   border: 1px solid var(--borda);
+  background: var(--superficie);
+}
+
+.ilha-material-imagem-vazia {
+  display: grid;
+  place-items: center;
+  color: var(--texto-3);
   background: var(--superficie);
 }
 
@@ -1264,6 +1335,29 @@ button.ilha-rapido-icone:hover:not(:disabled),
   font-weight: 600;
   letter-spacing: 0.02em;
   color: var(--i-tinta);
+}
+
+.ilha-material-meta {
+  color: var(--texto-3);
+  font-size: 10.5px;
+}
+
+.ilha-material-ver-codigos {
+  margin-left: auto;
+  color: var(--texto-3);
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.ilha-material-chevron {
+  flex: 0 0 auto;
+  color: var(--texto-3);
+  transition: transform 0.18s ease, color 0.18s ease;
+}
+
+.ilha-material-card[data-aberto] .ilha-material-chevron {
+  transform: rotate(180deg);
+  color: var(--destaque);
 }
 
 .ilha-material-controles {
@@ -1367,6 +1461,18 @@ button.ilha-rapido-icone:hover:not(:disabled),
   color: var(--texto);
   border-color: var(--destaque);
   background: var(--destaque-suave);
+}
+
+.ilha-materiais-foto-botao:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.ilha-materiais-foto-erro {
+  flex-basis: 100%;
+  color: var(--erro);
+  font-size: 10.5px;
+  line-height: 1.35;
 }
 
 .ilha-materiais-foto-previa {
@@ -1608,6 +1714,143 @@ button.ilha-rapido-icone:hover:not(:disabled),
   border-color: var(--destaque);
   box-shadow: 0 0 0 3px var(--foco);
   outline: none;
+}
+
+/* Catálogo compacto: foto e nome primeiro; códigos somente quando o cartão abre. */
+.ilha-pop.estilo-sistema.ilha-materiais {
+  width: 398px;
+  padding: 15px;
+  gap: 12px;
+  border-radius: 20px;
+  background: var(--fundo-barra);
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.24);
+}
+
+.ilha-materiais-topo {
+  gap: 11px;
+}
+
+.ilha-materiais-titulo {
+  font-size: 15px;
+  letter-spacing: -0.02em;
+}
+
+.ilha-materiais-titulo-icone {
+  width: 30px;
+  height: 30px;
+  border-radius: 10px;
+}
+
+.ilha-materiais-contagem {
+  height: 19px;
+  min-width: 19px;
+  background: var(--destaque-suave);
+  color: var(--destaque);
+}
+
+.ilha-materiais-subtitulo {
+  color: var(--texto-2);
+}
+
+.ilha-materiais-lista {
+  gap: 8px;
+  max-height: 430px;
+  padding: 1px;
+  margin: 0 -1px -1px;
+}
+
+.ilha-material-card {
+  gap: 9px;
+  padding: 10px;
+  border: 1px solid transparent;
+  border-radius: 15px;
+  background: var(--superficie);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.04);
+  transition: border-color 0.16s, background 0.16s, transform 0.16s;
+}
+
+.ilha-material-card:hover,
+.ilha-material-card[data-aberto] {
+  border-color: var(--destaque-borda);
+  background: var(--superficie-2);
+}
+
+.ilha-material-card:hover {
+  transform: translateY(-1px);
+}
+
+.ilha-material-resumo {
+  gap: 10px;
+  padding: 2px 0;
+}
+
+.ilha-material-imagem,
+.ilha-material-imagem-vazia {
+  width: 46px;
+  height: 46px;
+  flex-basis: 46px;
+  border-radius: 12px;
+}
+
+.ilha-material-imagem-vazia {
+  border-color: var(--borda-controle);
+  background: var(--fundo-barra);
+}
+
+.ilha-material-dados {
+  gap: 4px;
+}
+
+.ilha-material-nome {
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.ilha-material-meta {
+  font-family: var(--fonte-mono);
+  font-size: 10px;
+  color: var(--texto-3);
+}
+
+.ilha-material-chevron {
+  width: 27px;
+  height: 27px;
+  padding: 6px;
+  border-radius: 8px;
+  background: var(--fundo-barra);
+}
+
+.ilha-material-card[data-aberto] .ilha-material-chevron {
+  background: var(--destaque-suave);
+}
+
+.ilha-material-controles {
+  opacity: 0.55;
+  transition: opacity 0.16s;
+}
+
+.ilha-material-card:hover .ilha-material-controles,
+.ilha-material-card:focus-within .ilha-material-controles,
+.ilha-material-card[data-aberto] .ilha-material-controles {
+  opacity: 1;
+}
+
+.ilha-material-grade {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  padding-top: 10px;
+  border-top: 1px solid var(--borda-suave);
+}
+
+.ilha-material-pilula {
+  min-height: 32px;
+  padding: 5px 9px;
+  border-radius: 10px;
+  background: var(--fundo-barra);
+}
+
+.ilha-material-pilula-unica {
+  min-height: 30px;
 }
 
 @media (max-width: 520px) {

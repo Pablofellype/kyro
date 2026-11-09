@@ -5,11 +5,14 @@ if (!databaseUrl) throw new Error("DATABASE_URL ou POSTGRES_URL nao definida");
 
 const sql = neon(databaseUrl);
 
+await sql`ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS perfil VARCHAR(20) NOT NULL DEFAULT 'colaborador'`;
+await sql`UPDATE usuarios SET perfil = 'colaborador' WHERE perfil IS NULL OR perfil = 'usuario' OR perfil NOT IN ('dono', 'adm', 'colaborador')`;
 await sql`ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS cargo VARCHAR(120)`;
 await sql`ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS setor VARCHAR(120)`;
 await sql`ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS telefone VARCHAR(40)`;
 await sql`ALTER TABLE tokens_acesso ADD COLUMN IF NOT EXISTS cargo VARCHAR(120)`;
 await sql`ALTER TABLE tokens_acesso ADD COLUMN IF NOT EXISTS setor VARCHAR(120)`;
 await sql`ALTER TABLE tokens_acesso ADD COLUMN IF NOT EXISTS telefone VARCHAR(40)`;
+await sql`ALTER TABLE tokens_acesso ADD COLUMN IF NOT EXISTS perfil VARCHAR(20) NOT NULL DEFAULT 'colaborador'`;
 
 console.log("OK perfil profissional dos usuarios");

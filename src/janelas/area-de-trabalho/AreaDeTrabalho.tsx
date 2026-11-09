@@ -58,6 +58,7 @@ export function AreaDeTrabalho() {
   }
 
   const sistemaVisivel = ehMobile || (aberto && !minimizado);
+  const dono = usuario.perfil === "dono";
 
   return (
     <div className="area-trabalho" data-mobile={ehMobile ? "sim" : "nao"}>
@@ -70,9 +71,9 @@ export function AreaDeTrabalho() {
       <Ilha />
       {!ehMobile && <Dock />}
       {!ehMobile && <AssistiveTouch />}
-      <BuscaGlobal />
-      <CapturaRapida />
-      {!primeira && <PrimeiraExecucao />}
+      {dono && <BuscaGlobal />}
+      {dono && <CapturaRapida />}
+      {dono && !primeira && <PrimeiraExecucao />}
     </div>
   );
 }

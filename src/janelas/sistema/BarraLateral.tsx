@@ -19,6 +19,7 @@ import { primeiraRotaDaArea, rotaDisponivelNaArea, rotaVisivelNaArea, ROTULOS_EM
 import { mudarTema } from "../area-de-trabalho/mudarTema";
 import { IndicadorSincronia } from "../../componentes/IndicadorSincronia";
 import { Marca } from "../../marcas/Marca";
+import { ehDono, podeAcessarArea, podeAcessarRota } from "../../servicos/permissoes";
 
 function useContadores(): Partial<Record<Rota, { n: number; alerta?: boolean }>> {
   const hoje = hojeISO();
@@ -170,8 +171,15 @@ export function BarraLateral({ recolhida }: { recolhida: boolean }) {
   const [fade, setFade] = useState({ topo: false, base: false });
   const desligadas = useConfig((s) => s.funcoesDesligadas);
   const hoje = tarefasDoDia(tarefas.filter((t) => area === "empresa" ? t.area === "empresa" : t.area !== "empresa"), hojeISO()).filter((t) => t.status !== "cancelada").slice(0, 5);
-  const visiveis = barra.filter((i) => i.visivel && rotaLigada(i.rota, desligadas) && rotaVisivelNaArea(i.rota, area));
+  const visiveis = barra.filter((i) => i.visivel && rotaLigada(i.rota, desligadas) && rotaVisivelNaArea(i.rota, area) && podeAcessarRota(usuario, i.rota, area));
+  const dono = ehDono(usuario);
   const mostrarHoje = funcaoLigada("journal", desligadas);
+
+  useEffect(() => {
+    if (!usuario || dono) return;
+    if (area !== "empresa") definirArea("empresa");
+    if (!podeAcessarRota(usuario, rota, "empresa")) irPara("escritorio");
+  }, [area, definirArea, dono, irPara, rota, usuario]);
 
   useEffect(() => {
     const el = rolagem.current;
@@ -195,6 +203,7 @@ export function BarraLateral({ recolhida }: { recolhida: boolean }) {
   const alternarGrupo = (g: string) => definir({ gruposFechados: fechados.includes(g) ? fechados.filter((x) => x !== g) : [...fechados, g] });
 
   const trocarArea = (proxima: AreaSistema) => {
+    if (!podeAcessarArea(usuario, proxima)) return;
     if (proxima === area) return;
     definirArea(proxima);
     if (!rotaDisponivelNaArea(rota, proxima)) irPara(primeiraRotaDaArea(proxima));
@@ -247,10 +256,10 @@ export function BarraLateral({ recolhida }: { recolhida: boolean }) {
         </button>
       )}
       <div className="barra-contexto" role="tablist" aria-label="Área do sistema">
-        <button type="button" className="barra-contexto-botao" data-ativo={area === "pessoal" ? "sim" : "nao"} role="tab" aria-selected={area === "pessoal"} title="Pessoal" onClick={() => trocarArea("pessoal")}>
+        {dono && <button type="button" className="barra-contexto-botao" data-ativo={area === "pessoal" ? "sim" : "nao"} role="tab" aria-selected={area === "pessoal"} title="Pessoal" onClick={() => trocarArea("pessoal")}>
           <UserRound size={14} />
           {!recolhida && <span>Pessoal</span>}
-        </button>
+        </button>}
         <button type="button" className="barra-contexto-botao" data-ativo={area === "empresa" ? "sim" : "nao"} role="tab" aria-selected={area === "empresa"} title="Empresa" onClick={() => trocarArea("empresa")}>
           <Building2 size={14} />
           {!recolhida && <span>Empresa</span>}
@@ -306,7 +315,7 @@ export function BarraLateral({ recolhida }: { recolhida: boolean }) {
       <div className="barra-base">
         <IndicadorSincronia recolhida={recolhida} />
         <div className="barra-base-linha">
-          <button type="button" className="barra-perfil" title={T.perfil.abrirPerfil} onClick={() => irPara("configuracoes", { secao: "geral" })}>
+          <button type="button" className="barra-perfil" title={dono ? T.perfil.abrirPerfil : nomeExibido} disabled={!dono} onClick={() => irPara("configuracoes", { secao: "geral" })}>
             <Avatar tamanho={28} />
             {!recolhida && <span className="cortar">{nomeExibido}</span>}
           </button>
@@ -315,9 +324,9 @@ export function BarraLateral({ recolhida }: { recolhida: boolean }) {
               <button type="button" className="barra-icone" role="switch" aria-checked={escuroAgora} aria-label={rotuloTema} title={rotuloTema} onClick={(evento) => mudarTema(escuroAgora ? "claro" : "escuro", evento.currentTarget)}>
                 {escuroAgora ? <Moon size={15} /> : <Sun size={15} />}
               </button>
-              <button type="button" className="barra-icone" data-tour="ajustes" aria-current={emAjustes ? "page" : undefined} aria-label={T.rotas.configuracoes} title={T.rotas.configuracoes} onClick={() => irPara("configuracoes")}>
+              {dono && <button type="button" className="barra-icone" data-tour="ajustes" aria-current={emAjustes ? "page" : undefined} aria-label={T.rotas.configuracoes} title={T.rotas.configuracoes} onClick={() => irPara("configuracoes")}>
                 <Settings size={15} />
-              </button>
+              </button>}
               <button type="button" className="barra-icone" aria-label="Sair da conta" title="Sair da conta" onClick={() => void logout()}>
                 <LogOut size={15} />
               </button>
@@ -329,9 +338,9 @@ export function BarraLateral({ recolhida }: { recolhida: boolean }) {
             <button type="button" className="barra-icone barra-icone-largo" role="switch" aria-checked={escuroAgora} aria-label={rotuloTema} title={rotuloTema} onClick={(evento) => mudarTema(escuroAgora ? "claro" : "escuro", evento.currentTarget)}>
               {escuroAgora ? <Moon size={16} /> : <Sun size={16} />}
             </button>
-            <button type="button" className="barra-icone barra-icone-largo" data-tour="ajustes" aria-current={emAjustes ? "page" : undefined} aria-label={T.rotas.configuracoes} title={T.rotas.configuracoes} onClick={() => irPara("configuracoes")}>
+            {dono && <button type="button" className="barra-icone barra-icone-largo" data-tour="ajustes" aria-current={emAjustes ? "page" : undefined} aria-label={T.rotas.configuracoes} title={T.rotas.configuracoes} onClick={() => irPara("configuracoes")}>
               <Settings size={16} />
-            </button>
+            </button>}
             <button type="button" className="barra-icone barra-icone-largo" aria-label="Sair da conta" title="Sair da conta" onClick={() => void logout()}>
               <LogOut size={16} />
             </button>

@@ -74,6 +74,8 @@ export function AppSistema() {
     return <TelaLogin />;
   }
 
+  const dono = usuario.perfil === "dono";
+
   return (
     <div className="area-trabalho area-nativa estilo-sistema">
       <JanelaSistema />
@@ -82,9 +84,9 @@ export function AppSistema() {
           <JanelaConexao key={j.id} janela={j} />
         ))}
       </AnimatePresence>
-      <BuscaGlobal />
-      <CapturaRapida />
-      {!primeira && <PrimeiraExecucao />}
+      {dono && <BuscaGlobal />}
+      {dono && <CapturaRapida />}
+      {dono && !primeira && <PrimeiraExecucao />}
     </div>
   );
 }
