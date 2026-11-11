@@ -28,7 +28,7 @@ export function MateriaisNaBarra({
   const { materiais, adicionarMaterial, atualizarMaterial, importarTexto, excluirMaterial } =
     useMateriais();
   const usuario = useAuth((s) => s.usuario);
-  const podeEditar = usuario?.perfil === "dono" || usuario?.perfil === "adm";
+  const podeEditar = usuario?.perfil === "dono" || usuario?.perfil === "gerencia";
   const [busca, setBusca] = useState("");
   const [copiado, setCopiado] = useState<string | null>(null);
   const [modoCadastro, setModoCadastro] = useState<"fechado" | "item" | "lote">("fechado");

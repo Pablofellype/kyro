@@ -1,6 +1,5 @@
 import { useEffect } from "react";
 import { AnimatePresence } from "motion/react";
-import { LoaderCircle } from "lucide-react";
 import { Ilha } from "../ilha/Ilha";
 import { Dock } from "../dock/Dock";
 import { AssistiveTouch } from "../assistive/AssistiveTouch";
@@ -17,6 +16,7 @@ import { useServicos } from "../../servicos/servicos";
 import { usarTamanhoDaTela, verificarSeEhMobile } from "../usarTamanhoDaTela";
 import { useAuth } from "../../estado/autenticacao";
 import { TelaLogin } from "../../componentes/login/TelaLogin";
+import { CarregamentoKyro } from "../../componentes/login/CarregamentoKyro";
 
 export function AreaDeTrabalho() {
   usarTema();
@@ -24,8 +24,6 @@ export function AreaDeTrabalho() {
   useServicos();
   const tela = usarTamanhoDaTela();
   const ehMobile = verificarSeEhMobile(tela);
-  const aberto = useInterface((s) => s.sistemaAberto);
-  const minimizado = useInterface((s) => s.sistemaMinimizado);
   const janelas = useInterface((s) => s.janelasConexao);
   const primeira = useConfig((s) => s.primeiraExecucaoFeita);
 
@@ -46,23 +44,18 @@ export function AreaDeTrabalho() {
   }, [ehMobile]);
 
   if (carregandoAuth) {
-    return (
-      <div className="kyro-login-container">
-        <LoaderCircle size={28} className="girando" style={{ color: "#3b82f6" }} />
-      </div>
-    );
+    return <CarregamentoKyro mensagem="Confirmando seu acesso" />;
   }
 
   if (!usuario) {
     return <TelaLogin />;
   }
 
-  const sistemaVisivel = ehMobile || (aberto && !minimizado);
   const dono = usuario.perfil === "dono";
 
   return (
-    <div className="area-trabalho" data-mobile={ehMobile ? "sim" : "nao"}>
-      <AnimatePresence>{sistemaVisivel && <JanelaSistema key="sistema" mobile={ehMobile} />}</AnimatePresence>
+    <div className="area-trabalho area-web estilo-sistema" data-modelo={ehMobile ? "web-celular" : "web-computador"} data-mobile={ehMobile ? "sim" : "nao"}>
+      <JanelaSistema mobile={ehMobile} />
       <AnimatePresence>
         {!ehMobile && janelas.filter((j) => !j.minimizada).map((j) => (
           <JanelaConexao key={j.id} janela={j} />

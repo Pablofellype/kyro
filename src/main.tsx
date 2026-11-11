@@ -37,6 +37,7 @@ import "./estilos/telas/configuracoes.css";
 import "./estilos/telas/busca.css";
 import "./estilos/telas/whatsapp.css";
 import "./estilos/responsivo.css";
+import "./estilos/visualKyro.css";
 import { iniciarArmazenamento } from "./ponte/armazenamento";
 import { JANELA, NATIVO, prepararPonte, desviarLinksExternos, iniciarSinalDeVida } from "./desktop/desktop";
 import { T } from "./textos/textos";
@@ -47,6 +48,14 @@ document.documentElement.dataset.tema = "claro";
 const SELETOR_DAS_SOBREPOSTAS = ".ilha-raiz, .ilha-gatilho, .ilha-barra, .ilha-pop, .dock, .dock-gatilho, .dock-previa";
 
 async function iniciar() {
+  const visitante = typeof window !== "undefined" && (window.location.pathname === "/visitante" || new URLSearchParams(window.location.search).get("visitante") === "1");
+  if (visitante) {
+    const raizPublica = document.getElementById("raiz");
+    if (!raizPublica) return;
+    const VisitantePublico = (await import("./modulos/publico/VisitantePublico")).default;
+    createRoot(raizPublica).render(<StrictMode><VisitantePublico /></StrictMode>);
+    return;
+  }
   iniciarSinalDeVida();
   const sobreposta = JANELA === "ilha" || JANELA === "dock" || JANELA === "assistive";
   if (sobreposta) document.documentElement.classList.add("janela-sobreposta");

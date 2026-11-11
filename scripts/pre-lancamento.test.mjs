@@ -238,13 +238,17 @@ test("script temporário é revalidado e reparado depois de adulteração", () =
   } finally { fs.rmSync(pasta, { recursive: true, force: true }); }
 });
 
-test("CSP do HTML deriva da política nativa com permissões para PDF, mídia e workers", () => {
+test("CSP do HTML deriva da política nativa com permissões para PDF, mídia e workers", async () => {
   const config = JSON.parse(readFileSync("src-tauri/tauri.conf.json", "utf8"));
   const politica = config.app.security.csp;
   for (const trecho of ["worker-src 'self' blob:", "'wasm-unsafe-eval'", "object-src 'none'", "media-src 'self' data: blob:", "frame-src 'self' blob:"]) assert.ok(politica.includes(trecho), trecho);
   const vite = readFileSync("vite.config.ts", "utf8");
   assert.match(vite, /JSON\.parse\(readFileSync\(new URL\("\.\/src-tauri\/tauri\.conf\.json"/);
   assert.doesNotMatch(politica, /'unsafe-eval'/);
+  const { APLICATIVOS_EMPRESA } = await import("../src/modulos/escritorio/aplicativosEmpresaConfig.ts");
+  const origens = [...new Set(APLICATIVOS_EMPRESA.filter((app) => app.status === "disponivel" && app.url).map((app) => new URL(app.url).origin))];
+  const fontes = politica.split(";").find((diretiva) => diretiva.trim().startsWith("frame-src ")).trim().split(/\s+/).slice(1);
+  assert.deepEqual(fontes.sort(), ["'self'", "blob:", ...origens].sort(), "Somente os sistemas cadastrados devem ser liberados para exibição interna");
 });
 
 test("consulta de credenciais nativas tem prazo e não instala ponte sem token válido", async () => {

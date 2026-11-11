@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { alterarAtivoUsuario, alterarPermissaoAderencias, alterarPerfilProfissional, alterarPerfilUsuario, cancelarConviteUsuario, criarConviteUsuario, garantirPerfilProfissional, loginUsuario, listarConvitesPendentes, listarUsuarios, reenviarConviteUsuario, redefinirSenhaComToken, solicitarRedefinicaoSenha, urlPublicaDoAmbiente, validarSessao, logoutSessao, validarTokenAcesso } from "../src/servicos/autenticacao.js";
+import { alterarAtivoUsuario, alterarPermissaoAderencias, alterarPerfilProfissional, alterarPerfilUsuario, cancelarConviteUsuario, criarConviteUsuario, excluirUsuario, garantirPerfilProfissional, loginUsuario, listarConvitesPendentes, listarUsuarios, reenviarConviteUsuario, redefinirSenhaComToken, solicitarRedefinicaoSenha, urlPublicaDoAmbiente, validarSessao, logoutSessao, validarTokenAcesso } from "../src/servicos/autenticacao.js";
 import { configurarCors } from "./cors.js";
 
 function origemDaRequisicao(req: VercelRequest): string {
@@ -41,10 +41,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const acao = (req.query.acao as string) || "verificar";
 
-  // O painel de colaboradores e os convites usam os campos da migração 013.
+  // O painel Empresa e os convites usam os campos da migração 013.
   // Executamos a checagem uma vez por instância para corrigir implantações
   // publicadas antes da migração sem bloquear o login comum.
-  if (["recuperar", "redefinir", "convite", "usuarios", "convites", "usuario"].includes(acao)) {
+  if (["login", "recuperar", "redefinir", "convite", "usuarios", "convites", "usuario"].includes(acao)) {
     try {
       await garantirPerfilProfissional();
     } catch {
@@ -118,7 +118,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const cargo = typeof req.body?.cargo === "string" ? req.body.cargo : "";
     const setor = typeof req.body?.setor === "string" ? req.body.setor : "";
     const telefone = typeof req.body?.telefone === "string" ? req.body.telefone : "";
-    const perfil = req.body?.perfil === "adm" ? "adm" : "colaborador";
+    const perfil = "gerencia";
     try {
       await criarConviteUsuario(usuarioAtual, email, nome, urlPublicaDaRequisicao(req), { perfil, cargo, setor, telefone });
       return res.status(200).json({ sucesso: true, mensagem: "Convite enviado." });
@@ -150,6 +150,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const id = Number(req.body?.id);
     const ativo = req.body?.ativo === true;
     try {
+      if (req.body?.operacao === "excluir") {
+        return res.status(200).json({ sucesso: true, usuario: await excluirUsuario(usuarioAtual, id) });
+      }
       if (req.body?.perfilProfissional === true) {
         let usuarioAtualizado = await alterarPerfilProfissional(usuarioAtual, id, {
           cargo: typeof req.body?.cargo === "string" ? req.body.cargo : "",

@@ -8,6 +8,7 @@ import { tocarSom } from "../../ponte/sons";
 import { T } from "../../textos/textos";
 import { rotaLigada } from "../../utilitarios/funcoes";
 import { ACOES_GLOBAIS, combinaCom, type AcaoGlobal } from "../../utilitarios/atalhos";
+import { NATIVO } from "../../desktop/desktop";
 
 function emCampoDeTexto(alvo: EventTarget | null): boolean {
   const el = alvo as HTMLElement | null;
@@ -37,6 +38,10 @@ export function usarAtalhos() {
           privacidade: () => cfg.definir({ privacidade: !cfg.privacidade }),
           naoPerturbe: () => cfg.definir({ naoPerturbe: !cfg.naoPerturbe }),
           sistema: () => {
+            if (!NATIVO) {
+              ui.focarSistema();
+              return;
+            }
             const visivel = ui.sistemaAberto && !ui.sistemaMinimizado;
             ui.definirSistema(visivel ? { sistemaMinimizado: true } : { sistemaAberto: true, sistemaMinimizado: false });
             if (!visivel) ui.focarSistema();

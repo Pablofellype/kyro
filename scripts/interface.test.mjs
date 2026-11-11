@@ -293,3 +293,55 @@ test("ajustes do calendário claro preservam as cores base do tema escuro", () =
   assert.match(css, /\[data-tema="claro"\] \.estilo-sistema \.cl-mes\s*\{\s*background: var\(--borda\)/);
   assert.match(css, /\[data-tema="claro"\] \.estilo-sistema \.cl-dia\[data-fora="sim"\] \.cl-dia-numero\s*\{\s*color: var\(--texto-4\)/);
 });
+
+async function prepararModoVisualizacao(t, nativo) {
+  const nomes = ["window", "document", "localStorage", "BroadcastChannel"];
+  const anteriores = nomes.map((nome) => Object.getOwnPropertyDescriptor(globalThis, nome));
+  const memoria = new Map([
+    ["niko:sistema-aberto", "0"],
+    ["niko:janela-v2", JSON.stringify({ x: 70, y: 44, w: 960, h: 600 })],
+  ]);
+  globalThis.BroadcastChannel = undefined;
+  globalThis.localStorage = { getItem: (k) => memoria.get(k) ?? null, setItem: (k, v) => memoria.set(k, v), removeItem: (k) => memoria.delete(k) };
+  globalThis.window = Object.assign(new EventTarget(), {
+    innerWidth: 1366, innerHeight: 768, setTimeout, clearTimeout,
+    location: { search: "?banco=visualizacao" },
+    ...(nativo ? { __TAURI_INTERNALS__: { metadata: { currentWindow: { label: "sistema" } } } } : {}),
+  });
+  globalThis.document = Object.assign(new EventTarget(), { querySelector: () => null, body: {} });
+  const servidor = await criarServidorDeTeste(opcoes);
+  t.after(async () => {
+    await servidor.close();
+    nomes.forEach((nome, i) => {
+      if (anteriores[i]) Object.defineProperty(globalThis, nome, anteriores[i]);
+      else delete globalThis[nome];
+    });
+  });
+  const { useInterface } = await servidor.ssrLoadModule("/src/estado/interface.ts");
+  const { retangulosAbertos } = await servidor.ssrLoadModule("/src/janelas/geometria.ts");
+  return { useInterface, retangulosAbertos, memoria };
+}
+
+test("web abre o painel inteiro mesmo com sessão antiga fechada e não permite ocultá-lo", async (t) => {
+  const { useInterface, retangulosAbertos } = await prepararModoVisualizacao(t, false);
+  assert.equal(useInterface.getState().sistemaAberto, true);
+  useInterface.getState().definirSistema({ sistemaAberto: false, sistemaMinimizado: true });
+  assert.equal(useInterface.getState().sistemaAberto, true);
+  assert.equal(useInterface.getState().sistemaMinimizado, false);
+  assert.deepEqual(retangulosAbertos(), [{ x: 0, y: 0, w: 1366, h: 768 }]);
+  window.innerWidth = 390;
+  window.innerHeight = 844;
+  assert.deepEqual(retangulosAbertos(), [{ x: 0, y: 0, w: 390, h: 844 }]);
+  assert.deepEqual(useInterface.getState().geometria, { x: 70, y: 44, w: 960, h: 600 });
+});
+
+test("app nativo preserva fechamento, minimização e geometria independente da página web", async (t) => {
+  const { useInterface, retangulosAbertos, memoria } = await prepararModoVisualizacao(t, true);
+  useInterface.getState().definirSistema({ sistemaAberto: false, sistemaMinimizado: true });
+  assert.equal(useInterface.getState().sistemaAberto, false);
+  assert.equal(useInterface.getState().sistemaMinimizado, true);
+  assert.deepEqual(retangulosAbertos(), []);
+  useInterface.getState().definirSistema({ sistemaAberto: true, sistemaMinimizado: false });
+  assert.deepEqual(retangulosAbertos(), [{ x: 70, y: 44, w: 960, h: 600 }]);
+  assert.equal(memoria.get("niko:sistema-aberto"), "0");
+});

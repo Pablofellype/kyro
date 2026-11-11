@@ -62,6 +62,7 @@ const BLOCOS_PESSOAIS: ReadonlySet<BlocoInicio> = new Set(["time", "hoje", "foco
 function CabecalhoBloco({ numero, id, children }: { numero: string; id: BlocoInicio; children?: ReactNode }) {
   return (
     <header className="secao-cabecalho">
+      <span className="inicio-bloco-icone" aria-hidden="true">{ICONES[id]}</span>
       <span className="secao-numero">{numero}</span>
       <span className="secao-titulo">{TITULO[id]}</span>
       <span className="tracejado" aria-hidden="true" />
@@ -81,8 +82,6 @@ function BotaoIrPara({ rotulo, aoClicar }: { rotulo: string; aoClicar: () => voi
 
 function SecaoTime() {
   const agentes = useAgentes();
-  const favorito = useConfig((s) => s.agentes.favorito);
-  const irPara = useInterface((s) => s.irPara);
   const tarefas = useRotina((s) => s.tarefas);
   const hoje = hojeISO();
   const abertas = tarefasDoDia(tarefas, hoje).filter((t) => t.status !== "concluida" && t.status !== "cancelada").length;
@@ -94,7 +93,7 @@ function SecaoTime() {
 
   return (
     <section className="inicio-time" aria-label={T.inicio.time}>
-      <button type="button" className="inicio-agente" data-estado={estado} onClick={() => irPara("chat", { agente: favorito })}>
+      <div className="inicio-agente" data-estado={estado}>
         <span className="inicio-agente-retrato">
           <img src="/personagens/kyro/ocioso.svg" width="76" height="76" alt="" draggable={false} decoding="async" className="personagem-imagem" />
         </span>
@@ -106,7 +105,7 @@ function SecaoTime() {
           <span className="inicio-agente-cargo cortar">Assistente pessoal</span>
           <span className="inicio-agente-fala privado">{fala}</span>
         </span>
-      </button>
+      </div>
     </section>
   );
 }
@@ -619,23 +618,27 @@ export default function Inicio() {
 
   return (
     <>
-      <CabecalhoAba
-        rotulo={T.inicio.rotulo}
-        titulo={<>{T.inicio.saudacao(saudacao())}<em className="inicio-nome" title={nome || undefined}>{nome.trim().split(/\s+/)[0] || T.barraLateral.perfil}</em></>}
-        subtitulo={data}
-        acoes={
-          <>
-            <Botao icone={<ToggleRight size={13} />} onClick={() => setEscolhendoFuncoes(true)}>{T.funcoes.botao}</Botao>
-            <Botao icone={<SlidersHorizontal size={13} />} onClick={() => setPersonalizando(true)}>{T.inicio.personalizar}</Botao>
-            <Botao icone={<Users size={13} />} onClick={() => irPara("agentes")}>{T.agentes.personalizacao.botao}</Botao>
-          </>
-        }
-      />
-      {trechos.map((t, i) => (
-        <Fragment key={t.tipo === "time" ? `time-${i}` : `bento-${t.blocos[0].id}`}>
-          {t.tipo === "time" ? <SecaoTime /> : <GradeDoInicio blocos={t.blocos} />}
-        </Fragment>
-      ))}
+      <section className="inicio-painel" aria-label="Visão geral">
+        <div className="inicio-abertura">
+          <CabecalhoAba
+            rotulo={T.inicio.rotulo}
+            titulo={<>{T.inicio.saudacao(saudacao())}<em className="inicio-nome" title={nome || undefined}>{nome.trim().split(/\s+/)[0] || T.barraLateral.perfil}</em></>}
+            subtitulo={data}
+            acoes={
+              <>
+                <Botao icone={<ToggleRight size={13} />} onClick={() => setEscolhendoFuncoes(true)}>{T.funcoes.botao}</Botao>
+                <Botao icone={<SlidersHorizontal size={13} />} onClick={() => setPersonalizando(true)}>{T.inicio.personalizar}</Botao>
+                <Botao icone={<Users size={13} />} onClick={() => irPara("agentes")}>{T.agentes.personalizacao.botao}</Botao>
+              </>
+            }
+          />
+        </div>
+        {trechos.map((t, i) => (
+          <Fragment key={t.tipo === "time" ? `time-${i}` : `bento-${t.blocos[0].id}`}>
+            {t.tipo === "time" ? <SecaoTime /> : <GradeDoInicio blocos={t.blocos} />}
+          </Fragment>
+        ))}
+      </section>
       <Modal aberto={personalizando} titulo={T.inicio.personalizarTitulo} aoFechar={() => setPersonalizando(false)}>
         <p className="inicio-modal-dica">{T.inicio.personalizarDica}</p>
         <DndContext collisionDetection={closestCenter} onDragEnd={aoArrastar}>

@@ -1,0 +1,36 @@
+/* A versão web usa toda a área da aba. A moldura de Janela é exclusiva do app. */
+.area-trabalho.area-web,
+[data-tema="escuro"] .area-trabalho.area-web {
+  background: var(--fundo);
+  background-image: none;
+}
+
+.sistema-web {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  background: var(--fundo);
+  color: var(--texto);
+}
+
+.sistema-web-cabecalho {
+  display: flex;
+  align-items: center;
+  flex: 0 0 40px;
+  min-width: 0;
+  padding-inline: 18px;
+  border-bottom: 1px solid var(--borda);
+  background: var(--superficie);
+}
+
+.sistema-web-cabecalho > .migalha { min-width: 0; max-width: 100%; }
+.sistema-web > .janela-corpo { min-width: 0; }
+
+.sistema-web[data-mobile="sim"] {
+  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+}

@@ -194,7 +194,7 @@ export function Ilha() {
       window.clearInterval(sempre);
     };
   }, []);
-  usarAreaInterativa([".ilha-raiz:not(.ilha-raiz-oculta) .ilha", ".ilha-gatilho", ".ilha-barra-aba", ".ilha-pop"]);
+  usarAreaInterativa([".ilha-raiz:not(.ilha-raiz-oculta) .ilha", ".ilha-gatilho", ".ilha-barra-gatilho", ".ilha-barra-aba", ".ilha-pop"]);
   usarCursorFora(useCallback(() => setSobre(false), []));
   const aoClicarForaDaJanela = useRef<() => void>(() => undefined);
   usarCliqueFora(useCallback(() => aoClicarForaDaJanela.current(), []));
@@ -230,7 +230,7 @@ export function Ilha() {
   const abasDaEmpresa = new Set<AbaIlha>(["conexoes", "whatsapp"]);
   const abas = cfg.ordemAbas.filter((a) => ABAS_ILHA.includes(a) && cfg.blocos[a] && (usuario?.perfil === "dono" || abasDaEmpresa.has(a)) && (a !== "avisos" || comAvisos) && abaLigada(a, desligadas));
   const capturaDisponivel = usuario?.perfil === "dono" && tiposDeCapturaLigados(desligadas).length > 0;
-  const fallback = usuario?.perfil === "adm" ? "conexoes" : "hoje";
+  const fallback = usuario?.perfil === "gerencia" ? "conexoes" : "hoje";
   const abaAtual: VisaoIlha = aba === "captura" && capturaDisponivel ? "captura" : abas.includes(aba as AbaIlha) ? aba : abas[0] ?? fallback;
   const abaAntesDaCaptura = useRef<AbaIlha>("hoje");
   const rolagemDasAbas = useRef({ acumulado: 0, ultimaTroca: 0 });
@@ -470,7 +470,7 @@ export function Ilha() {
   const agenteCompacto = ["agente", "pomodoro", "relogio", "nada"].includes(compacta.tipo) ? agenteDaVez : compacta.tipo === "trabalho" ? trabalhando[0] : compacta.tipo === "revelacao" && !revelacao?.marca ? revelacao?.agente : undefined;
   const agenteContinuo = estadoEfetivo === "expandida" ? agenteLateral : agenteCompacto ?? agenteDaVez;
   const restantePomodoro = restanteAtual(pomodoro, agora);
-  const barraVisivel = !ehMobile && mostrarLateraisDaIlha({ ativadas: cfg.laterais, estado: estadoEfetivo, saudando, telaCheia: frente.telaCheia, areaEmFoco: lateraisLivres });
+  const barraVisivel = !ehMobile && mostrarLateraisDaIlha({ ativadas: cfg.laterais, estado: estadoEfetivo, saudando, telaCheia: frente.telaCheia, areaEmFoco: lateraisLivres, emUso: barraEmUso });
 
   const abaDaCompacta = (): VisaoIlha | undefined =>
     compacta.tipo === "revelacao" ? revelacao?.aba : compacta.tipo === "pomodoro" ? "foco" : compacta.tipo === "midia" ? "midia" : compacta.tipo === "trabalho" ? "chat" : compacta.tipo === "claude" || compacta.tipo === "claudePedido" ? "claude" : undefined;
@@ -587,15 +587,16 @@ export function Ilha() {
     }
   };
 
-  if (usuario?.perfil === "colaborador") return null;
+  if (usuario?.perfil === "visitante") return null;
 
   return (
     <>
       {cfg.laterais && (
         <BarraDoTopo
           visivel={barraVisivel}
+          revelarAoPassar={!ehMobile && !saudando}
           escala={escala}
-          larguraDaIlha={alvo.w * escala}
+          larguraDaIlha={oculta ? 0 : alvo.w * escala}
           aparencia={aparencia}
           aoUsar={setBarraEmUso}
         />

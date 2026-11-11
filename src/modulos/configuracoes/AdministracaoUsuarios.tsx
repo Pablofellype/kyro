@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { FormEvent } from "react";
-import { Check, FileSpreadsheet, LoaderCircle, MailPlus, Pencil, RefreshCw, Save, ShieldCheck, UserCheck, UserCog, UserX, X } from "lucide-react";
+import { Check, FileSpreadsheet, LoaderCircle, MailPlus, Pencil, RefreshCw, Save, ShieldCheck, Trash2, UserCheck, UserCog, UserX, X } from "lucide-react";
 import { Botao, Campo, AvisoFaixa } from "../../componentes/basicos";
 import { cabecalhosNiko, useAuth, urlApi } from "../../estado/autenticacao";
 
@@ -9,7 +9,7 @@ interface UsuarioAdministrado {
   email: string;
   nome: string;
   ativo: boolean;
-  perfil: "dono" | "adm" | "colaborador";
+  perfil: "dono" | "gerencia" | "visitante";
   robo_aderencias: boolean;
   cargo?: string | null;
   setor?: string | null;
@@ -22,7 +22,7 @@ interface ConvitePendente {
   cargo?: string | null;
   setor?: string | null;
   telefone?: string | null;
-  perfil?: "adm" | "colaborador" | null;
+  perfil?: "gerencia" | "visitante" | null;
   expira_em: string;
 }
 
@@ -55,8 +55,8 @@ export function AdministracaoUsuarios() {
   const [cargo, setCargo] = useState("");
   const [setor, setSetor] = useState("");
   const [telefone, setTelefone] = useState("");
-  const [papel, setPapel] = useState<"adm" | "colaborador">("colaborador");
-  const [papelEdicao, setPapelEdicao] = useState<"adm" | "colaborador">("colaborador");
+  const [papel, setPapel] = useState<"gerencia">("gerencia");
+  const [papelEdicao, setPapelEdicao] = useState<"gerencia" | "visitante">("gerencia");
   const [editandoId, setEditandoId] = useState<number | null>(null);
   const [carregando, setCarregando] = useState(false);
   const [enviando, setEnviando] = useState(false);
@@ -104,7 +104,7 @@ export function AdministracaoUsuarios() {
       setCargo("");
       setSetor("");
       setTelefone("");
-      setPapel("colaborador");
+      setPapel("gerencia");
       void carregar();
     } catch (e) {
       setErro(mensagemDoConvite(e instanceof Error ? e.message : "Não foi possível enviar o convite."));
@@ -163,12 +163,30 @@ export function AdministracaoUsuarios() {
     }
   };
 
+  const excluirAcesso = async (alvo: UsuarioAdministrado) => {
+    if (alvo.perfil === "dono" || !window.confirm(`Excluir definitivamente o acesso de ${alvo.nome}? Essa ação não pode ser desfeita.`)) return;
+    setErro("");
+    setMensagem("");
+    try {
+      await respostaJson(await fetch(urlApi("/api/auth?acao=usuario"), {
+        method: "POST",
+        headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify({ id: alvo.id, operacao: "excluir" }),
+      }));
+      setUsuarios((atuais) => atuais.filter((item) => item.id !== alvo.id));
+      if (editandoId === alvo.id) cancelarEdicao();
+      setMensagem(`O acesso de ${alvo.nome} foi excluído.`);
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : "Não foi possível excluir o acesso.");
+    }
+  };
+
   const iniciarEdicao = (alvo: UsuarioAdministrado) => {
     setEditandoId(alvo.id);
     setCargo(alvo.cargo ?? "");
     setSetor(alvo.setor ?? "");
     setTelefone(alvo.telefone ?? "");
-    setPapelEdicao(alvo.perfil === "adm" ? "adm" : "colaborador");
+    setPapelEdicao(alvo.perfil === "gerencia" ? "gerencia" : "visitante");
     setErro("");
     setMensagem("");
   };
@@ -178,7 +196,7 @@ export function AdministracaoUsuarios() {
     setCargo("");
     setSetor("");
     setTelefone("");
-    setPapelEdicao("colaborador");
+    setPapelEdicao("gerencia");
   };
 
   const salvarPerfil = async (e: FormEvent) => {
@@ -234,9 +252,8 @@ export function AdministracaoUsuarios() {
             <input id="admin-email" className="campo" type="email" value={email} maxLength={320} onChange={(e) => setEmail(e.target.value)} autoComplete="email" required />
           </Campo>
           <Campo id="admin-perfil" rotulo="Acesso">
-            <select id="admin-perfil" className="seletor campo" value={papel} onChange={(e) => setPapel(e.target.value as "adm" | "colaborador")}>
-              <option value="colaborador">Colaborador — painel da empresa</option>
-              <option value="adm">Administrador — área da empresa</option>
+            <select id="admin-perfil" className="seletor campo" value={papel} onChange={(e) => setPapel(e.target.value as "gerencia")}>
+              <option value="gerencia">Gerência — painel completo da empresa</option>
             </select>
           </Campo>
           <Campo id="admin-cargo" rotulo="Cargo">
@@ -295,13 +312,14 @@ export function AdministracaoUsuarios() {
                 <><span className="admin-usuarios-proprietario"><ShieldCheck size={13} /> Proprietário</span><span className="admin-usuarios-proprietario"><FileSpreadsheet size={13} /> Robô liberado</span></>
               ) : (
                 <>
-                  <span className="admin-usuarios-proprietario">{item.perfil === "adm" ? "Administrador" : "Colaborador"}</span>
+                  <span className="admin-usuarios-proprietario">{item.perfil === "gerencia" ? "Gerência" : "Visitante"}</span>
                   <Botao pequeno variante={item.robo_aderencias ? "primario" : "secundario"} icone={<FileSpreadsheet size={13} />} onClick={() => void alterarAcessoAderencias(item)}>
                     {item.robo_aderencias ? "Robô liberado" : "Liberar robô"}
                   </Botao>
                   <Botao pequeno variante={item.ativo ? "secundario" : "primario"} icone={item.ativo ? <UserX size={13} /> : <UserCheck size={13} />} onClick={() => void alterarAtivo(item)}>
                     {item.ativo ? "Desativar" : "Reativar"}
                   </Botao>
+                  <Botao pequeno variante="fantasma" icone={<Trash2 size={13} />} onClick={() => void excluirAcesso(item)}>Excluir</Botao>
                 </>
               )}
               <Botao pequeno variante="fantasma" icone={<Pencil size={13} />} onClick={() => editandoId === item.id ? cancelarEdicao() : iniciarEdicao(item)}>
@@ -313,9 +331,9 @@ export function AdministracaoUsuarios() {
                 <div className="admin-usuarios-edicao-cabecalho"><strong>Perfil profissional</strong><span>Esses dados ficam visíveis no ambiente da empresa.</span></div>
                 <div className="admin-usuarios-campos">
                   <Campo id={`admin-editar-perfil-${item.id}`} rotulo="Acesso">
-                    <select id={`admin-editar-perfil-${item.id}`} className="seletor campo" value={papelEdicao} onChange={(e) => setPapelEdicao(e.target.value as "adm" | "colaborador")}>
-                      <option value="colaborador">Colaborador — painel da empresa</option>
-                      <option value="adm">Administrador — área da empresa</option>
+                    <select id={`admin-editar-perfil-${item.id}`} className="seletor campo" value={papelEdicao} onChange={(e) => setPapelEdicao(e.target.value as "gerencia" | "visitante")}>
+                      <option value="gerencia">Gerência — painel completo da empresa</option>
+                      <option value="visitante">Visitante — acesso público, sem login</option>
                     </select>
                   </Campo>
                   <Campo id={`admin-editar-cargo-${item.id}`} rotulo="Cargo">

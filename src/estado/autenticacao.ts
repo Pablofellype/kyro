@@ -6,7 +6,7 @@ export interface UsuarioAutenticado {
   id: number;
   email: string;
   nome: string;
-  perfil: "dono" | "adm" | "colaborador";
+  perfil: "dono" | "gerencia" | "visitante";
   roboAderencias: boolean;
 }
 
@@ -115,6 +115,10 @@ export const useAuth = create<EstadoAuth>((set, get) => ({
       }
       const dados = await res.json();
       if (dados.autenticado && dados.usuario) {
+        if (dados.usuario.perfil === "visitante") {
+          get().definirUsuario(null);
+          return false;
+        }
         set({ usuario: dados.usuario, carregando: false, erroVerificacao: null });
         return true;
       }

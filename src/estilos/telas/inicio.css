@@ -21,12 +21,7 @@
   background: var(--superficie-alta);
   color: var(--texto);
   text-align: left;
-  cursor: pointer;
-  transition: background 0.15s;
-}
-
-.estilo-sistema .inicio-agente:hover {
-  background: var(--superficie-ativa);
+  cursor: default;
 }
 
 .estilo-sistema .inicio-agente[data-estado="ouvindo"] { --cor-estado: var(--info); }

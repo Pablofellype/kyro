@@ -17,6 +17,7 @@ import { LimiteDeErro } from "../../componentes/LimiteDeErro";
 import { NotificacoesSistema } from "../../componentes/NotificacoesSistema";
 import { podeAcessarArea, podeAcessarRota } from "../../servicos/permissoes";
 import { useAuth } from "../../estado/autenticacao";
+import "./sistemaWeb.css";
 
 const MINIMO = { w: 960, h: 600 };
 
@@ -45,7 +46,7 @@ export function JanelaSistema({ mobile = false }: { mobile?: boolean } = {}) {
   const conteudo = useRef<HTMLDivElement>(null);
   const [largura, setLargura] = useState(1280);
 
-  const geometria = geometriaSalva.w > 0 ? geometriaSalva : geometriaPadrao();
+  const geometria = NATIVO ? (geometriaSalva.w > 0 ? geometriaSalva : geometriaPadrao()) : geometriaSalva;
 
   useEffect(() => {
     const el = conteudo.current?.parentElement;
@@ -69,18 +70,52 @@ export function JanelaSistema({ mobile = false }: { mobile?: boolean } = {}) {
   const Pagina = PAGINA_ROTA[rota];
   const recolhida = !mobile && (recolhidaManual || largura < 1100);
 
+  const titulo = (
+    <span className="migalha">
+      <span>{T.gruposBarra[GRUPO_DA_ROTA[rota]]}</span>
+      <span className="migalha-barra" aria-hidden="true">/</span>
+      <span className="migalha-atual">
+        {areaEfetiva === "empresa" ? "Empresa" : "Pessoal"} / {numeroDaRota(rota)} {(areaEfetiva === "pessoal" ? ROTULOS_PESSOAIS[rota] : ROTULOS_EMPRESA[rota]) || T.rotas[rota]}
+      </span>
+    </span>
+  );
+
+  const conteudoSistema = (
+    <>
+      <div className="sistema">
+        <BarraLateral recolhida={recolhida} />
+        <main className="sistema-conteudo" ref={conteudo}>
+          <LimiteDeErro key={rota} aoVoltar={() => useInterface.getState().irPara("inicio")}>
+            <Suspense fallback={<div className="carregando-pagina" aria-busy="true" />}>
+              <div className="pagina" key={rota}>
+                <Pagina />
+              </div>
+            </Suspense>
+          </LimiteDeErro>
+        </main>
+      </div>
+      <AvisosRodape />
+      <NotificacoesSistema />
+      <TourDoNiko />
+      <EstilosDaMidia />
+    </>
+  );
+
+  // No navegador, a navegação é uma página permanente. A janela arrastável,
+  // geometria salva e controles do sistema operacional pertencem ao desktop.
+  if (!NATIVO) {
+    return (
+      <section className="estilo-sistema sistema-web" data-mobile={mobile ? "sim" : "nao"} aria-label={T.app.nome} style={{ zIndex: z }} onPointerDownCapture={focar}>
+        {!mobile && <header className="sistema-web-cabecalho">{titulo}</header>}
+        <div className="janela-corpo" id="camada-sistema">{conteudoSistema}</div>
+      </section>
+    );
+  }
+
   return (
     <Janela
       className="estilo-sistema"
-      titulo={
-        <span className="migalha">
-          <span>{T.gruposBarra[GRUPO_DA_ROTA[rota]]}</span>
-          <span className="migalha-barra" aria-hidden="true">/</span>
-          <span className="migalha-atual">
-            {areaEfetiva === "empresa" ? "Empresa" : "Pessoal"} / {numeroDaRota(rota)} {(areaEfetiva === "pessoal" ? ROTULOS_PESSOAIS[rota] : ROTULOS_EMPRESA[rota]) || T.rotas[rota]}
-          </span>
-        </span>
-      }
+      titulo={titulo}
       rotuloAcessivel={T.app.nome}
       geometria={geometria}
       maximizada={maximizada}
@@ -98,22 +133,7 @@ export function JanelaSistema({ mobile = false }: { mobile?: boolean } = {}) {
       aoMaximizar={() => definirSistema({ sistemaMaximizado: !maximizada })}
       aoMudarGeometria={aoMudarGeometria}
     >
-      <div className="sistema">
-        <BarraLateral recolhida={recolhida} />
-        <main className="sistema-conteudo" ref={conteudo}>
-          <LimiteDeErro key={rota} aoVoltar={() => useInterface.getState().irPara("inicio")}>
-            <Suspense fallback={<div className="carregando-pagina" aria-busy="true" />}>
-              <div className="pagina" key={rota}>
-                <Pagina />
-              </div>
-            </Suspense>
-          </LimiteDeErro>
-        </main>
-      </div>
-      <AvisosRodape />
-      <NotificacoesSistema />
-      <TourDoNiko />
-      <EstilosDaMidia />
+      {conteudoSistema}
     </Janela>
   );
 }

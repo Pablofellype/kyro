@@ -87,6 +87,17 @@ test("foco no localhost distingue área de trabalho, janelas e controles da ilha
   assert.equal(focoDaAreaPeloElemento(null), undefined);
 });
 
+test("passar o mouse nas laterais revela a barra sem abrir a ilha central e mantém os painéis em uso", () => {
+  const base = { ativadas: true, estado: "escondida", saudando: false, telaCheia: false, areaEmFoco: false };
+  assert.equal(mostrarLateraisDaIlha(base), false);
+  assert.equal(mostrarLateraisDaIlha({ ...base, emUso: true }), true);
+  assert.equal(mostrarLateraisDaIlha({ ...base, estado: "compacta", emUso: true }), true);
+  assert.equal(mostrarLateraisDaIlha({ ...base, emUso: false }), false);
+  for (const bloqueio of [{ ativadas: false }, { saudando: true }, { telaCheia: true }]) {
+    assert.equal(mostrarLateraisDaIlha({ ...base, emUso: true, ...bloqueio }), false);
+  }
+});
+
 test("usar os controles das pontas não recolhe a ilha nem dispara o fechamento automático", () => {
   const codigo = readFileSync(new URL("../src/janelas/ilha/Ilha.tsx", import.meta.url), "utf8");
   assert.match(codigo, /sobre \|\| barraEmUso \|\| atraso === null \|\| fixada/);

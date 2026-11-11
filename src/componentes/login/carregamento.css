@@ -1,0 +1,98 @@
+@font-face {
+  font-family: "Bricolage Grotesque Variable";
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: swap;
+  src: url("../../../node_modules/@fontsource-variable/bricolage-grotesque/files/bricolage-grotesque-latin-opsz-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Geist";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../../../node_modules/@fontsource/geist/files/geist-latin-400-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Geist Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../../../node_modules/@fontsource/geist-mono/files/geist-mono-latin-400-normal.woff2") format("woff2");
+}
+
+.kyro-boot, .kyro-boot * { box-sizing: border-box; }
+.kyro-boot {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 24px;
+  width: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: max(24px, env(safe-area-inset-top)) max(clamp(22px, 4.5vw, 84px), env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom)) max(clamp(22px, 4.5vw, 84px), env(safe-area-inset-left));
+  overflow: auto;
+  color: #f2efe9;
+  background: #111113;
+  font-family: "Geist", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  color-scheme: dark;
+}
+.kyro-boot-topo { display: flex; align-items: center; gap: 28px; min-width: 0; }
+.kyro-boot-marca { display: inline-flex; align-items: center; gap: 10px; }
+.kyro-boot-marca img { width: 36px; height: 36px; object-fit: contain; border-radius: 22%; }
+.kyro-boot-marca > span { font: 650 34px/1 "Bricolage Grotesque Variable", "Geist", sans-serif; letter-spacing: -.08em; }
+.kyro-boot-marca b { color: #ff3b47; }
+.kyro-boot-assinatura { padding-left: 25px; border-left: 1px solid #303034; color: #a29f9b; font-size: 12px; }
+.kyro-boot-centro { display: flex; flex-direction: column; align-items: center; justify-content: center; align-self: center; min-width: 0; padding-block: 16px; text-align: center; }
+.kyro-boot-cena { position: relative; width: 240px; max-width: 90%; height: 172px; margin-bottom: 29px; perspective: 750px; }
+.kyro-boot-placa { position: absolute; width: 156px; height: 110px; border: 1px solid #454047; border-radius: 12px; background: #1b1b1f; }
+.kyro-boot-placa-atras { top: 16px; left: 22px; border-color: #302c32; background: #171719; transform: rotateY(-15deg) rotateZ(-12deg); }
+.kyro-boot-placa-frente { top: 22px; left: 50px; padding: 12px; transform: rotateY(-9deg) rotateZ(-5deg); box-shadow: 0 7px 0 #080809; animation: kyro-boot-janela 3.6s ease-in-out infinite; }
+.kyro-boot-placa-barra { display: flex; align-items: center; gap: 4px; padding-bottom: 9px; border-bottom: 1px solid #353038; }
+.kyro-boot-placa-barra i { width: 4px; height: 4px; border-radius: 50%; background: #5b5259; }
+.kyro-boot-placa-barra i:first-child { background: #ff5966; }
+.kyro-boot-placa-barra span { width: 32px; height: 3px; margin-left: auto; border-radius: 2px; background: #51464e; }
+.kyro-boot-miniapp { display: grid; grid-template-columns: 26px 1fr; gap: 7px 11px; align-items: center; padding-top: 15px; }
+.kyro-boot-miniapp img { grid-row: span 2; width: 26px; height: 26px; object-fit: contain; }
+.kyro-boot-miniapp > span { width: 70%; height: 5px; border-radius: 2px; background: #beb5b7; }
+.kyro-boot-miniapp > span:last-child { width: 90%; height: 4px; background: #574c54; }
+.kyro-boot-ilha { position: absolute; left: 57px; bottom: 16px; display: flex; align-items: center; gap: 9px; width: 149px; height: 34px; padding: 0 13px; border: 1px solid #6c424d; border-radius: 24px; background: #0b0b0d; transform: rotateZ(-5deg); box-shadow: 0 5px 0 #080809; animation: kyro-boot-ilha 3.6s ease-in-out infinite; }
+.kyro-boot-ilha b { color: #ff5966; font: 650 19px/1 "Bricolage Grotesque Variable", sans-serif; letter-spacing: -.08em; }
+.kyro-boot-ilha i { height: 4px; flex: 1; border-radius: 2px; background: #72616b; }
+.kyro-boot-ilha i:last-child { width: 5px; height: 5px; flex: 0 0 5px; border-radius: 50%; background: #ff6572; }
+.kyro-boot-kicker { color: #ada4a6; font: 9px/1.5 "Geist Mono", monospace; letter-spacing: .14em; }
+.kyro-boot-titulo { margin: 17px 0 14px; color: #f2efe9; font: 540 clamp(32px, 3.5vw, 54px)/1.08 "Bricolage Grotesque Variable", "Geist", sans-serif; letter-spacing: -.05em; }
+.kyro-boot-titulo > span { color: #ff3b47; }
+.kyro-boot-descricao { max-width: 100%; margin: 0; color: #a8a1a3; font-size: 13px; line-height: 1.6; }
+.kyro-boot-progresso { width: min(240px, 100%); height: 2px; margin-top: 30px; overflow: hidden; background: #363035; }
+.kyro-boot-progresso > span { display: block; width: 35%; height: 100%; background: #ff3b47; animation: kyro-boot-progresso 1.8s ease-in-out infinite; }
+.kyro-boot-status { display: flex; align-items: center; gap: 9px; margin-top: 14px; color: #b6aeb1; font: 9px/1.5 "Geist Mono", monospace; letter-spacing: .03em; }
+.kyro-boot-status > i { width: 4px; height: 4px; border-radius: 50%; background: #ff6370; }
+.kyro-boot-rodape { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-top: 19px; border-top: 1px solid #29272c; color: #a39b9b; font-size: 11px; }
+.kyro-boot-rodape > span:last-child { font: 9px "Geist Mono", monospace; letter-spacing: .08em; }
+html.janela-sobreposta .kyro-boot { display: none; }
+
+@keyframes kyro-boot-janela { 0%, 100% { transform: rotateY(-9deg) rotateZ(-5deg); } 50% { transform: rotateY(-5deg) rotateZ(-3deg) translateY(-4px); } }
+@keyframes kyro-boot-ilha { 0%, 100% { transform: rotateZ(-5deg); } 50% { transform: rotateZ(-3deg) translateY(-6px); } }
+@keyframes kyro-boot-progresso { from { transform: translateX(-110%); } to { transform: translateX(400%); } }
+@media (max-width: 599px) {
+  .kyro-boot { padding: max(20px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left)); }
+  .kyro-boot-assinatura { display: none; }
+  .kyro-boot-titulo { font-size: clamp(30px, 7vw, 40px); }
+  .kyro-boot-rodape { font-size: 9px; }
+  .kyro-boot-rodape > span:last-child { font-size: 8px; }
+}
+@media (max-height: 580px) {
+  .kyro-boot { gap: 14px; padding-block: 16px; }
+  .kyro-boot-cena { height: 145px; margin-bottom: 8px; }
+  .kyro-boot-centro { padding-block: 0; }
+  .kyro-boot-titulo { margin-block: 12px; font-size: 30px; }
+  .kyro-boot-progresso { margin-top: 18px; }
+  .kyro-boot-rodape { padding-top: 10px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .kyro-boot * { animation: none !important; }
+  .kyro-boot-progresso > span { width: 45%; margin-inline: auto; }
+}

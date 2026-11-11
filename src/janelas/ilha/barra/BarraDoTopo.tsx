@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { ChevronUp, Package, SlidersHorizontal } from "lucide-react";
 import { useConfig } from "../../../estado/configuracoes";
@@ -18,7 +18,7 @@ import type { AparenciaDeBorda } from "../../../utilitarios/cores";
 import "./barra.css";
 
 export const ALTURA_DA_FAIXA = 5;
-const ALTURA_DA_ABA = 30;
+const ALTURA_DA_ABA = 42;
 const RAIO_DAS_ORELHAS = 10;
 const PASSO_DA_RODA = 2;
 const MARGEM_DOS_POPS = 6;
@@ -27,6 +27,7 @@ type Pop = { tipo: "painel" } | { tipo: "materiais" } | { tipo: "bandeja"; direi
 
 interface PropsBarra {
   visivel: boolean;
+  revelarAoPassar: boolean;
   escala: number;
   larguraDaIlha: number;
   aparencia: AparenciaDeBorda;
@@ -118,13 +119,29 @@ function LadoDireito({ pop, alternarPainel, alternarBandeja }: { pop: Pop; alter
   );
 }
 
-export function BarraDoTopo({ visivel, escala, larguraDaIlha, aparencia, aoUsar }: PropsBarra) {
+export function BarraDoTopo({ visivel, revelarAoPassar, escala, larguraDaIlha, aparencia, aoUsar }: PropsBarra) {
   const [pop, setPop] = useState<Pop>(null);
   const [sobre, setSobre] = useState(false);
+  const relogioSaida = useRef<number | undefined>(undefined);
   const playerAberto = useIlha((s) => s.estado === "expandida" && s.aba === "midia");
   usarAudio(visivel || playerAberto, pop?.tipo === "painel" ? 1000 : 3000);
   usarRede(visivel, pop?.tipo === "painel" ? 8000 : 30000);
-  usarCursorFora(useCallback(() => setSobre(false), []));
+  usarCursorFora(useCallback(() => {
+    window.clearTimeout(relogioSaida.current);
+    setSobre(false);
+  }, []));
+
+  useEffect(() => () => {
+    window.clearTimeout(relogioSaida.current);
+    aoUsar(false);
+  }, [aoUsar]);
+
+  useEffect(() => {
+    if (!revelarAoPassar && !visivel) {
+      window.clearTimeout(relogioSaida.current);
+      setSobre(false);
+    }
+  }, [revelarAoPassar, visivel]);
 
   useEffect(() => {
     const { audio, rede, sincronizarAudio, sincronizarRede } = useControleRapido.getState();
@@ -174,20 +191,34 @@ export function BarraDoTopo({ visivel, escala, larguraDaIlha, aparencia, aoUsar 
   const altura = ALTURA_DA_ABA * escala;
   const topoDosPops = altura + MARGEM_DOS_POPS;
   const meiaIlha = Math.max(0, larguraDaIlha / 2 - 1);
-  const recorteDaIlha = `linear-gradient(to right, #000 calc(50% - ${meiaIlha}px), transparent calc(50% - ${meiaIlha}px), transparent calc(50% + ${meiaIlha}px), #000 calc(50% + ${meiaIlha}px))`;
+  const recorteDaIlha = larguraDaIlha > 0
+    ? `linear-gradient(to right, #000 calc(50% - ${meiaIlha}px), transparent calc(50% - ${meiaIlha}px), transparent calc(50% + ${meiaIlha}px), #000 calc(50% + ${meiaIlha}px))`
+    : "none";
   const variaveis = variaveisDaBorda(aparencia);
-  const aoEntrar = () => setSobre(true);
-  const aoSair = () => setSobre(false);
+  const aoEntrar = () => {
+    window.clearTimeout(relogioSaida.current);
+    setSobre(true);
+  };
+  const aoSair = () => {
+    window.clearTimeout(relogioSaida.current);
+    relogioSaida.current = window.setTimeout(() => setSobre(false), 250);
+  };
 
   return (
     <>
+      {revelarAoPassar && (
+        <div className="ilha-barra ilha-barra-gatilhos" data-visivel={visivel ? "sim" : "nao"} aria-hidden="true">
+          <div className="ilha-barra-gatilho ilha-barra-gatilho-esquerdo" onPointerEnter={aoEntrar} onPointerLeave={aoSair} />
+          <div className="ilha-barra-gatilho ilha-barra-gatilho-direito" onPointerEnter={aoEntrar} onPointerLeave={aoSair} />
+        </div>
+      )}
       <AnimatePresence>
         {visivel && (
           <motion.div
             key="barra"
             className="ilha-barra"
             {...atributosDoFundo(aparencia)}
-            style={{ ...variaveis, height: altura, ["--escala-barra" as string]: escala, ["--faixa" as string]: `${ALTURA_DA_FAIXA}px`, ["--raio-aba" as string]: `${RAIO_DAS_ORELHAS}px` }}
+            style={{ ...variaveis, height: altura, ["--escala-barra" as string]: escala, ["--faixa" as string]: `${ALTURA_DA_FAIXA * escala}px`, ["--raio-aba" as string]: `${RAIO_DAS_ORELHAS * escala}px` }}
             initial={{ y: "-100%" }}
             animate={{ y: 0 }}
             exit={{ y: "-100%" }}

@@ -1,5 +1,6 @@
 import { useConfig } from "../estado/configuracoes";
 import { useInterface, type Geometria } from "../estado/interface";
+import { NATIVO } from "../desktop/desktop";
 
 export const ALTURA_BARRA_TAREFAS = 0;
 export const ALTURA_DOCK = 62;
@@ -23,7 +24,7 @@ export function retangulosAbertos(): Geometria[] {
   const s = useInterface.getState();
   const area = areaUtil();
   const lista: Geometria[] = [];
-  if (s.sistemaAberto && !s.sistemaMinimizado) lista.push(s.sistemaMaximizado ? { x: 0, y: 0, w: area.w, h: area.h } : s.geometria);
+  if (s.sistemaAberto && !s.sistemaMinimizado) lista.push(!NATIVO ? { x: 0, y: 0, w: window.innerWidth, h: window.innerHeight } : s.sistemaMaximizado ? { x: 0, y: 0, w: area.w, h: area.h } : s.geometria);
   for (const j of s.janelasConexao) if (!j.minimizada) lista.push(j.maximizada ? { x: 0, y: 0, w: area.w, h: area.h } : j.geometria);
   return lista.filter((g) => g.w > 0);
 }

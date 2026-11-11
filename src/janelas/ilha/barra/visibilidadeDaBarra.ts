@@ -13,12 +13,13 @@ export function focoDaAreaPeloElemento(alvo: Element | null): boolean | undefine
   return undefined;
 }
 
-export function mostrarLateraisDaIlha({ ativadas, estado, saudando, telaCheia, areaEmFoco }: {
+export function mostrarLateraisDaIlha({ ativadas, estado, saudando, telaCheia, areaEmFoco, emUso = false }: {
   ativadas: boolean;
   estado: EstadoIlha;
   saudando: boolean;
   telaCheia: boolean;
   areaEmFoco: boolean;
+  emUso?: boolean;
 }): boolean {
-  return ativadas && !telaCheia && !saudando && estado !== "escondida" && (areaEmFoco || estado === "expandida");
+  return ativadas && !telaCheia && !saudando && (emUso || (estado !== "escondida" && (areaEmFoco || estado === "expandida")));
 }

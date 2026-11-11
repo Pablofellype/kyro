@@ -50,6 +50,7 @@ export interface ItemBarra {
 export const BARRA_PADRAO: ItemBarra[] = [
   { rota: "inicio", visivel: true },
   { rota: "escritorio", visivel: true },
+  { rota: "appsEmpresa", visivel: true },
   { rota: "conexoes", visivel: true },
   { rota: "journal", visivel: true },
   { rota: "estudos", visivel: true },
@@ -62,6 +63,7 @@ export const GRUPO_DA_ROTA: Record<Rota, "principal" | "organizacao" | "ferramen
   inicio: "principal",
   chat: "principal",
   escritorio: "principal",
+  appsEmpresa: "principal",
   conexoes: "principal",
   journal: "organizacao",
   estudos: "organizacao",

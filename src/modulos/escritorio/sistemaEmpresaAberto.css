@@ -1,0 +1,81 @@
+.estilo-sistema .sistema .pagina:has(> .apps-empresa-visualizador) {
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  min-height: 0;
+  padding: 0;
+  gap: 0;
+  animation: none;
+}
+
+.apps-empresa-visualizador {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 28rem;
+  background: var(--fundo);
+}
+
+.apps-empresa-ferramentas {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 12px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--borda-suave);
+  background: var(--superficie);
+}
+
+.apps-empresa-sistema-titulo {
+  display: flex;
+  align-items: center;
+  flex: 1 1 180px;
+  gap: 9px;
+  min-width: 0;
+}
+
+.apps-empresa-sistema-titulo > svg { color: var(--destaque-claro); }
+.apps-empresa-sistema-titulo h1 { font-size: 15px; font-weight: 600; line-height: 1.4; overflow-wrap: anywhere; }
+.apps-empresa-ferramentas-acoes { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.apps-empresa-ajuda {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 6px 16px;
+  padding: 9px 18px;
+  border-bottom: 1px solid var(--borda-suave);
+  color: var(--texto-2);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.apps-empresa-ajuda > span { flex: 1 1 240px; min-width: 0; }
+.apps-empresa-ajuda > button { color: var(--destaque-claro); padding: 4px 0; font-weight: 500; }
+
+.apps-empresa-quadro {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  background: #fff;
+}
+
+.apps-empresa-quadro > iframe { display: block; flex: 1 1 auto; width: 100%; height: 100%; min-width: 0; min-height: 0; border: 0; }
+.apps-empresa-quadro-carregando { position: absolute; z-index: 1; top: 12px; left: 12px; display: flex; align-items: center; gap: 8px; max-width: calc(100% - 24px); padding: 8px 12px; border: 1px solid var(--borda); border-radius: 9px; background: var(--superficie); color: var(--texto-2); font-size: 12px; pointer-events: none; }
+
+@media (max-width: 768px), (pointer: coarse) and (max-width: 1024px) {
+  .apps-empresa-ferramentas { gap: 10px; padding: 10px 12px; }
+  .apps-empresa-sistema-titulo { flex-basis: 100%; order: -1; }
+  .apps-empresa-ferramentas-acoes { flex: 1 1 auto; justify-content: flex-end; }
+  .estilo-sistema .sistema .apps-empresa-ferramentas .botao { height: auto; min-height: 44px; padding: 8px 10px; font-size: 12px; }
+  .apps-empresa-ajuda { padding: 8px 12px; font-size: 11px; }
+  .apps-empresa-ajuda > button { min-height: 32px; }
+}

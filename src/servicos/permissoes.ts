@@ -3,7 +3,7 @@ import type { UsuarioAutenticado } from "../estado/autenticacao";
 
 export type PapelOrganizacional = UsuarioAutenticado["perfil"];
 
-export const ROTAS_DA_EMPRESA: Rota[] = ["escritorio", "calendario", "conexoes", "whatsapp"];
+export const ROTAS_DA_EMPRESA: Rota[] = ["escritorio", "appsEmpresa", "calendario", "conexoes", "whatsapp"];
 
 export function ehDono(usuario: Pick<UsuarioAutenticado, "perfil"> | null | undefined): boolean {
   return usuario?.perfil === "dono";
@@ -20,12 +20,12 @@ export function podeAcessarRota(
 ): boolean {
   if (!usuario || usuario.perfil === "dono") return true;
   if (area !== "empresa") return false;
-  if (usuario.perfil === "adm") return ROTAS_DA_EMPRESA.includes(rota);
-  return rota === "escritorio";
+  if (usuario.perfil === "gerencia") return ROTAS_DA_EMPRESA.includes(rota);
+  return false;
 }
 
 export function rotuloDoPapel(perfil: PapelOrganizacional): string {
   if (perfil === "dono") return "Dono";
-  if (perfil === "adm") return "Administrador";
-  return "Colaborador";
+  if (perfil === "gerencia") return "Gerência";
+  return "Visitante";
 }

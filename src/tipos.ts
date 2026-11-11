@@ -14,6 +14,7 @@ export type Rota =
   | "inicio"
   | "chat"
   | "escritorio"
+  | "appsEmpresa"
   | "conexoes"
   | "journal"
   | "estudos"

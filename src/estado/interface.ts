@@ -85,15 +85,6 @@ function areaSalva(): AreaSistema {
   }
 }
 
-function sistemaAbertoSalvo(): boolean {
-  if (NATIVO) return true;
-  try {
-    return localStorage.getItem(CHAVE_SISTEMA_ABERTO) !== "0";
-  } catch {
-    return true;
-  }
-}
-
 function salvarSistemaAberto(aberto: boolean) {
   if (NATIVO) return;
   try {
@@ -168,7 +159,8 @@ export const useInterface = create<EstadoInterface>()((set, get) => ({
   capturaAberta: false,
   estilosDaMidiaAbertos: false,
   avisos: [],
-  sistemaAberto: sistemaAbertoSalvo(),
+  // No navegador, abrir a aba sempre deve mostrar o painel, inclusive em sessões antigas.
+  sistemaAberto: true,
   sistemaMinimizado: false,
   sistemaMaximizado: false,
   geometria: geometriaSalva() ?? { x: 0, y: 0, w: 0, h: 0 },
@@ -248,8 +240,9 @@ export const useInterface = create<EstadoInterface>()((set, get) => ({
       if (parcial.sistemaAberto || parcial.sistemaMinimizado === false) void mostrarSistema();
       return;
     }
-    set(parcial);
-    if (parcial.sistemaAberto !== undefined) salvarSistemaAberto(parcial.sistemaAberto);
+    const estado = NATIVO ? parcial : { ...parcial, sistemaAberto: true, sistemaMinimizado: false };
+    set(estado);
+    if (estado.sistemaAberto !== undefined) salvarSistemaAberto(estado.sistemaAberto);
     if (parcial.geometria) {
       try {
         localStorage.setItem("niko:janela-v2", JSON.stringify(parcial.geometria));

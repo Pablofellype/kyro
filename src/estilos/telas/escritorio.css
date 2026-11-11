@@ -667,7 +667,66 @@
 .estilo-sistema .colaborador-app span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .estilo-sistema .colaborador-vazio { padding: 18px; color: var(--texto-3); text-align: center; }
 
+.estilo-sistema .apps-empresa-painel { display: grid; gap: 22px; }
+.estilo-sistema .apps-empresa-grade { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+.estilo-sistema .apps-empresa-cartao { display: grid; grid-template-rows: auto 1fr auto; min-width: 0; gap: 12px; padding: 16px; border: 1px solid var(--borda); border-radius: 14px; background: var(--superficie); }
+@container conteudo (min-width: 640px) {
+  .estilo-sistema .apps-empresa-grade { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@container conteudo (min-width: 1000px) {
+  .estilo-sistema .apps-empresa-grade { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+.estilo-sistema .apps-empresa-cartao h2, .estilo-sistema .apps-empresa-cartao p { margin: 0; }
+.estilo-sistema .apps-empresa-cartao h2 { font-size: 15px; }
+.estilo-sistema .apps-empresa-cartao p { margin-top: 5px; color: var(--texto-2); font-size: 12px; line-height: 1.45; }
+.estilo-sistema .apps-empresa-icone { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 11px; background: var(--destaque-suave); color: var(--destaque-claro); }
+.estilo-sistema .apps-empresa-pendente { color: var(--texto-3); font-size: 12px; }
+.estilo-sistema .apps-empresa-solicitacoes { display: grid; gap: 14px; padding: 18px; border: 1px solid var(--borda); border-radius: 14px; background: var(--superficie); }
+.estilo-sistema .apps-empresa-secao-cabecalho { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.estilo-sistema .apps-empresa-secao-cabecalho h2, .estilo-sistema .apps-empresa-secao-cabecalho p { margin: 3px 0 0; }
+.estilo-sistema .apps-empresa-secao-cabecalho h2 { font-size: 17px; }
+.estilo-sistema .apps-empresa-secao-cabecalho p { color: var(--texto-2); font-size: 12px; }
+.estilo-sistema .apps-empresa-lista { display: grid; gap: 7px; }
+.estilo-sistema .apps-empresa-linha { display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; align-items: center; gap: 14px; padding: 11px 12px; border: 1px solid var(--borda); border-radius: 9px; }
+.estilo-sistema .apps-empresa-linha > div { display: grid; gap: 3px; }
+.estilo-sistema .apps-empresa-linha small, .estilo-sistema .apps-empresa-linha time { color: var(--texto-3); font-size: 11px; }
+.estilo-sistema .apps-empresa-vazio { display: flex; align-items: center; gap: 8px; padding: 18px; color: var(--texto-3); }
+
+.visitante-publico { min-height: 100vh; padding: 28px clamp(18px, 5vw, 80px) 36px; color: var(--texto); background: var(--fundo); }
+.visitante-cabecalho, .visitante-introducao, .visitante-apps, .visitante-material, .visitante-rodape { width: min(100%, 1040px); margin-inline: auto; }
+.visitante-cabecalho { display: flex; align-items: center; justify-content: space-between; }
+.visitante-marca { display: flex; align-items: center; gap: 9px; font-family: var(--fonte-titulo); font-size: 22px; }
+.visitante-marca-simbolo { display: grid; place-items: center; width: 31px; height: 31px; border-radius: 10px; color: #fff; background: var(--destaque); font-family: var(--fonte-mono); font-size: 16px; }
+.visitante-etiqueta, .visitante-kicker { color: var(--texto-3); font-family: var(--fonte-mono); font-size: 10px; letter-spacing: .13em; }
+.visitante-introducao { padding: clamp(56px, 10vw, 110px) 0 30px; }
+.visitante-introducao h1 { max-width: 650px; margin: 8px 0 10px; font-family: var(--fonte-titulo); font-size: clamp(38px, 6vw, 70px); font-weight: 400; line-height: .98; }
+.visitante-introducao p { max-width: 560px; margin: 0; color: var(--texto-2); font-size: 16px; line-height: 1.55; }
+.visitante-apps { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 12px; }
+.visitante-app { display: flex; align-items: center; gap: 13px; min-height: 92px; padding: 16px; border: 1px solid var(--borda); border-radius: 15px; color: var(--texto); background: var(--superficie); text-align: left; transition: transform .18s ease, border-color .18s ease; }
+.visitante-app:not(:disabled):hover, .visitante-app.selecionado { transform: translateY(-2px); border-color: var(--destaque); }
+.visitante-app:disabled { cursor: not-allowed; opacity: .56; }
+.visitante-app > span:nth-child(2) { display: grid; flex: 1; gap: 4px; min-width: 0; }
+.visitante-app strong { font-size: 14px; }
+.visitante-app small { color: var(--texto-2); font-size: 12px; line-height: 1.4; }
+.visitante-app-icone { display: grid; place-items: center; width: 40px; height: 40px; flex: 0 0 40px; border-radius: 12px; color: var(--destaque-claro); background: var(--destaque-suave); }
+.visitante-material { display: grid; gap: 20px; margin-top: 28px; padding: clamp(18px, 4vw, 34px); border: 1px solid var(--borda); border-radius: 18px; background: var(--superficie); }
+.visitante-material-cabecalho { display: flex; align-items: flex-start; gap: 13px; }
+.visitante-material-cabecalho h2, .visitante-material-cabecalho p { margin: 4px 0 0; }
+.visitante-material-cabecalho h2 { font-size: 22px; }
+.visitante-material-cabecalho p { color: var(--texto-2); font-size: 13px; }
+.visitante-formulario { display: grid; gap: 14px; }
+.visitante-formulario-grade { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.visitante-sucesso { display: grid; justify-items: center; gap: 10px; padding: 18px; text-align: center; }
+.visitante-sucesso svg { color: var(--sucesso); }
+.visitante-sucesso h3, .visitante-sucesso p { margin: 0; }
+.visitante-sucesso p { color: var(--texto-2); }
+.visitante-sucesso code { padding: 8px 11px; border-radius: 8px; color: var(--texto-2); background: var(--superficie-2); font-family: var(--fonte-mono); }
+.visitante-rodape { padding-top: 34px; color: var(--texto-3); font-size: 11px; text-align: center; }
+
 @container conteudo (max-width: 640px) {
   .estilo-sistema .colaborador-acoes { grid-template-columns: minmax(0, 1fr); }
   .estilo-sistema .colaborador-boas-vindas { align-items: flex-start; }
+  .estilo-sistema .apps-empresa-linha { grid-template-columns: 1fr auto; }
+  .estilo-sistema .apps-empresa-linha > small, .estilo-sistema .apps-empresa-linha > time { display: none; }
+  .visitante-formulario-grade { grid-template-columns: 1fr; }
 }

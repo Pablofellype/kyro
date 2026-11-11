@@ -123,6 +123,7 @@ export const T = {
     inicio: "Início",
     chat: "Chat",
     escritorio: "Escritório",
+    appsEmpresa: "Apps Empresa",
     conexoes: "Conexões",
     journal: "Rotina",
     estudos: "Estudos",

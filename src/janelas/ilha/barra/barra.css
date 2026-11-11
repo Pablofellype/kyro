@@ -37,6 +37,24 @@
   background: var(--borda-fundo);
 }
 
+/* Os cantos continuam alcançáveis quando as cápsulas estão recolhidas. */
+.ilha-barra-gatilhos {
+  height: 12px;
+  z-index: 1001;
+}
+
+.ilha-barra-gatilho {
+  position: absolute;
+  top: 0;
+  width: clamp(96px, 20%, 220px);
+  height: 12px;
+  pointer-events: auto;
+}
+
+.ilha-barra-gatilho-esquerdo { left: 0; }
+.ilha-barra-gatilho-direito { right: 0; }
+.ilha-barra-gatilhos[data-visivel="sim"] .ilha-barra-gatilho { height: 5px; }
+
 .ilha-barra-aba {
   position: absolute;
   top: var(--faixa);

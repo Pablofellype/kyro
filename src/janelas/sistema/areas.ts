@@ -1,11 +1,11 @@
 import type { AreaSistema, Rota } from "../../tipos";
 
 export const ROTAS_PESSOAIS: Rota[] = ["inicio", "journal", "estudos", "financas", "metas", "calendario"];
-export const ROTAS_EMPRESA: Rota[] = ["escritorio", "calendario", "conexoes", "whatsapp"];
+export const ROTAS_EMPRESA: Rota[] = ["escritorio", "appsEmpresa", "calendario", "conexoes", "whatsapp"];
 // Atualização não aparece na barra lateral, mas continua acessível por Configurações > Sobre.
 export const ROTAS_COMPARTILHADAS: Rota[] = ["atualizacao", "configuracoes"];
 export const ROTULOS_PESSOAIS: Partial<Record<Rota, string>> = { journal: "Rotina", metas: "Objetivos", calendario: "Calendário pessoal" };
-export const ROTULOS_EMPRESA: Partial<Record<Rota, string>> = { escritorio: "Escritório", conexoes: "Conexões de trabalho", calendario: "Agenda da empresa" };
+export const ROTULOS_EMPRESA: Partial<Record<Rota, string>> = { escritorio: "Escritório", appsEmpresa: "Apps Empresa", conexoes: "Conexões de trabalho", calendario: "Agenda da empresa" };
 
 export function rotasDaArea(area: AreaSistema): Rota[] {
   return area === "empresa" ? ROTAS_EMPRESA : ROTAS_PESSOAIS;
