@@ -44,7 +44,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // O painel Empresa e os convites usam os campos da migração 013.
   // Executamos a checagem uma vez por instância para corrigir implantações
   // publicadas antes da migração sem bloquear o login comum.
-  if (["login", "recuperar", "redefinir", "convite", "usuarios", "convites", "usuario"].includes(acao)) {
+  if (["recuperar", "redefinir", "convite", "usuarios", "convites", "usuario"].includes(acao)) {
     try {
       await garantirPerfilProfissional();
     } catch {
@@ -53,9 +53,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   if (req.method === "POST" && acao === "login") {
-    const { email, senha } = req.body || {};
+    const email = typeof req.body?.email === "string" ? req.body.email.trim() : "";
+    const senha = typeof req.body?.senha === "string" ? req.body.senha : "";
     if (!email || !senha) {
       return res.status(400).json({ sucesso: false, erro: "E-mail e senha são obrigatórios." });
+    }
+
+    try {
+      await garantirPerfilProfissional();
+    } catch {
+      return res.status(503).json({ sucesso: false, erro: "banco_nao_atualizado" });
     }
 
     const resultado = await loginUsuario(email, senha, origemDaRequisicao(req));

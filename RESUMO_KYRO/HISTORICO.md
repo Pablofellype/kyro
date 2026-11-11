@@ -998,3 +998,41 @@ Resultado e pendências:
 - Esta etapa forneceu orientação; sincronização, commit, push e publicação da v0.2.37 não foram executados pelo assistente.
 - A suíte completa deve passar antes de o usuário enviar a nova versão. Login único entre os sistemas permanece para uma etapa futura, conforme sua orientação.
 
+## 2026-11-11 — v0.2.37 — Correção das falhas de teste e versão no GitHub Actions
+
+Objetivo:
+
+Corrigir as duas falhas mostradas nas cinco capturas: a tag v0.2.37 apontando para um projeto ainda em 0.2.36 e o teste de autenticação recebendo HTTP 500 em vez de 400 no Windows e no Linux.
+
+Diagnóstico:
+
+- O commit local e remoto `6006c30` tem mensagem “Prepara release 0.2.37”, mas mantinha os quatro arquivos de versão em 0.2.36. A main e a tag v0.2.37 apontam para esse commit.
+- A ponte preparava o banco antes de validar e-mail/senha. Com as configurações locais, o teste passava; sem DATABASE_URL/POSTGRES_URL, como no CI, a preparação lançava erro e retornava 500.
+- O teste de regressão foi primeiro executado com as duas variáveis de banco removidas e reproduziu exatamente `500 !== 400` antes da correção.
+- API pública do GitHub: repositório acessível (200) e release v0.2.37 inexistente (404). O empacotamento falhou antes de publicar os instaladores.
+
+Alterações:
+
+- `servidor/ponte.ts` e `api/auth.ts`: login valida primeiro a presença e o tipo de e-mail e senha. A preparação do banco ocorre depois dessa validação. Credenciais inválidas retornam 400 sem consultar o banco; indisponibilidade da preparação retorna 503. As verificações de origem e da ponte continuam antes do login local.
+- `scripts/configuracao-vite.test.mjs`: o teste remove explicitamente as configurações de banco durante sua execução e as restaura no encerramento. Exercita campos vazios, ausentes, tipos incorretos, e-mail em branco e indisponibilidade de banco, tanto na ponte quanto na API.
+- Executado `pnpm versao:sincronizar 0.2.37`, atualizando package.json, tauri.conf.json, Cargo.toml, Cargo.lock e o badge do README.
+- A instalação automática acionada pelo pnpm após a alteração do manifesto falhou por restrição de rede do sandbox. Dependências restauradas com `pnpm install --frozen-lockfile --prod=false`, com acesso autorizado; nenhum pacote ou lockfile foi atualizado.
+
+Validação:
+
+- Teste focado de autenticação sem banco: aprovado após reproduzir a falha original.
+- `pnpm test`: 371 testes aprovados, nenhuma falha.
+- `pnpm build`: aprovado, incluindo TypeScript e build de produção.
+- `pnpm lancar:verificar`: quatro arquivos sincronizados em 0.2.37.
+- `git diff --check`: aprovado, apenas avisos LF/CRLF.
+- `git ls-remote`: main e tag remotas ainda apontam para `6006c30`; a correção local não foi publicada pelo assistente.
+
+Resultado:
+
+Correções prontas localmente, com a versão correta e a suíte completa aprovada. O usuário precisa enviar o commit corrigido e recriar a tag v0.2.37 para disparar uma nova execução do empacotamento.
+
+Pendências:
+
+- Ainda não houve nova execução corrigida do GitHub Actions; o resultado no CI depende do envio pelo usuário.
+- Nenhum commit, push, remoção/recriação de tag ou publicação foi executado pelo assistente. Nenhuma credencial ou banco remoto foi alterado.
+

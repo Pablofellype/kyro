@@ -294,11 +294,18 @@ export const rotas: Connect.NextHandleFunction = async (req, res, proximo) => {
     if (!hostLocal(req) || !origemConfiavel(req)) return responder(res, 403, { erro: "origem_nao_permitida" });
     const acao = url.searchParams.get("acao") || "verificar";
     try {
-      if (["login", "convite", "convites", "usuarios", "usuario"].includes(acao)) await garantirPerfilProfissional();
+      if (["convite", "convites", "usuarios", "usuario"].includes(acao)) await garantirPerfilProfissional();
       if (req.method === "POST" && acao === "login") {
-        const { email, senha } = (await lerCorpo(req)) as { email?: string; senha?: string };
+        const corpo = await lerCorpo(req);
+        const email = typeof corpo.email === "string" ? corpo.email.trim() : "";
+        const senha = typeof corpo.senha === "string" ? corpo.senha : "";
         if (!email || !senha) return responder(res, 400, { sucesso: false, erro: "E-mail e senha são obrigatórios." });
-        const resultado = await loginUsuario(String(email), String(senha), origemDaRequisicao(req));
+        try {
+          await garantirPerfilProfissional();
+        } catch {
+          return responder(res, 503, { sucesso: false, erro: "banco_nao_atualizado" });
+        }
+        const resultado = await loginUsuario(email, senha, origemDaRequisicao(req));
         if (!resultado.sucesso) return responder(res, 401, resultado);
         return responder(res, 200, resultado);
       }

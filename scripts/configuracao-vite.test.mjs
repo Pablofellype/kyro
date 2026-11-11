@@ -60,7 +60,15 @@ test("ponte no carregador nativo atende somente pedidos locais autorizados", asy
   }
 });
 
-test("rota local de autenticação exige a ponte e aceita o formato de login", async () => {
+test("rota local de autenticação valida o login antes de consultar o banco", async (t) => {
+  const bancoAnterior = ["DATABASE_URL", "POSTGRES_URL"].map((nome) => [nome, process.env[nome]]);
+  for (const [nome] of bancoAnterior) delete process.env[nome];
+  t.after(() => {
+    for (const [nome, valor] of bancoAnterior) {
+      if (valor === undefined) delete process.env[nome];
+      else process.env[nome] = valor;
+    }
+  });
   const servidor = await createServer({
     root: raiz,
     configFile: arquivo,
@@ -83,19 +91,46 @@ test("rota local de autenticação exige a ponte e aceita o formato de login", a
     assert.equal(semAutorizacao.status, 403);
     await semAutorizacao.body.cancel();
 
-    const autorizado = await fetch(url, {
+    const corposInvalidos = [{ email: "", senha: "" }, {}, { email: "   ", senha: "senha" }, { email: {}, senha: [] }, { email: "teste@example.com", senha: 123 }];
+    for (const corpo of corposInvalidos) {
+      const autorizado = await fetch(url, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          connection: "close",
+          "x-niko": "1",
+          "x-niko-token": process.env.NIKO_TOKEN,
+        },
+        body: JSON.stringify(corpo),
+        signal: AbortSignal.timeout(LIMITE_PEDIDO_LOCAL_MS),
+      });
+      assert.equal(autorizado.status, 400);
+      assert.equal((await autorizado.json()).sucesso, false);
+    }
+
+    const semBanco = await fetch(url, {
       method: "POST",
-      headers: {
-        "content-type": "application/json",
-        connection: "close",
-        "x-niko": "1",
-        "x-niko-token": process.env.NIKO_TOKEN,
-      },
-      body: JSON.stringify({ email: "", senha: "" }),
+      headers: { "content-type": "application/json", connection: "close", "x-niko": "1", "x-niko-token": process.env.NIKO_TOKEN },
+      body: JSON.stringify({ email: "teste@example.com", senha: "senha" }),
       signal: AbortSignal.timeout(LIMITE_PEDIDO_LOCAL_MS),
     });
-    assert.equal(autorizado.status, 400);
-    assert.equal((await autorizado.json()).sucesso, false);
+    assert.equal(semBanco.status, 503);
+    assert.equal((await semBanco.json()).sucesso, false);
+
+    const { default: autenticarApi } = await servidor.ssrLoadModule("/api/auth.ts");
+    for (const corpo of [...corposInvalidos, { email: "teste@example.com", senha: "senha" }]) {
+      const resposta = {
+        codigo: 0,
+        dados: null,
+        setHeader() { return this; },
+        status(codigo) { this.codigo = codigo; return this; },
+        json(dados) { this.dados = dados; return this; },
+      };
+      await autenticarApi({ method: "POST", query: { acao: "login" }, headers: {}, cookies: {}, body: corpo }, resposta);
+      const esperado = corpo.email === "teste@example.com" && corpo.senha === "senha" ? 503 : 400;
+      assert.equal(resposta.codigo, esperado);
+      assert.equal(resposta.dados.sucesso, false);
+    }
   } finally {
     await servidor.close();
   }
