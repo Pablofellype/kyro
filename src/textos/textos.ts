@@ -2428,6 +2428,13 @@ export const T = {
     nome: "WhatsApp",
     descricao: "Conversas, respostas e menções na ilha",
     aba: "WhatsApp",
+    avisoRemoto: "O Kyro usa o GOWA no servidor para conectar o WhatsApp como um aparelho vinculado, igual ao WhatsApp Web.",
+    privacidadeRemota: "A sessão e o histórico do gateway ficam no servidor da empresa. As conversas exibidas aqui pertencem à sua conta do Kyro.",
+    passosRemotos: [
+      "Ligue a integração do WhatsApp nesta tela. O gateway já está instalado no servidor.",
+      "Se aparecer um QR, abra o WhatsApp no celular e vá a Aparelhos conectados → Conectar aparelho para escaneá-lo.",
+      "Aguarde a confirmação de conectado para acessar suas conversas.",
+    ],
     aviso: "O WhatsApp não tem API oficial para contas pessoais. O Kyro usa o GOWA, um gateway de código aberto que roda só no seu computador e conecta como um aparelho, igual ao WhatsApp Web. O WhatsApp pode bloquear contas que usam ferramentas não oficiais: use por sua conta e risco.",
     privacidade: "Tudo fica neste computador. O gateway guarda a sessão e o histórico das conversas na pasta dele, como o WhatsApp Web guarda no navegador. O Kyro mantém as mensagens, fotos e mídias abertas só na memória, e apaga na hora o arquivo de cada mídia que o gateway baixa. Esquecer tudo desconecta o celular e apaga a pasta do gateway.",
     naoSuportado: "Este sistema não tem uma versão do gateway. Ele existe para Windows (x64) e Linux (x64 e ARM).",

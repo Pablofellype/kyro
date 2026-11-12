@@ -2,12 +2,13 @@ import { createServer } from "node:net";
 import { spawn, type ChildProcess } from "node:child_process";
 import { existsSync, mkdtempSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { WebSocket } from "ws";
 import { lerTudo, gravar } from "./banco.ts";
 import { comWhatsappUsuario, enviarImagemNoWhatsapp, estadoDoWhatsapp, iniciarWhatsapp } from "./whatsapp/whatsapp.ts";
 import { pastaDados } from "./ia.ts";
 import { configuracaoAderenciasValida, planilhaAderenciaValida, type ConfiguracaoAderencias, type PlanilhaAderencia, type ResultadoAderencia } from "../src/modulos/escritorio/aderenciasTipos.ts";
+import { criarFilaDeCapturas, escalasDaCaptura, TELA_DA_CAPTURA } from "./capturaAderencias.ts";
 
 interface CelulaAderencia {
   texto: string;
@@ -29,9 +30,8 @@ interface CdpResposta {
 
 const MAXIMO_PLANILHAS = 30;
 const LIMITE_IMAGEM = 16 * 1024 * 1024;
-// O chatbot antigo entregava a captura com DPR 3. Tentamos essa escala primeiro e
-// reduzimos somente se a imagem ultrapassar o limite aceito pelo WhatsApp.
-const ESCALAS_DA_CAPTURA = [3, 2, 1] as const;
+// Um único Chrome por vez, inclusive entre usuários e execuções manuais/agendadas.
+const naFilaDeCapturas = criarFilaDeCapturas();
 let relogioAgendamento: ReturnType<typeof setInterval> | null = null;
 const slotsExecutados = new Set<string>();
 const execucoesAgendadas = new Set<string>();
@@ -99,11 +99,13 @@ interface PaginaDoDebugger {
   webSocketDebuggerUrl?: string;
 }
 
-async function abrirDebugger(porta: number): Promise<{ webSocketDebuggerUrl?: string }> {
+async function abrirDebugger(porta: number, falhaDoProcesso: () => Error | null): Promise<{ webSocketDebuggerUrl?: string }> {
   const limite = Date.now() + 10000;
   while (Date.now() < limite) {
+    const falha = falhaDoProcesso();
+    if (falha) throw falha;
     try {
-      const resposta = await fetch(`http://127.0.0.1:${porta}/json/list`);
+      const resposta = await fetch(`http://127.0.0.1:${porta}/json/list`, { signal: AbortSignal.timeout(1000) });
       if (resposta.ok) {
         const paginas = await resposta.json() as PaginaDoDebugger[];
         const pagina = paginas.find((item) => item.type === "page" && item.webSocketDebuggerUrl);
@@ -117,13 +119,15 @@ async function abrirDebugger(porta: number): Promise<{ webSocketDebuggerUrl?: st
   throw new Error("navegador_nao_respondeu");
 }
 
-class ClienteCdp {
+export class ClienteCdp {
   private readonly socket: WebSocket;
   private sequencia = 0;
-  private readonly pendentes = new Map<number, { resolver: (v: CdpResposta) => void; rejeitar: (e: Error) => void }>();
+  private readonly pendentes = new Map<number, { resolver: (v: CdpResposta) => void; rejeitar: (e: Error) => void; limite: ReturnType<typeof setTimeout> }>();
 
   private constructor(url: string) {
-    this.socket = new WebSocket(url);
+    this.socket = new WebSocket(url, { handshakeTimeout: 5000 });
+    this.socket.on("error", () => this.rejeitarPendentes(new Error("O navegador perdeu a conexão durante a captura.")));
+    this.socket.on("close", () => this.rejeitarPendentes(new Error("O navegador foi encerrado antes de concluir a captura.")));
     this.socket.on("message", (dados) => {
       let resposta: CdpResposta;
       try { resposta = JSON.parse(dados.toString()) as CdpResposta; } catch { return; }
@@ -131,6 +135,7 @@ class ClienteCdp {
       const pendente = this.pendentes.get(resposta.id);
       if (!pendente) return;
       this.pendentes.delete(resposta.id);
+      clearTimeout(pendente.limite);
       if (resposta.error) pendente.rejeitar(new Error(resposta.error.message || "falha_cdp"));
       else pendente.resolver(resposta);
     });
@@ -146,12 +151,19 @@ class ClienteCdp {
     });
   }
 
-  comando(metodo: string, parametros: Record<string, unknown> = {}): Promise<CdpResposta> {
+  comando(metodo: string, parametros: Record<string, unknown> = {}, tempoMs = 15_000): Promise<CdpResposta> {
+    if (this.socket.readyState !== WebSocket.OPEN) return Promise.reject(new Error("O navegador não está conectado para a captura."));
     const id = ++this.sequencia;
     return new Promise((resolver, rejeitar) => {
-      this.pendentes.set(id, { resolver, rejeitar });
+      const limite = setTimeout(() => {
+        this.pendentes.delete(id);
+        rejeitar(new Error("O navegador demorou demais para concluir a captura. Tente uma planilha por vez."));
+      }, tempoMs);
+      limite.unref();
+      this.pendentes.set(id, { resolver, rejeitar, limite });
       this.socket.send(JSON.stringify({ id, method: metodo, params: parametros }), (erro) => {
         if (erro) {
+          clearTimeout(limite);
           this.pendentes.delete(id);
           rejeitar(erro);
         }
@@ -166,7 +178,16 @@ class ClienteCdp {
     return resultado.value as T;
   }
 
+  private rejeitarPendentes(erro: Error) {
+    for (const pendente of this.pendentes.values()) {
+      clearTimeout(pendente.limite);
+      pendente.rejeitar(erro);
+    }
+    this.pendentes.clear();
+  }
+
   fechar() {
+    this.rejeitarPendentes(new Error("A captura foi encerrada."));
     try { this.socket.close(); } catch { return; }
   }
 }
@@ -192,8 +213,10 @@ async function aguardarProcesso(processo: ChildProcess, limiteMs = 4000) {
 }
 
 function removerPastaTemporaria(caminho: string) {
+  const destino = resolve(caminho);
+  if (dirname(destino) !== resolve(tmpdir()) || !basename(destino).startsWith("kyro-aderencias-")) return;
   try {
-    rmSync(caminho, { recursive: true, force: true, maxRetries: 8, retryDelay: 200 });
+    rmSync(destino, { recursive: true, force: true, maxRetries: 8, retryDelay: 200 });
   } catch {
     // O Windows pode liberar o perfil alguns instantes depois; a pasta é descartável.
   }
@@ -206,20 +229,21 @@ async function iniciarNavegador(): Promise<{ processo: ChildProcess; cliente: Cl
   const pasta = mkdtempSync(join(tmpdir(), "kyro-aderencias-"));
   const processo = spawn(executavel, [
     "--headless=new", "--disable-gpu", "--disable-dev-shm-usage", "--no-sandbox", "--hide-scrollbars",
-    "--force-device-scale-factor=3", "--window-size=2400,1600", "--remote-allow-origins=*", `--remote-debugging-port=${porta}`,
+    "--disable-extensions", "--disable-background-networking", "--disable-sync", "--no-first-run",
+    "--force-device-scale-factor=1", `--window-size=${TELA_DA_CAPTURA.width},${TELA_DA_CAPTURA.height}`, "--remote-allow-origins=*", `--remote-debugging-port=${porta}`,
     `--user-data-dir=${pasta}`, "about:blank",
   ], { stdio: "ignore", windowsHide: true });
+  let erroDoProcesso: Error | null = null;
+  processo.once("error", (erro) => { erroDoProcesso = erro; });
   try {
-    const versao = await abrirDebugger(porta);
+    const versao = await abrirDebugger(porta, () => erroDoProcesso ?? (processo.exitCode !== null || processo.signalCode !== null ? new Error("O navegador foi encerrado durante a inicialização da captura.") : null));
     if (!versao.webSocketDebuggerUrl) throw new Error("debugger_sem_url");
     const cliente = await ClienteCdp.abrir(versao.webSocketDebuggerUrl);
     await cliente.comando("Emulation.setDeviceMetricsOverride", {
-      width: 2400,
-      height: 1600,
-      deviceScaleFactor: 3,
+      ...TELA_DA_CAPTURA,
       mobile: false,
-      screenWidth: 2400,
-      screenHeight: 1600,
+      screenWidth: TELA_DA_CAPTURA.width,
+      screenHeight: TELA_DA_CAPTURA.height,
     });
     return { processo, cliente, pasta };
   } catch (erro) {
@@ -290,8 +314,19 @@ const SCRIPT_DA_TABELA = (planilha: PlanilhaAderencia) => `(() => {
   return { clip, celulas };
 })()`;
 
-async function capturar(planilha: PlanilhaAderencia): Promise<CapturaAderencia> {
+function capturar(planilha: PlanilhaAderencia): Promise<CapturaAderencia> {
+  return naFilaDeCapturas(() => capturarPlanilha(planilha));
+}
+
+async function capturarPlanilha(planilha: PlanilhaAderencia): Promise<CapturaAderencia> {
   const navegador = await iniciarNavegador();
+  let expirou = false;
+  const prazo = setTimeout(() => {
+    expirou = true;
+    navegador.cliente.fechar();
+    try { navegador.processo.kill(); } catch { /* o processo já encerrou */ }
+  }, 60_000);
+  prazo.unref();
   try {
     await navegador.cliente.comando("Page.enable");
     await navegador.cliente.comando("Runtime.enable");
@@ -318,11 +353,10 @@ async function capturar(planilha: PlanilhaAderencia): Promise<CapturaAderencia> 
     })()`);
     await esperar(500);
     const dados = await navegador.cliente.avaliar<{ clip: { x: number; y: number; width: number; height: number; scale: number } | null; celulas: CelulaAderencia[] }>(SCRIPT_DA_TABELA(planilha));
-    for (const escala of ESCALAS_DA_CAPTURA) {
-      const parametros = dados.clip
-        ? { format: "png", fromSurface: true, captureBeyondViewport: true, clip: { ...dados.clip, scale: escala } }
-        : { format: "png", fromSurface: true, captureBeyondViewport: true };
-      const imagem = await navegador.cliente.comando("Page.captureScreenshot", parametros);
+    if (!dados.clip) throw new Error("Não foi possível localizar o intervalo configurado na planilha para gerar o print.");
+    for (const escala of escalasDaCaptura(dados.clip)) {
+      const parametros = { format: "png", fromSurface: true, captureBeyondViewport: true, clip: { ...dados.clip, scale: escala } };
+      const imagem = await navegador.cliente.comando("Page.captureScreenshot", parametros, 30_000);
       const base64 = (imagem.result?.data as string | undefined) ?? "";
       const bytes = Buffer.from(base64, "base64");
       if (bytes.length > 0 && bytes.length <= LIMITE_IMAGEM) {
@@ -330,7 +364,11 @@ async function capturar(planilha: PlanilhaAderencia): Promise<CapturaAderencia> 
       }
     }
     throw new Error("print_invalido");
+  } catch (erro) {
+    if (expirou) throw new Error("A captura da planilha excedeu um minuto e foi interrompida. Confira o intervalo e tente uma planilha por vez.");
+    throw erro;
   } finally {
+    clearTimeout(prazo);
     await fecharNavegador(navegador);
   }
 }

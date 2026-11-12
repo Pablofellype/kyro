@@ -56,6 +56,7 @@ export function CartaoWhatsapp({ aoConfigurar }: { aoConfigurar: () => void }) {
 
 export function ConfigWhatsapp({ aberto, aoFechar }: { aberto: boolean; aoFechar: () => void }) {
   const estado = useWhatsapp((s) => s.estado);
+  const erroCarregamento = useWhatsapp((s) => s.erroCarregamento);
   const carregar = useWhatsapp((s) => s.carregar);
   const definir = useWhatsapp((s) => s.definir);
   const [erro, setErro] = useState("");
@@ -106,15 +107,16 @@ export function ConfigWhatsapp({ aberto, aoFechar }: { aberto: boolean; aoFechar
     <Modal aberto={aberto} titulo={W.configurar} aoFechar={aoFechar} largo>
       <div className="formulario">
         <AvisoFaixa tipo="alerta">
-          <span className="linha"><ShieldAlert size={13} />{W.aviso}</span>
+          <span className="linha"><ShieldAlert size={13} />{remoto ? W.avisoRemoto : W.aviso}</span>
         </AvisoFaixa>
-        <span className="campo-dica">{W.privacidade}</span>
+        <span className="campo-dica">{remoto ? W.privacidadeRemota : W.privacidade}</span>
+        {erroCarregamento && <AvisoFaixa tipo="erro"><span role="alert">{erroCarregamento}</span><Botao pequeno disabled={ocupado} onClick={() => void agir(carregar)}>Tentar novamente</Botao></AvisoFaixa>}
         {estado && !estado.suportado ? (
           <AvisoFaixa tipo="erro">{W.naoSuportado}</AvisoFaixa>
         ) : (
           <>
             <ol className="guia-conexao-passos">
-              {W.passos.map((p) => <li key={p}>{p}</li>)}
+              {(remoto ? W.passosRemotos : W.passos).map((p) => <li key={p}>{p}</li>)}
             </ol>
             {remoto ? <AvisoFaixa><span>O WhatsApp está sendo executado no VPS. Você pode ligar ou desligar a integração aqui; a reinstalação do gateway é feita somente no VPS.</span></AvisoFaixa> : <>
               <div className="linha">
@@ -125,7 +127,7 @@ export function ConfigWhatsapp({ aberto, aoFechar }: { aberto: boolean; aoFechar
               </div>
               <LinhaAlternador rotulo={W.ligar} ligado={Boolean(estado?.ligado)} desativado={!estado?.instalado || ocupado} aoMudar={(v) => void agir(() => whatsappPonte.ligar(v))} />
             </>}
-            {remoto && <LinhaAlternador rotulo={W.ligar} ligado={Boolean(estado?.ligado)} desativado={!estado?.instalado || ocupado} aoMudar={(v) => void agir(() => whatsappPonte.ligar(v))} />}
+            {remoto && estado && <LinhaAlternador rotulo={W.ligar} ligado={estado.ligado} desativado={!estado.instalado || ocupado} aoMudar={(v) => void agir(() => whatsappPonte.ligar(v))} />}
             {estado?.ligado && (
               <div className="whatsapp-vinculo">
                 {estado.vinculo === "precisa_qr" && estado.qr && !qrExpirado && (!estado.qrExpira || estado.qrExpira > Date.now()) ? (

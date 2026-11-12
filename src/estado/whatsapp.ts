@@ -1,11 +1,14 @@
 import { create } from "zustand";
 import { whatsappPonte, type ConversaWhatsapp, type EstadoWhatsapp } from "../ponte/whatsapp";
 import { useAuth } from "./autenticacao";
+import { T } from "../textos/textos";
+import { mensagemDeErroApi } from "../utilitarios/erroApi";
 
 interface EstadoDoWhatsappNaInterface {
   estado: EstadoWhatsapp | null;
   pedidoEm: number;
   falhou: boolean;
+  erroCarregamento: string | null;
   carregar: () => Promise<EstadoWhatsapp | null>;
   definir: (estado: EstadoWhatsapp) => void;
   atualizarConversa: (conversa: ConversaWhatsapp) => void;
@@ -19,6 +22,7 @@ export const useWhatsapp = create<EstadoDoWhatsappNaInterface>()((set, get) => (
   estado: null,
   pedidoEm: 0,
   falhou: false,
+  erroCarregamento: null,
   carregar: async () => {
     const inicio = proximoMarco();
     const sessao = useAuth.getState();
@@ -29,14 +33,19 @@ export const useWhatsapp = create<EstadoDoWhatsappNaInterface>()((set, get) => (
     try {
       const estado = await whatsappPonte.estado();
       if (!mesmaSessao() || inicio < get().pedidoEm) return get().estado;
-      set({ estado, pedidoEm: inicio, falhou: false });
+      set({ estado, pedidoEm: inicio, falhou: false, erroCarregamento: null });
       return estado;
-    } catch {
-      if (mesmaSessao() && inicio >= get().pedidoEm) set({ falhou: true, pedidoEm: inicio });
+    } catch (erro) {
+      if (mesmaSessao() && inicio >= get().pedidoEm) {
+        const codigo = erro instanceof Error ? erro.message : "";
+        const status = /^http_(\d{3})$/.exec(codigo);
+        const mensagem = T.whatsapp.erros[codigo] ?? mensagemDeErroApi(erro, status ? Number(status[1]) : undefined);
+        set({ falhou: true, pedidoEm: inicio, erroCarregamento: mensagem });
+      }
       return null;
     }
   },
-  definir: (estado) => set({ estado, pedidoEm: proximoMarco(), falhou: false }),
+  definir: (estado) => set({ estado, pedidoEm: proximoMarco(), falhou: false, erroCarregamento: null }),
   ignorar: async (jid) => {
     const sessao = useAuth.getState();
     const estado = await whatsappPonte.ignorar(jid, true);
@@ -50,13 +59,13 @@ export const useWhatsapp = create<EstadoDoWhatsappNaInterface>()((set, get) => (
     const substituir = (itens: ConversaWhatsapp[]) => itens.map((c) => c.id === conversa.id ? conversa : c);
     return {
       estado: { ...s.estado, conversas: substituir(s.estado.conversas), abertas: substituir(s.estado.abertas ?? []) },
-      pedidoEm: proximoMarco(), falhou: false,
+      pedidoEm: proximoMarco(), falhou: false, erroCarregamento: null,
     };
   }),
 }));
 
 useAuth.subscribe((atual, anterior) => {
   if (atual.usuario?.id !== anterior.usuario?.id || atual.token !== anterior.token) {
-    useWhatsapp.setState({ estado: null, pedidoEm: proximoMarco(), falhou: false });
+    useWhatsapp.setState({ estado: null, pedidoEm: proximoMarco(), falhou: false, erroCarregamento: null });
   }
 });

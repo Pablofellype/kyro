@@ -54,6 +54,7 @@ function paraCampoDeData(d: Date): string {
 export default function Whatsapp() {
   const estado = useWhatsapp((s) => s.estado);
   const falhou = useWhatsapp((s) => s.falhou);
+  const erroCarregamento = useWhatsapp((s) => s.erroCarregamento);
   const carregar = useWhatsapp((s) => s.carregar);
   const definir = useWhatsapp((s) => s.definir);
   const usuario = useAuth((s) => s.usuario);
@@ -143,8 +144,8 @@ export default function Whatsapp() {
       return (
         <div className="wpp-tela wpp-tela-carregando" role="alert">
           <CircleAlert size={24} />
-          <strong>{W.erros.gateway_remoto_indisponivel}</strong>
-          <span>{W.erros.gateway_remoto_nao_configurado}</span>
+          <strong>Não foi possível carregar o WhatsApp</strong>
+          <span>{erroCarregamento ?? "Tente novamente em alguns segundos."}</span>
           <Botao variante="secundario" icone={<RotateCw size={14} />} onClick={() => void carregar()}>Tentar novamente</Botao>
         </div>
       );

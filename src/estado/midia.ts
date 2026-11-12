@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { ponteLocalDisponivel } from "../ponte/ambiente";
 
 export interface Faixa {
   titulo: string;
@@ -73,6 +74,7 @@ function nomeDoApp(id: string): string {
 }
 
 async function pedir(caminho: string, corpo?: unknown): Promise<RespostaMidia | null> {
+  if (!ponteLocalDisponivel()) return null;
   try {
     const r = await fetch(`/ponte/midia${caminho}`, { method: corpo === undefined ? "GET" : "POST", headers: CABECALHOS, body: corpo === undefined ? undefined : JSON.stringify(corpo) });
     if (!r.ok) return null;

@@ -214,6 +214,7 @@ export function Aderencias() {
         ? <AvisoFaixa tipo="alerta"><span>{EXECUCAO_REMOTA ? "O VPS ainda não confirmou o WhatsApp conectado. Deixe o gateway ligado e atualize o estado." : <>Conecte o WhatsApp em <strong>Conexões</strong> para testar e enviar os resultados.</>}</span><Botao pequeno soIcone aria-label="Atualizar estado do WhatsApp" title="Atualizar estado" onClick={() => void carregarWhatsapp()} icone={<RefreshCw size={13} />} /></AvisoFaixa>
         : <AvisoFaixa><span><strong>WhatsApp conectado.</strong> Esta rotina será executada pelo {EXECUCAO_REMOTA ? "VPS" : "Kyro neste computador"} mesmo que esta tela seja fechada.</span></AvisoFaixa>}
       {erro && <AvisoFaixa tipo="erro"><span role="alert">{erro}</span></AvisoFaixa>}
+      {processando && <AvisoFaixa><span role="status" aria-live="polite">{processando.startsWith("teste:") ? "Gerando a prévia da planilha. Aguarde a conclusão." : "Executando a rotina. Aguarde a captura das planilhas e a confirmação dos envios pelo WhatsApp antes de executar novamente."}</span></AvisoFaixa>}
       <div className="aderencias-resumo">
         <Cartao titulo="Planilhas configuradas" icone={<FileSpreadsheet size={15} />}><strong>{totalPlanilhas}</strong><span>em {config.grupos.length} rotina(s)</span></Cartao>
         <Cartao titulo="Destino" icone={<Send size={15} />}><strong>{config.destinoNome || "Não escolhido"}</strong><span>{conectado ? "WhatsApp conectado" : "Aguardando conexão"}</span></Cartao>

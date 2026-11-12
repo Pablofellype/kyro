@@ -1,4 +1,5 @@
 import { cabecalhosNiko } from "../estado/autenticacao";
+import { ponteLocalDisponivel } from "./ambiente";
 
 export type TipoProvedor = "anthropic" | "openai_compativel";
 
@@ -89,6 +90,7 @@ function cabecalhos(): Record<string, string> {
 }
 
 async function pedir<T>(caminho: string, opcoes: RequestInit = {}): Promise<T> {
+  if (!ponteLocalDisponivel()) throw new Error("Esta função precisa do aplicativo Kyro instalado.");
   const r = await fetch(`/ponte${caminho}`, { ...opcoes, headers: { ...cabecalhos(), ...(opcoes.headers ?? {}) } });
   const json = (await r.json().catch(() => ({}))) as T & { erro?: string };
   if (!r.ok) throw new Error(json.erro ?? `http_${r.status}`);

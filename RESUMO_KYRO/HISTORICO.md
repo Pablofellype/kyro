@@ -1295,3 +1295,74 @@ Resultado e pendências:
 - Novo caminho: Empresa → Apps Empresa → Robô de Aderências. A mudança está no código local, sem publicação, atualização do VPS ou alteração de versão.
 - O problema informado de envios não realizados continua pendente de diagnóstico; esta tarefa mudou somente o local de acesso ao painel.
 
+## 2026-11-12 — v0.2.38 — Chamadas locais indevidas no site e diagnóstico das aderências
+
+Objetivo:
+
+Investigar o acesso ao WhatsApp web após a publicação e os erros do console, além da execução manual de aderências informada pelo usuário.
+
+Evidências:
+
+- O usuário publicou a 0.2.38 e atualizou o VPS. O console confirmou o pull, a instalação de dependências e a alteração de `WHATSAPP_WEBHOOK_EVENTS` para os seis eventos previstos. Após reiniciar os serviços, o usuário informou que os estados e o health check esperados apareceram. Esse resultado não comprova envio de aderências.
+- As primeiras capturas do WhatsApp mostravam falha de carregamento. A captura `155549.png` enviada depois mostra o WhatsApp conectado e conversas carregadas; a `155636.png` mostra `whatsapp?acao=estado` e as chamadas de configuração de aderências com HTTP 200.
+- O console registra 404 em `/ponte/midia`, `/ponte/sistema/estado` e `/ponte/conexoes/notion`, rotas locais que não existem no site publicado. O serviço de mídia fazia consultas a cada 2,5 segundos.
+- Na captura das aderências, `aderencias?acao=executar` ainda está pendente. A rotina está com frequência “Somente manual”; o horário configurado não gera disparo automático nessa opção. O cartão de último resultado mostra uma execução de 27/10, sem comprovar envio na tentativa atual.
+- O 409 de `/api/dados` corresponde ao fluxo de conflito de versões para o qual já existe reconciliação no armazenamento. Não foi alterado esse mecanismo apenas pela ocorrência mostrada no console.
+
+Correções locais:
+
+- `src/ponte/ambiente.ts`: identificação da disponibilidade da ponte no aplicativo nativo e no desenvolvimento. Produção web deixa de presumir uma ponte local.
+- `src/estado/midia.ts`, `src/ponte/ponteLocal.ts`, `src/ponte/conexoesReais.ts` e `src/servicos/servicos.ts`: evitam os pedidos locais no site e o agendamento de consultas locais de mídia. As configurações e as informações de credenciais das conexões são preservadas; serviços remotos de WhatsApp e aderências não foram bloqueados.
+- `src/estado/whatsapp.ts` e `src/modulos/whatsapp/Whatsapp.tsx`: conservam e apresentam a causa recebida ao carregar o WhatsApp. Removida a indicação simultânea de VPS indisponível e configuração ausente, que era apresentada independentemente do erro real. Sucesso e troca de sessão limpam o erro transitório; respostas antigas continuam descartadas.
+- `src/modulos/conexoes/ConexaoWhatsapp.tsx` e `src/textos/textos.ts`: instruções corretas para o gateway remoto, erro de carregamento com nova tentativa e ausência de alternador falsamente desligado quando ainda não há estado recebido.
+- `src/modulos/escritorio/Aderencias.tsx`: mensagem acessível enquanto a prévia ou execução aguarda conclusão, sem anunciar envios concluídos.
+
+Validação:
+
+- `pnpm verificar`: aprovado.
+- Execução de `ambiente-ponte`, `whatsapp`, `aderencias`, `conexoes-em-testes`, `midia` e `ilha`: 69 testes aprovados, 0 falhas. Os primeiros testes do ambiente precisaram separar os contextos da simulação; a execução corrigida passou.
+- `pnpm build`: aprovado. Não foi executado um novo teste visual em navegador nem envio real de mensagens. O último ajuste posterior ao build foi somente o texto de andamento da rotina.
+- Teste novo `scripts/ambiente-ponte.test.mjs` incluído no manifesto de `pnpm test`; confirma ausência de pedidos locais no site e continuidade das funções no desenvolvimento/aplicativo.
+
+Resultado e pendências:
+
+- Correções no código local, sem commit, push, tag, deploy ou alterações no VPS nesta tarefa. Versão mantida em 0.2.38.
+- A tentativa de consultar o health público encontrou restrição de rede; a repetição com acesso solicitado foi interrompida pelo usuário. Não há resultado independente dessa consulta.
+- Solicitados os estados/logs atuais do worker e, depois da captura mais recente, o Status e a aba Response da chamada `aderencias?acao=executar`. Ainda sem resposta; é necessário obter o resultado ou os logs para concluir a causa dos envios não realizados.
+- A frequência não foi modificada automaticamente. Os 404 de funções locais não comprovam a causa de uma falha no envio remoto de aderências.
+
+## 2026-11-12 — v0.2.38 — OOM confirmado no VPS e redução do custo das capturas
+
+Objetivo:
+
+Corrigir o consumo excessivo das capturas de aderências após obter os registros e a memória atual do VPS.
+
+Diagnóstico confirmado pelo usuário:
+
+- O journal de `kyro-worker.service` registra encerramentos por `oom-kill` em 12/11, às 15:53 e 16:07, seguidos de reinício automático. As execuções de captura ficam sem resposta e o serviço que atende o WhatsApp também fica temporariamente indisponível.
+- `free -h`: 961 MiB de RAM total, 911 MiB usados e 49 MiB disponíveis. Nenhum swap ativo. Os limites `MemoryHigh`, `MemoryMax` e `MemorySwapMax` da unidade são `infinity`; o problema observado não é um limite menor configurado nessa unidade.
+- O código anterior abria Chrome com viewport 2400×1600 e DPR 3, e tentava primeiro escala 3 no recorte. Execuções simultâneas podiam abrir mais de um navegador, e os pedidos CDP não tinham prazo nem rejeição ao perder a conexão.
+
+Correções locais:
+
+- Novo `servidor/capturaAderencias.ts`: viewport 1600×1000 com DPR 1; resolução extra aplicada somente ao recorte, até 2x e no máximo 4 milhões de pixels. Intervalos excessivos/invalidos retornam erro explicativo em vez de criar um bitmap sem limite ou reduzir o texto abaixo de 1x.
+- Fila global por processo do worker para capturas manuais, prévias e agendamentos, inclusive entre usuários. A próxima captura só inicia depois do encerramento/limpeza da anterior, e uma falha libera a fila.
+- `servidor/aderencias.ts`: captura somente do intervalo localizado; removido o fallback de capturar a página inteira sem recorte. Desabilitados recursos de fundo desnecessários no Chrome isolado.
+- Pedidos CDP com prazo de 15 segundos, 30 segundos para screenshot e limite de um minuto na captura após iniciar o navegador. Queda/erro do socket rejeita os pedidos pendentes. Falha de inicialização e término do processo passam a ser tratados sem deixar a consulta aguardando indefinidamente.
+- Remoção do perfil temporário verifica a pasta pai e o prefixo antes de executar a limpeza recursiva.
+- Não foram regravados rotinas, planilhas, limiares, horários, destinos, credenciais ou sessões reais.
+
+Validação:
+
+- `node --test scripts/aderencias.test.mjs`: 12 testes aprovados. Inclui orçamento de pixels, intervalos inválidos, fila concorrente preservando AsyncLocalStorage por usuário, continuidade após falha, timeout, queda e resposta válida do navegador.
+- `pnpm verificar`, `pnpm build` e `pnpm ponte:build`: aprovados.
+- `pnpm test` após as correções do robô e do site: 404 testes aprovados, 0 falhas. `git diff --check`: aprovado.
+- Chrome real isolado no Windows com uma tabela de teste local, sem Google, sessões do usuário ou envio ao WhatsApp: PNG 1320×1124, 1.483.680 pixels, 80.900 bytes; limite respeitado e legibilidade conferida na imagem. Artefatos em `node_modules/.kyro-revisoes/aderencias-memoria-2026-11-12`. Roteiro temporário retirado da raiz.
+
+Resultado e pendências:
+
+- Correção permanece local, junto com os ajustes anteriores de web/console, sem commit, tag, push ou deploy nesta etapa. Versão mantida em 0.2.38.
+- Ainda não medido o pico de RAM da captura no VPS de 1 GB nem confirmado um envio real com esse código; o teste Windows valida a captura e o orçamento de pixels, sem garantir o consumo total do Chrome no Linux.
+- Solicitado `df -h /` para verificar espaço em disco antes de preparar swap. Nenhum arquivo swap, fstab ou configuração de serviço do VPS foi alterado nesta etapa.
+- Depois de publicar, atualizar o worker, verificar memória/journal durante uma captura e confirmar o recebimento real no destino. A frequência continua como estava configurada pelo usuário.
+

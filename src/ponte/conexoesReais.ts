@@ -5,6 +5,7 @@ import type { CalendarioContribuicoesGithub } from "../utilitarios/contribuicoes
 import type { CommitGithub } from "../utilitarios/commitsGithub";
 import { hojeISO, paraISO } from "../utilitarios/datas";
 import { cabecalhosNiko } from "../estado/autenticacao";
+import { ponteLocalDisponivel } from "./ambiente";
 
 export interface DadosStripe {
   disponivel: number;
@@ -274,6 +275,7 @@ async function pedir<R>(caminho: string, opcoes: RequestInit = {}): Promise<R> {
   const recursoGoogle = /^\/(google|gmail|agenda)(\/|$)/.test(caminho);
   const conexaoGoogle = /^\/conexoes\/google(?:\?|$|\/)/.test(caminho) && opcoes.method !== "DELETE";
   if (recursoGoogle || conexaoGoogle) exigirConexaoDisponivel("google");
+  if (!ponteLocalDisponivel()) throw new Error("Esta conexão precisa do aplicativo Kyro instalado.");
   const r = await fetch(`/ponte${caminho}`, { ...opcoes, headers: { ...cabecalhosNiko(), "content-type": "application/json", ...(opcoes.headers ?? {}) } });
   const json = (await r.json().catch(() => ({}))) as R & { erro?: string };
   if (!r.ok) throw new Error(json.erro ?? `http_${r.status}`);

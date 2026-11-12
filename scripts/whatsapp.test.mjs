@@ -294,7 +294,7 @@ async function estadoFrontendIsolado(t) {
   const ignorarOriginal = whatsappPonte.ignorar;
   const authAntes = useAuth.getState();
   useAuth.setState({ usuario: { id: 7, perfil: "gerencia", nome: "Teste", email: "teste@example.invalid" }, token: "sessao-teste-7" });
-  useWhatsapp.setState({ estado: null, pedidoEm: 0, falhou: false });
+  useWhatsapp.setState({ estado: null, pedidoEm: 0, falhou: false, erroCarregamento: null });
   t.after(() => { whatsappPonte.estado = original; whatsappPonte.ignorar = ignorarOriginal; useAuth.setState({ usuario: authAntes.usuario, token: authAntes.token }); });
   return { useWhatsapp, whatsappPonte, useAuth };
 }
@@ -371,6 +371,40 @@ test("ignorar conversa não publica uma resposta antiga depois da troca de conta
   concluir({ filtros: { ignoradas: [JID_TESTE] }, conversas: [] });
   assert.equal(await pendente, false);
   assert.equal(useWhatsapp.getState().estado, atual);
+});
+
+test("falha ao carregar WhatsApp conserva a causa recebida sem inventar configuração ausente", async (t) => {
+  const { useWhatsapp, whatsappPonte } = await estadoFrontendIsolado(t);
+  for (const [codigo, trecho] of [
+    ["gateway_remoto_nao_configurado", /Configure KYRO_GATEWAY_URL/],
+    ["gateway_nao_autorizado", /segredos diferentes/],
+    ["gateway_remoto_indisponivel", /VPS não respondeu/],
+    ["http_401", /sessão expirou/],
+    ["http_504", /API está indisponível/],
+  ]) {
+    whatsappPonte.estado = async () => { throw new Error(codigo); };
+    assert.equal(await useWhatsapp.getState().carregar(), null);
+    assert.equal(useWhatsapp.getState().falhou, true);
+    assert.match(useWhatsapp.getState().erroCarregamento, trecho);
+    if (codigo !== "gateway_remoto_nao_configurado") assert.doesNotMatch(useWhatsapp.getState().erroCarregamento, /Configure KYRO_GATEWAY_URL/);
+  }
+  whatsappPonte.estado = async () => ({ naoLidas: 0 });
+  await useWhatsapp.getState().carregar();
+  assert.equal(useWhatsapp.getState().falhou, false);
+  assert.equal(useWhatsapp.getState().erroCarregamento, null);
+});
+
+test("erro atrasado de uma consulta não apaga o WhatsApp recuperado em tempo real", async (t) => {
+  const { useWhatsapp, whatsappPonte } = await estadoFrontendIsolado(t);
+  let rejeitar;
+  whatsappPonte.estado = () => new Promise((_, r) => { rejeitar = r; });
+  const antiga = useWhatsapp.getState().carregar();
+  useWhatsapp.getState().definir({ naoLidas: 4 });
+  rejeitar(new Error("gateway_remoto_indisponivel"));
+  await antiga;
+  assert.equal(useWhatsapp.getState().estado.naoLidas, 4);
+  assert.equal(useWhatsapp.getState().falhou, false);
+  assert.equal(useWhatsapp.getState().erroCarregamento, null);
 });
 
 test("filtros da lista separam grupos e preservam a lista original", async () => {

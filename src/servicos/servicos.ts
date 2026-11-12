@@ -26,6 +26,7 @@ import { conexaoEmTestes } from "../utilitarios/disponibilidadeConexoes";
 import type { Evento, Habito, ServicoId } from "../tipos";
 import { addDays, addMonths, addWeeks } from "date-fns";
 import { conquistaLigada, funcaoLigada } from "../utilitarios/funcoes";
+import { ponteLocalDisponivel } from "../ponte/ambiente";
 
 function notificar(titulo: string, corpo: string, categoria?: CategoriaDeAviso) {
   if (useConfig.getState().naoPerturbe || !avisoLigado(categoria)) return;
@@ -106,7 +107,7 @@ function verificarDatas() {
 }
 
 async function verificarLimitesPlanos() {
-  if (!useConfig.getState().consumo.lerPlanos || document.hidden) return;
+  if (!ponteLocalDisponivel() || !useConfig.getState().consumo.lerPlanos || document.hidden) return;
   try {
     const dados = await lerConsumo();
     for (const f of dados.ferramentas) {
@@ -221,6 +222,7 @@ function lembrarHabitos() {
 }
 
 async function acertarConexoes() {
+  if (!ponteLocalDisponivel()) return;
   try {
     const estado = await conexoesPonte.estado();
     const com = useComunicacao.getState();
@@ -241,6 +243,7 @@ const emLeitura = new Set<ServicoId>();
 const vistas = new Map<ServicoId, Set<string>>();
 
 export async function atualizarConexaoAgora(id: ServicoId, forcar = true) {
+  if (!ponteLocalDisponivel()) return;
   if (conexaoEmTestes(id)) return;
   if (emLeitura.has(id)) return;
   emLeitura.add(id);
@@ -282,7 +285,7 @@ export async function atualizarConexaoAgora(id: ServicoId, forcar = true) {
 }
 
 function lerConexoes() {
-  if (useConfig.getState().pausarConexoes) return;
+  if (!ponteLocalDisponivel() || useConfig.getState().pausarConexoes) return;
   const com = useComunicacao.getState();
   const agora = Date.now();
   for (const id of SERVICOS) {
@@ -324,8 +327,10 @@ export function useServicos() {
     const iniciar = () => {
       parar();
       planos = window.setInterval(() => void verificarLimitesPlanos(), 5 * 60000);
-      void useMidia.getState().sincronizar();
-      midia = window.setInterval(() => void useMidia.getState().sincronizar(), 2500);
+      if (ponteLocalDisponivel()) {
+        void useMidia.getState().sincronizar();
+        midia = window.setInterval(() => void useMidia.getState().sincronizar(), 2500);
+      }
       void verificarLimitesPlanos();
       verificarDatas();
       rapido = window.setInterval(() => {
