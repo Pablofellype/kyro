@@ -19,6 +19,8 @@ const STATUS_CONECTADO_MS = 60_000;
 const VARREDURA_COM_WEBHOOK_MS = 60_000;
 const VARREDURA_SEM_WEBHOOK_MS = 20_000;
 const MAXIMO_DE_NOVIDADES = 50;
+const CONVERSAS_DO_GATEWAY = "80";
+const NOMES_DOS_GRUPOS_MS = 15 * 60_000;
 const GOWA_EXTERNO = (process.env.NIKO_GOWA_URL ?? "").trim().replace(/\/+$/, "");
 
 type EstadoWhatsappInterno = {
@@ -38,6 +40,9 @@ type EstadoWhatsappInterno = {
   ultimoStatus: number;
   conversasAbertas: Map<string, number>;
   nomesPedidos: Set<string>;
+  nomesDosGrupos: Map<string, string>;
+  gruposLidosEm: number;
+  geracao: number;
   novidades: { seq: number; jid: string; nome: string; grupo: boolean }[];
   seq: number;
 };
@@ -135,6 +140,7 @@ const rastrosPorSessao = new Map<string, RastroWhatsapp[]>();
 const digitandoPorSessao = new Map<string, Map<string, { nome: string; audio: boolean; ate: number }>>();
 const unicasPorSessao = new Map<string, { conhecidas: Set<string>; abertas: Set<string> }>();
 const unicasEmAndamentoPorSessao = new Map<string, Set<string>>();
+const confirmacoesPorSessao = new Map<string, Map<string, ReturnType<typeof setTimeout>>>();
 type OuvinteWhatsapp = (pacote: PacoteWhatsapp) => void;
 const ouvintesWhatsapp = new Map<string, Set<OuvinteWhatsapp>>();
 const notificacoesWhatsappAgendadas = new Set<string>();
@@ -175,7 +181,7 @@ function novoEstado(id: string): EstadoWhatsappInterno {
   return {
     config: lerConfig(), porta: 0, dispositivo: dispositivoDaSessao(id), acesso: "", segredo: "", vinculo: "desligado",
     eu: null, qr: null, erro: "", falhasSeguidas: 0, historicoCarregado: false, ultimoWebhook: 0, ultimaVarredura: 0,
-    ultimoStatus: 0, conversasAbertas: new Map(), nomesPedidos: new Set(), novidades: [], seq: 0,
+    ultimoStatus: 0, conversasAbertas: new Map(), nomesPedidos: new Set(), nomesDosGrupos: new Map(), gruposLidosEm: 0, geracao: 0, novidades: [], seq: 0,
   };
 }
 
@@ -434,14 +440,57 @@ async function nomearGrupo(jid: string) {
   }
 }
 
+export function nomesDeGruposDoGateway(corpo: unknown): Map<string, string> {
+  const lista = ((corpo as Record<string, unknown> | null)?.results as Record<string, unknown> | undefined)?.data;
+  const nomes = new Map<string, string>();
+  if (!Array.isArray(lista)) return nomes;
+  for (const grupo of lista) {
+    if (!grupo || typeof grupo !== "object") continue;
+    const jid = typeof grupo.JID === "string" ? grupo.JID : "";
+    const nome = typeof grupo.Name === "string" ? grupo.Name.trim() : "";
+    if (jid.endsWith("@g.us") && nome) nomes.set(jidNormalizado(jid), nome.slice(0, 120));
+  }
+  return nomes;
+}
+
+async function lerNomesDosGrupos() {
+  if (Date.now() - estado.gruposLidosEm >= NOMES_DOS_GRUPOS_MS) {
+    estado.gruposLidosEm = Date.now();
+    const geracao = estado.geracao;
+    try {
+      const corpo = await chamarComSucesso("GET", "/user/my/groups", { tempoMs: 20_000 });
+      if (!estado.config.ligado || geracao !== estado.geracao) return;
+      for (const [jid, nome] of nomesDeGruposDoGateway(corpo)) estado.nomesDosGrupos.set(jid, nome);
+    } catch {
+      if (!estado.config.ligado || geracao !== estado.geracao) return;
+      estado.gruposLidosEm = Date.now() - NOMES_DOS_GRUPOS_MS + 60_000;
+    }
+  }
+  aplicarNomesDosGrupos();
+}
+
+function aplicarNomesDosGrupos() {
+  let mudou = false;
+  for (const [jid, nome] of estado.nomesDosGrupos) {
+    const conversa = caixa.conversas.get(jid);
+    if (conversa && conversa.nome !== nome) { caixa.renomear(jid, nome); mudou = true; }
+  }
+  if (mudou) notificarMudancaWhatsapp();
+}
+
 async function carregarHistorico() {
-  const conversas = conversasDoGateway(await chamarComSucesso("GET", "/chats", { query: { limit: "40" } }));
-  if (conversas.length === 0) return;
+  const geracao = estado.geracao;
+  const conversas = conversasDoGateway(await chamarComSucesso("GET", "/chats", { query: { limit: CONVERSAS_DO_GATEWAY } }));
+  if (!estado.config.ligado || geracao !== estado.geracao) return;
   for (const c of conversas) caixa.registrarConversa(c.jid, c.nome, c.ultima, estado.config, c.arquivada);
+  if (conversas.length) await lerNomesDosGrupos();
+  if (!estado.config.ligado || geracao !== estado.geracao) return;
   for (const c of [...conversas].sort((a, b) => b.ultima.localeCompare(a.ultima)).slice(0, 8)) {
     const corpo = await chamarComSucesso("GET", `/chat/${encodeURIComponent(c.jid)}/messages`, { query: { limit: "10" } }).catch(() => null);
+    if (!estado.config.ligado || geracao !== estado.geracao) return;
     for (const m of mensagensDoGateway(corpo, estado.eu)) caixa.adicionar(m, estado.config, true, ehGrupo(c.jid) ? c.nome || undefined : undefined);
   }
+  aplicarNomesDosGrupos();
   caixa.marcarTodasLidas();
   estado.historicoCarregado = true;
   estado.ultimaVarredura = Date.now();
@@ -453,14 +502,20 @@ function horaDeVarrer() {
 }
 
 async function varrerSemWebhook() {
+  const geracao = estado.geracao;
   const desde = new Date(estado.ultimaVarredura - 5000).toISOString();
   estado.ultimaVarredura = Date.now();
-  const conversas = conversasDoGateway(await chamarComSucesso("GET", "/chats", { query: { limit: "40" } }));
+  const conversas = conversasDoGateway(await chamarComSucesso("GET", "/chats", { query: { limit: CONVERSAS_DO_GATEWAY } }));
+  if (!estado.config.ligado || geracao !== estado.geracao) return;
   for (const c of conversas) caixa.registrarConversa(c.jid, c.nome, c.ultima, estado.config, c.arquivada);
+  await lerNomesDosGrupos();
+  if (!estado.config.ligado || geracao !== estado.geracao) return;
   for (const c of conversas.filter((x) => x.ultima > desde).slice(0, 8)) {
     const corpo = await chamarComSucesso("GET", `/chat/${encodeURIComponent(c.jid)}/messages`, { query: { limit: "10", start_time: desde } }).catch(() => null);
+    if (!estado.config.ligado || geracao !== estado.geracao) return;
     guardar(mensagensDoGateway(corpo, estado.eu).sort((a, b) => a.data.localeCompare(b.data)), true);
   }
+  aplicarNomesDosGrupos();
 }
 
 function gatewayAindaConectando(corpo: unknown) {
@@ -470,14 +525,20 @@ function gatewayAindaConectando(corpo: unknown) {
 
 async function atualizarQr() {
   if (estado.qr && estado.qr.expira > Date.now()) return;
+  // Não manter um QR antigo enquanto o próximo login ou download está pendente.
+  estado.qr = null;
   const r = await chamar("GET", `/devices/${encodeURIComponent(estado.dispositivo)}/login`, { tempoMs: 45_000 });
   if (codigoDeErro(r.corpo) === "ALREADY_LOGGED_IN" || gatewayAindaConectando(r.corpo)) return;
   if (r.status < 200 || r.status >= 300) throw new Error(codigoDeErro(r.corpo) || `gateway_${r.status}`);
   const qr = caminhoDoQr(r.corpo);
-  if (!qr) return;
+  if (!qr) throw new Error("qr_indisponivel");
+  // O GOWA informa metade do tempo do código em qr_duration (usecase/app.go).
+  // Descontar a margem antes do download, sem prolongar códigos curtos.
+  const expira = Date.now() + Math.max(0, qr.segundos * 2 - 5) * 1000;
   const imagem = await chamar("GET", qr.caminho, { binario: true });
-  if (imagem.status !== 200 || !imagem.bytes || imagem.bytes.subarray(0, 4).toString("hex") !== "89504e47") return;
-  estado.qr = { png: `data:image/png;base64,${imagem.bytes.toString("base64")}`, expira: Date.now() + Math.max(20, qr.segundos * 2 - 5) * 1000 };
+  if (imagem.status !== 200 || !imagem.bytes || imagem.bytes.subarray(0, 4).toString("hex") !== "89504e47") throw new Error("qr_indisponivel");
+  if (!estado.config.ligado || expira <= Date.now()) return;
+  estado.qr = { png: `data:image/png;base64,${imagem.bytes.toString("base64")}`, expira };
 }
 
 async function prepararGateway() {
@@ -563,6 +624,7 @@ function iniciarRelogio() {
 
 function pararTudo(esquecer: boolean) {
   const id = idDaSessaoAtual();
+  cancelarConfirmacoesDeHorario();
   const relogio = relogioDaSessao();
   if (relogio) clearInterval(relogio);
   definirRelogio(null);
@@ -584,6 +646,8 @@ function pararTudo(esquecer: boolean) {
     digitandoDaSessao().clear();
     rastrosPorSessao.delete(id);
     unicasPorSessao.delete(id);
+    estado.nomesDosGrupos.clear();
+    estado.gruposLidosEm = 0;
   }
 }
 
@@ -781,9 +845,12 @@ function resumoDaConversa(c: ConversaWhatsapp) {
 
 export function estadoDoWhatsapp() {
   const filtros = estado.config;
-  const visiveis = caixa.visiveis(filtros).slice(0, 30);
+  const todas = caixa.visiveis(filtros);
+  const visiveis = [...todas.filter((c) => !c.grupo).slice(0, 40), ...todas.filter((c) => c.grupo).slice(0, 25)]
+    .sort((a, b) => b.ultimaAtividade.localeCompare(a.ultimaAtividade));
   const abertas = [...estado.conversasAbertas.keys()].filter((jid) => conversaEstaAberta(jid) && caixa.conversas.has(jid));
   const rastros = rastrosDaSessao();
+  const qr = estado.config.ligado && estado.vinculo === "precisa_qr" && estado.qr && estado.qr.expira > Date.now() ? estado.qr : null;
   pedirFotos(visiveis);
   return {
     suportado: alvoDaPlataforma() !== null,
@@ -793,7 +860,8 @@ export function estadoDoWhatsapp() {
     rodando: usaGowaExterno() || gowaRodando(),
     vinculo: estado.config.ligado ? estado.vinculo : "desligado",
     eu: estado.eu,
-    qr: estado.vinculo === "precisa_qr" ? estado.qr?.png ?? null : null,
+    qr: qr?.png ?? null,
+    qrExpira: qr?.expira ?? null,
     erro: estado.erro,
     filtros: { silenciarGrupos: filtros.silenciarGrupos, lerAoAbrir: filtros.lerAoAbrir, esconderArquivadas: filtros.esconderArquivadas !== false, esconderGrupos: filtros.esconderGrupos === true, mostrarFotos: filtros.mostrarFotos !== false, ignoradas: filtros.ignoradas },
     conversas: visiveis.map(resumoDaConversa),
@@ -896,11 +964,43 @@ export async function enviarMensagem(jid: unknown, texto: unknown) {
   if (!envios.permitir()) throw new Error("resposta_muitas");
   const corpo = await chamarComSucesso("POST", "/send/message", { json: { phone: id, message: texto.trim() } });
   const idDaMensagem = ((corpo as Record<string, unknown> | null)?.results as Record<string, unknown> | undefined)?.message_id;
-  caixa.adicionar({ id: typeof idDaMensagem === "string" ? idDaMensagem : `niko-${randomBytes(6).toString("hex")}`, conversa: id, remetente: estado.eu ?? id, nomeRemetente: "", texto: texto.trim(), midia: "nenhuma", data: new Date().toISOString(), minha: true, mencionaMe: false }, estado.config);
+  caixa.adicionar({ id: typeof idDaMensagem === "string" ? idDaMensagem : `niko-${randomBytes(6).toString("hex")}`, conversa: id, remetente: estado.eu ?? id, nomeRemetente: "", texto: texto.trim(), midia: "nenhuma", data: horarioDoEnvio(id), minha: true, mencionaMe: false, local: true }, estado.config);
   notificarMudancaWhatsapp();
-  await confirmarLeitura(id);
+  void confirmarLeitura(id);
+  confirmarHorariosDepois(id);
   const conversa = caixa.conversas.get(id);
   return conversa ? resumoDaConversa(conversa) : null;
+}
+
+function horarioDoEnvio(jid: string): string {
+  const ultima = caixa.conversas.get(jid)?.mensagens.at(-1)?.data ?? "";
+  const agora = new Date().toISOString();
+  return ultima > agora ? new Date(Date.parse(ultima) + 1).toISOString() : agora;
+}
+
+function cancelarConfirmacoesDeHorario() {
+  estado.geracao += 1;
+  const id = idDaSessaoAtual();
+  for (const temporizador of confirmacoesPorSessao.get(id)?.values() ?? []) clearTimeout(temporizador);
+  confirmacoesPorSessao.delete(id);
+}
+
+function confirmarHorariosDepois(jid: string) {
+  const id = idDaSessaoAtual();
+  const geracao = estado.geracao;
+  let confirmacoes = confirmacoesPorSessao.get(id);
+  if (!confirmacoes) { confirmacoes = new Map(); confirmacoesPorSessao.set(id, confirmacoes); }
+  clearTimeout(confirmacoes.get(jid));
+  const temporizador = setTimeout(() => {
+    confirmacoes?.delete(jid);
+    void contextoWhatsapp.run(id, async () => {
+      if (!estado.config.ligado || estado.geracao !== geracao) return;
+      const corpo = await chamarComSucesso("GET", `/chat/${encodeURIComponent(jid)}/messages`, { query: { limit: "20" } }).catch(() => null);
+      if (estado.config.ligado && estado.geracao === geracao && corpo) guardar(mensagensDoGateway(corpo, estado.eu), false);
+    });
+  }, 1500);
+  temporizador.unref?.();
+  confirmacoes.set(jid, temporizador);
 }
 
 const MENSAGENS_POR_PAGINA = 40;
@@ -1042,7 +1142,8 @@ export async function enviarImagemNoWhatsapp(jid: unknown, bytes: Buffer, nome =
   const idDaMensagem = (corpo?.results as Record<string, unknown> | undefined)?.message_id;
   const idFinal = typeof idDaMensagem === "string" ? idDaMensagem : `niko-${randomBytes(6).toString("hex")}`;
   guardarMidia(`${id}/${idFinal}`, { tipo, bytes });
-  caixa.adicionar({ id: idFinal, conversa: id, remetente: estado.eu ?? id, nomeRemetente: "", texto, midia: "imagem", nomeDoArquivo: arquivo, tamanho: bytes.length, data: new Date().toISOString(), minha: true, mencionaMe: false }, estado.config);
+  caixa.adicionar({ id: idFinal, conversa: id, remetente: estado.eu ?? id, nomeRemetente: "", texto, midia: "imagem", nomeDoArquivo: arquivo, tamanho: bytes.length, data: horarioDoEnvio(id), minha: true, mencionaMe: false, local: true }, estado.config);
+  confirmarHorariosDepois(id);
   notificarMudancaWhatsapp();
   const conversa = caixa.conversas.get(id);
   return conversa ? resumoDaConversa(conversa) : null;
@@ -1097,7 +1198,8 @@ export async function enviarArquivoNoWhatsapp(req: IncomingMessage, consulta: UR
   const idFinal = typeof idDaMensagem === "string" ? idDaMensagem : `niko-${randomBytes(6).toString("hex")}`;
   const tipo = tipoPelosBytes(bytes, rota.midia);
   if (tipo && rota.midia !== "documento") guardarMidia(`${id}/${idFinal}`, { tipo, bytes });
-  caixa.adicionar({ id: idFinal, conversa: id, remetente: estado.eu ?? id, nomeRemetente: "", texto: legenda, midia: rota.midia, nomeDoArquivo: nome, tamanho: bytes.length, data: new Date().toISOString(), minha: true, mencionaMe: false }, estado.config);
+  caixa.adicionar({ id: idFinal, conversa: id, remetente: estado.eu ?? id, nomeRemetente: "", texto: legenda, midia: rota.midia, nomeDoArquivo: nome, tamanho: bytes.length, data: horarioDoEnvio(id), minha: true, mencionaMe: false, local: true }, estado.config);
+  confirmarHorariosDepois(id);
   notificarMudancaWhatsapp();
   const conversa = caixa.conversas.get(id);
   return conversa ? resumoDaConversa(conversa) : null;
@@ -1105,6 +1207,9 @@ export async function enviarArquivoNoWhatsapp(req: IncomingMessage, consulta: UR
 
 export async function desconectarWhatsapp() {
   await chamarComSucesso("POST", `/devices/${encodeURIComponent(estado.dispositivo)}/logout`).catch(() => undefined);
+  cancelarConfirmacoesDeHorario();
+  estado.nomesDosGrupos.clear();
+  estado.gruposLidosEm = 0;
   caixa.limpar();
   estado.novidades = [];
   estado.historicoCarregado = false;

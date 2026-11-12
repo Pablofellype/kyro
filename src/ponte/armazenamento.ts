@@ -371,6 +371,7 @@ function conectarTempoReal() {
       socket.send(JSON.stringify({ tipo: "autenticar", token }));
     });
     socket.addEventListener("message", (evento) => {
+      if (websocketSincronia !== socket || tokenDaSessao() !== token) return;
       let mensagem: unknown;
       try {
         mensagem = JSON.parse(String(evento.data));

@@ -1036,3 +1036,262 @@ Pendências:
 - Ainda não houve nova execução corrigida do GitHub Actions; o resultado no CI depende do envio pelo usuário.
 - Nenhum commit, push, remoção/recriação de tag ou publicação foi executado pelo assistente. Nenhuma credencial ou banco remoto foi alterado.
 
+## 2026-11-11 — v0.2.37 — Correções no vínculo e na renovação do QR do WhatsApp
+
+Objetivo:
+
+Investigar a falha de conexão por QR Code relatada pelo usuário e corrigir problemas reproduzíveis no fluxo existente. A mensagem exata e o ambiente da tentativa real ainda não foram informados.
+
+Diagnóstico:
+
+- `dispositivoDoGateway` reutilizava outro dispositivo quando o identificador solicitado não existia. Isso podia impedir a criação da sessão correta e misturar contas.
+- O QR vencido continuava sendo entregue pelo estado, inclusive depois de erro na renovação. O download da imagem iniciava uma nova contagem e o mínimo fixo de 20 segundos prolongava códigos curtos.
+- A interface exibia somente `gateway_fora` entre os erros de estado. Outros erros recebidos pelo worker não eram apresentados no modal.
+- Conferido o código oficial do GOWA v9.6.0: `qr_duration` corresponde à metade do tempo do código. A conversão para o tempo real foi preservada, com margem de cinco segundos; não se tratava simplesmente de remover o multiplicador. Fonte: https://github.com/aldinokemal/go-whatsapp-web-multidevice/blob/v9.6.0/src/usecase/app.go.
+- Tentada consulta somente de leitura ao estado de `kyro-gowa.service` e `kyro-worker.service`, com a chave existente do gateway. A conexão SSH ao host conhecido expirou; nenhum registro remoto nem versão instalada do GOWA foi obtido. Não se pode atribuir a falha real a uma versão ou a um erro específico do VPS sem essa evidência.
+
+Alterações:
+
+- `servidor/whatsapp/caixa.ts`: busca exata quando há dispositivo solicitado, retornando ausência em vez de selecionar outra conta; validação de duração numérica positiva e finita.
+- `servidor/whatsapp/whatsapp.ts`: remove o QR antigo antes da renovação; calcula o vencimento antes de baixar a imagem; não publica imagem vencida ou inválida; impede entregar QR vencido/desligado; inclui `qrExpira` no estado.
+- `src/ponte/whatsapp.ts`: campo opcional `qrExpira` para compatibilidade com workers anteriores.
+- `ConexaoWhatsapp.tsx`: retira o QR ao vencer, faz uma única consulta nesse momento e apresenta os demais erros do gateway com `role="alert"`.
+- `src/textos/textos.ts`: mensagens para falhas de QR, autenticação e configuração de acesso ao gateway.
+- `scripts/whatsapp.test.mjs`: sete regressões com gateway, relógio e dados isolados. Nenhuma conta real ou mensagem foi usada. Limpeza dos diretórios de teste verifica o caminho temporário antes de remover.
+
+Validação:
+
+- Antes da correção: quatro testes reproduziram seleção de outra conta, QR vencido visível, imagem antiga após falha e vencimento prolongado por download lento.
+- Após a correção: os 11 testes de WhatsApp passaram, incluindo criação do dispositivo correto, recuperação após falha, confirmação do vínculo e rejeição de imagem inválida.
+- `pnpm test`: 378 testes aprovados, nenhuma falha. Execução inicialmente bloqueada por `spawn EPERM` no sandbox; repetida com autorização e concluída com sucesso. Registro em `node_modules/.kyro-revisoes/whatsapp-qr-2026-11-11/testes.log`.
+- `pnpm build`: aprovado, incluindo TypeScript e build de produção.
+- Chrome headless com perfil temporário, componente real e chamadas de API simuladas: erro de QR visível, imagem retirada no vencimento, exatamente uma consulta ao vencer, novo QR visível e confirmação de conexão retirando a imagem. Nenhum erro de execução observado. Nenhuma sessão de navegador do usuário foi utilizada.
+- Prévia isolada em `node_modules/.kyro-revisoes/whatsapp-qr-2026-11-11/`. Script temporário de automação removido após o teste.
+- `git diff --check`: aprovado, apenas aviso LF/CRLF existente.
+
+Resultado e pendências:
+
+- Correções prontas e verificadas localmente. A conexão real com o telefone não foi concluída nem declarada resolvida.
+- Falta receber o erro exato, saber se a tentativa é no navegador ou no aplicativo instalado e consultar os registros/versão do gateway remoto quando ele estiver acessível.
+- Para aplicar no ambiente publicado, será necessário enviar estas alterações e atualizar o worker no VPS; isso não foi realizado nesta tarefa. Não foi alterado o número da versão.
+- Nenhum commit, push, deploy, reinício de serviço, exclusão de sessão, troca de credencial, envio de mensagem ou alteração de banco remoto foi executado.
+
+## 2026-11-11 — v0.2.37 — Mensagem de vínculo recusado confirmada no celular
+
+Objetivo:
+
+Direcionar o diagnóstico a partir da informação exata do usuário: o QR aparece no Kyro, mas o WhatsApp do celular informa “não é possível conectar novos dispositivos no momento, tente novamente mais tarde”.
+
+Conferência e resultado:
+
+- A recusa acontece na etapa de vínculo após a leitura do QR. A mensagem não comprova, sozinha, bloqueio da conta, limite de dispositivos ou incompatibilidade do gateway.
+- Consultadas fontes primárias: central oficial do WhatsApp sobre dispositivos conectados e discussão #718 do GOWA sobre vínculos recusados em contas específicas. Os relatos do GOWA mostram que a confirmação do vínculo pode falhar mesmo quando a conexão e a emissão do QR funcionam; não constituem diagnóstico desta conta sem registros da tentativa.
+- Solicitado teste com o mesmo número no WhatsApp Web oficial. Se funcionar, priorizar o gateway/sessão e seus registros; se também falhar, investigar o fluxo oficial, dispositivos conectados e condições do celular/rede/conta. O teste é uma forma de direcionar a investigação, não uma prova definitiva da causa.
+- Fontes: https://faq.whatsapp.com/378279804439436/?cms_platform=android&locale=pt_BR e https://github.com/aldinokemal/go-whatsapp-web-multidevice/discussions/718.
+
+Alterações, validação e pendências:
+
+- Acrescentado somente este registro; nenhum novo ajuste funcional ou teste de código nesta continuação. As correções locais e os 378 testes aprovados da entrada anterior permanecem.
+- Aguardar o resultado do teste oficial e a identificação do ambiente usado (web ou executável). A versão instalada do GOWA e os registros do VPS continuam desconhecidos após o timeout SSH da investigação anterior.
+- Nenhuma sessão foi apagada, nenhum dispositivo foi desvinculado e nenhum serviço remoto foi alterado.
+
+## 2026-11-11 — v0.2.37 — WhatsApp Web oficial conectou com o mesmo número
+
+Objetivo:
+
+Prosseguir na investigação do vínculo recusado pelo celular após o usuário confirmar que o mesmo número conectou normalmente no WhatsApp Web oficial.
+
+Conferência:
+
+- O teste comprova que o número conseguiu realizar um vínculo pelo fluxo oficial naquele momento. Direciona a investigação para a sessão, versão, comunicação e compatibilidade do gateway usado pelo Kyro, sem provar uma causa específica nem excluir restrições aplicadas somente ao gateway.
+- Confirmado em `whatsappRemotoAtivo` que o perfil de dono usa normalmente o VPS tanto no navegador quanto no executável; o modo nativo local depende da configuração explícita de desenvolvimento.
+- Repetida consulta SSH somente de leitura ao host conhecido: conexão à porta 22 expirou novamente. Não foram obtidos estado dos serviços, versão instalada nem registros de pareamento. Esse timeout do SSH não comprova que o gateway HTTP esteja parado.
+- Conferidas as releases oficiais do GOWA: há mudanças de autenticação e TLS a partir da v9.8.0. Não foi feita atualização automática sem conhecer a versão/configuração existente. Fonte: https://github.com/aldinokemal/go-whatsapp-web-multidevice/releases/tag/v9.8.0.
+
+Alterações e validação:
+
+- Acrescentado somente este registro. Nenhuma nova alteração funcional nem nova execução de testes nesta continuação; os resultados de 378 testes e build da correção local anterior continuam registrados acima.
+- Nenhum commit, deploy, reinício, atualização do GOWA, limpeza de sessão ou mudança de conta foi executado.
+
+Resultado e pendências:
+
+- Necessário obter os registros recentes de `kyro-gowa.service` pelo console do Droplet na DigitalOcean, já que o acesso SSH daqui não está disponível. Esses registros devem direcionar a correção, antes de apagar sessões ou trocar versões.
+- A conexão real do Kyro permanece pendente. O êxito do WhatsApp Web oficial não foi tratado como êxito do gateway.
+
+## 2026-11-12 — v0.2.37 local — Estado do VPS identificado pelo console
+
+Objetivo:
+
+Continuar a atualização do servidor e do gateway, autorizada pelo usuário, a partir da captura `Captura de tela 2026-11-12 104102.png`.
+
+Conferência:
+
+- Console em `/opt/kyro`, sem alterações apresentadas por `git status --short`.
+- HEAD e referências locais do VPS em `096e5a1`, mensagem “Prepara release 0.2.31”. Conferido esse commit no repositório local: seu package.json informa 0.2.31. As referências `origin/main` mostradas no VPS ainda dependem de fetch; não indicam que o GitHub atual esteja nessa versão.
+- Executável ativo do GOWA identificado por `/proc`: `/root/.local/share/com.niko.empresa/whatsapp/gowa`.
+- O checkout do computador permanece em `9676182`, versão 0.2.37, com as correções de WhatsApp da investigação anterior ainda sem commit/push. Um pull da main no VPS não inclui essas alterações locais.
+- Conferidas as diferenças de dependências entre 0.2.31 e a main local: adições de `@vercel/blob` e `@vercel/node`. Instalação/reinício no servidor devem ser acompanhados, sem presumir que o processo já carregou a versão nova.
+- Release oficial mais recente do GOWA consultada nesta data: v9.9.0, com notas que remetem às mudanças de autenticação/TLS da v9.8.0. A versão instalada no VPS continua desconhecida.
+
+Alterações e validação:
+
+- Acrescentado somente este registro; nenhuma nova alteração funcional ou teste local nesta etapa.
+- Orientada atualização inicial do checkout com `git pull --ff-only origin main`, seguida de conferência da versão do projeto, arquitetura e versão do executável GOWA identificado. Esses comandos ainda não tiveram resultado observado.
+- Nenhuma atualização, parada, reinício, alteração de configuração ou exclusão de dados no VPS foi executada pelo assistente.
+
+Pendências:
+
+- Receber a saída do pull e das verificações para atualizar o GOWA com binário da arquitetura correta, conferência de integridade e cópia de segurança antes da substituição.
+- Concluir dependências/carregamento do worker conforme sua forma de execução, conferir health check e validar o vínculo real com o celular após a atualização.
+
+## 2026-11-12 — v0.2.37 — Versões do checkout e do GOWA confirmadas no VPS
+
+Objetivo:
+
+Prosseguir na atualização autorizada a partir da captura `Captura de tela 2026-11-12 104430.png`.
+
+Conferência:
+
+- O package.json no console do VPS agora informa 0.2.37. A captura não mostra a saída do pull nem comprova que o worker em execução já carregou esse código.
+- Arquitetura retornada por `uname -m`: x86_64.
+- `/root/.local/share/com.niko.empresa/whatsapp/gowa version`: 9.7.0.
+- Pacote oficial selecionado: `whatsapp_9.9.0_linux_amd64.zip`, release v9.9.0. SHA-256 publicado pelo GitHub: `b3a0afc3cd2721198de60032a21f7f0aa78e58d0a478a7b00566d1604b7aa574`. Origem: https://github.com/aldinokemal/go-whatsapp-web-multidevice/releases/expanded_assets/v9.9.0.
+- Conferido no código oficial v9.9.0 que o subcomando `version` pula a inicialização de configuração e armazenamento. A extração usa somente a entrada `linux-amd64`, o mesmo nome esperado pelo instalador do projeto.
+
+Alterações e validação:
+
+- Acrescentado somente este registro, sem mudanças funcionais ou testes de código nesta continuação.
+- Preparada orientação para baixar e conferir o ZIP em pasta separada, extrair o novo executável sem substituir o atual, confirmar sua versão e consultar somente diretórios/arquivos de ambiente declarados nos serviços. Não se solicita o conteúdo das credenciais.
+- Esses comandos de preparação ainda não tiveram resultado observado. Nenhum serviço foi parado/reiniciado nem binário ativo foi substituído pelo assistente.
+
+Pendências:
+
+- Obter os diretórios e arquivos de ambiente dos serviços para preservar a instalação real durante o backup e conferir as mudanças de autenticação/TLS antes da substituição.
+- Concluir atualização do GOWA, dependências/carregamento do worker, health check e teste de pareamento com o telefone. O simples número 0.2.37 do checkout não comprova a atualização do processo ativo.
+
+## 2026-11-12 — v0.2.37 — Pacote GOWA 9.9.0 conferido e troca preparada
+
+Objetivo:
+
+Prosseguir com backup e substituição do gateway após a captura `Captura de tela 2026-11-12 105029.png`.
+
+Conferência:
+
+- O ZIP oficial Linux amd64 terminou o download e `sha256sum -c` retornou `whatsapp_9.9.0_linux_amd64.zip: OK`.
+- O executável separado `/root/kyro-gowa-9.9.0/gowa-novo` retornou 9.9.0. Isso ainda não comprova que o serviço ativo foi atualizado.
+- Ambos os serviços usam `/etc/kyro-gateway/gowa.env`. Diretório de trabalho do GOWA: `/root/.local/share/com.niko.empresa/whatsapp`; do worker: `/opt/kyro`.
+
+Preparação:
+
+- Bloco de atualização preparado em arquivo local ignorado pelo Git: `node_modules/.kyro-revisoes/gowa-vps/atualizar-gowa.sh`.
+- Confere o candidato 9.9.0 e consulta ambiente/argumentos do processo para detectar armazenamento PostgreSQL e a porta do GOWA, sem imprimir credenciais. Se detectar PostgreSQL, interrompe antes de parar os serviços para preparar o backup adequado desse banco.
+- Atualiza dependências com o mesmo comando da CI e recompila a ponte caso a unidade do worker aponte para o bundle `src-tauri/recursos/ponte.mjs`.
+- Com serviços parados, copia a pasta completa do WhatsApp e o arquivo de configuração para um diretório privado e exclusivo em `/root/kyro-backup-gowa-*`.
+- Substitui somente o executável, inicia o GOWA e confere `/health`, depois inicia o worker e verifica seu estado e `/api/health`.
+- Em falha durante a troca/inicialização, tenta parar os serviços, preservar a tentativa em outra pasta, recolocar a pasta anterior e iniciar novamente. Nenhum diretório de sessão é apagado.
+
+Validação e resultado:
+
+- `bash --noprofile --norc -n`: sintaxe aprovada. A execução inicial no sandbox falhou por restrição de criação do signal pipe; repetida com autorização e aprovada. O script não foi executado contra serviços reais nem foi feito teste de restauração real.
+- Nenhuma nova alteração funcional no Kyro nem repetição da suíte de testes; acrescentado somente este histórico e o artefato de orientação ignorado pelo Git.
+- O usuário ainda precisa executar o bloco no console do VPS e enviar a saída. Não foi observado backup, substituição ou reinício no servidor nesta etapa.
+
+Pendências:
+
+- Conferir versão do processo ativo, estados dos dois serviços e health check após a execução.
+- Confirmar o vínculo real no WhatsApp do celular. As correções locais de QR feitas anteriormente continuam sem publicação e não foram incluídas no pull já realizado.
+
+## 2026-11-12 — v0.2.37 — Atualização do gateway para GOWA 9.9.0 confirmada
+
+Objetivo:
+
+Conferir o resultado da atualização executada pelo usuário no console da DigitalOcean, apresentado em `Captura de tela 2026-11-12 110745.png`.
+
+Resultado observado:
+
+- Instalação de dependências concluída com pnpm 10.34.9, incluindo `@vercel/blob` 2.8.2 e `@vercel/node` 29.0.1.
+- O bloco informou o diretório privado de backup com prefixo `/root/kyro-backup-gowa-` e, ao final, confirmou sua preservação. O conteúdo do backup não foi inspecionado separadamente.
+- Houve uma primeira tentativa de conexão recusada na porta 3000 durante a inicialização do GOWA; a nova tentativa retornou `OK`. Isso corresponde ao retry previsto no bloco, não a uma falha final da atualização.
+- Executável GOWA após a troca: 9.9.0.
+- `kyro-gowa.service`: ActiveState=active e SubState=running.
+- `kyro-worker.service`: ActiveState=active e SubState=running.
+- Health check do worker retornou `ok:true`, `api:"ok"` e `banco:"ok"`, com data `2026-11-12T14:07:39.526Z`.
+- A sequência chegou ao final e devolveu o prompt do terminal. Não há indicação de execução da restauração de falha.
+
+Alterações e validação:
+
+- Atualização do VPS executada pelo usuário a partir do bloco preparado na etapa anterior. O assistente conferiu a saída na captura.
+- Acrescentado somente este registro local, sem nova alteração funcional no Kyro nem nova execução da suíte de testes.
+- A validação confirma versão, disponibilidade dos serviços e API/banco. Não confirma ainda um vínculo com o WhatsApp do celular nem o envio de mensagens.
+
+Pendências:
+
+- Atualizar a página ou reabrir o aplicativo Kyro, abrir Conexões → WhatsApp e testar a leitura de um QR novo pelo celular.
+- Se o vínculo continuar recusado, consultar os registros recentes do GOWA 9.9.0 durante essa tentativa; a causa original de pareamento ainda não foi declarada resolvida.
+- As correções de QR e isolamento feitas no checkout local continuam sem commit/push e não integraram esta atualização da main no VPS.
+
+## 2026-11-12 — v0.2.37 — Melhorias do WhatsApp comparadas com o Niko
+
+Objetivo:
+
+Trazer as melhorias da referência local `C:\Users\pfmmelo\Downloads\Niko-main\Niko-main` para o Kyro, mantendo as configurações e a integração remota já existentes. O usuário confirmou que o vínculo real funcionou após a atualização anterior do GOWA no VPS.
+
+Implementação:
+
+- Ilha do WhatsApp com busca, filtros de conversas/não lidas/grupos, contador na aba, presença digitando/gravando, reações, confirmações de leitura e marcações de edição/exclusão. A aba abre a página completa do WhatsApp pelo atalho e recebe largura própria de 760 px, limitada pela estrutura responsiva existente.
+- Envio de texto em fila, apresentação imediata da mensagem pendente, tentativa novamente/descarte em falha, prevenção de envio duplicado e colagem de imagem com confirmação do anexo. A fila não continua enviando sob a identidade de outra conta.
+- Cache da interface com marcos monotônicos para descartar consultas atrasadas, atualização da conversa após envio e limpeza apenas do estado transitório ao trocar de conta. Eventos de WebSocket e respostas de ignorar conversa da sessão anterior são descartados.
+- Servidor consulta até 80 chats e apresenta até 40 conversas individuais e 25 grupos, mantendo os filtros salvos. Nomes de grupos são consultados com cache de 15 minutos, separado por usuário.
+- Mensagens enviadas recebem horário provisório ordenado e confirmação posterior pelo gateway. Os temporizadores são separados por usuário e cancelados ao desligar/desconectar. Limite interno de envio passa para 30 por minuto por conta, como na referência.
+- Gateway local habilita os seis eventos necessários para mensagem, edição, exclusão, reação, confirmação e presença, preservando outros eventos já configurados. README documenta a conferência da lista no VPS ao publicar.
+- Barra de busca e filtros usa composição por largura do contêiner: duas linhas em espaços pequenos e uma em espaços maiores. A confirmação de anexo quebra os controles em linhas, sem comprimir o nome e os botões.
+
+Preservação:
+
+- Nenhuma configuração real de usuário, credencial, banco de sessão ou arquivo do VPS foi regravado. Mantidos perfis, permissões, sessões por usuário, integração com a DigitalOcean e atualizações remotas por WebSocket, sem acrescentar polling HTTP frequente no navegador.
+- As correções locais de QR feitas antes desta etapa foram preservadas. A referência Niko foi somente lida.
+- Cópias dos arquivos anteriores à implementação em `node_modules/.kyro-revisoes/whatsapp-melhorias-2026-11-12/antes`, ignoradas pelo Git.
+
+Arquivos principais:
+
+- `src/janelas/ilha/VisaoWhatsapp.tsx`, `Ilha.tsx` e `ilha.css`; `src/estado/whatsapp.ts`; `src/ponte/armazenamento.ts`.
+- `servidor/whatsapp/whatsapp.ts`, `caixa.ts` e `gowa.ts`; `scripts/whatsapp.test.mjs`, `scripts/pre-lancamento.test.mjs` e `README.md`.
+
+Validação:
+
+- `pnpm verificar`: aprovado. `pnpm build`: aprovado após as últimas alterações.
+- `pnpm test`: 391 testes aprovados, 0 falhas, após as últimas alterações. Testes adicionais cobrem QR, filtros preservados, cache de nomes por usuário, confirmação de horários, consultas fora de ordem, WebSocket antigo e resposta de ignorar conversa após trocar de conta.
+- A tentativa final de testes/build no sandbox encontrou bloqueio de criação de processos (`EPERM`); ambos foram repetidos com autorização fora do sandbox e aprovados. O primeiro ensaio visual precisou corrigir o ambiente isolado do React; os ensaios seguintes identificaram o problema real da barra em telas pequenas e confirmaram a correção.
+- Chrome isolado com serviços simulados: busca, filtros, leitura/reações/edição/exclusão, envio em fila sem duplicação, falha e reenvio, colagem de imagem, troca de conta durante envio e preservação de filtros aprovados. Nenhuma mensagem real foi enviada.
+- Lista validada em 320×568, 390×844, 667×375, 768×1024, 1024×768, 1366×768 e 1920×1080. Conversa com anexo validada em 320×568, 390×844, 667×375 e 1366×768. Detectado e corrigido o overflow da busca em larguras pequenas; após a correção, documento e painel respeitaram a largura disponível. Capturas e medidas em `node_modules/.kyro-revisoes/whatsapp-melhorias-2026-11-12/ui`.
+- O roteiro visual temporário foi retirado da raiz após a execução. A validação em navegador usa dados simulados e não substitui um teste real após publicação.
+
+Publicação:
+
+- Nenhum commit, push, tag, deploy ou nova alteração na DigitalOcean nesta etapa. Versão mantida em 0.2.37.
+- Ao publicar, atualizar também o worker do VPS e conferir os eventos documentados no README, mantendo os eventos adicionais e as demais variáveis existentes.
+
+## 2026-11-12 — v0.2.37 — Robô de Aderências em Apps Empresa
+
+Objetivo:
+
+Mover o acesso ao Robô de Aderências do Escritório para Apps Empresa, conforme pedido do usuário.
+
+Alterações:
+
+- `src/modulos/escritorio/AplicativosEmpresa.tsx`: cartão próprio para abrir o Robô de Aderências dentro do Kyro, com botão “Voltar aos apps”. Mantida a permissão existente: dono e gerência com `roboAderencias` liberado.
+- `src/modulos/escritorio/Escritorio.tsx`: removido o alternador de Aderências; a página mantém o painel de coordenação da empresa.
+- O mesmo componente `Aderencias` continua usando as rotinas, planilhas, agendamentos, destino do WhatsApp e armazenamento existentes. Nenhuma configuração foi migrada, redefinida ou apagada. Os seis sistemas do catálogo e o portal público permanecem iguais; o robô é um acesso interno.
+
+Validação:
+
+- `pnpm verificar` e `pnpm build`: aprovados.
+- `node --test scripts/aderencias.test.mjs`: 5 testes aprovados, 0 falhas.
+- Checagem SSR temporária: cartão visível para dono e gerência autorizada, oculto para gerência sem liberação, visitante e sessão ausente. Confirmados os seis cartões externos, a retirada do alternador no Escritório e a preservação do catálogo público. Execução final aprovada; os primeiros ensaios exigiram ajustes no ambiente SSR, no usuário simulado e nos canais do processo. Roteiro temporário removido após a validação.
+- `git diff --check`: aprovado.
+
+Resultado e pendências:
+
+- Novo caminho: Empresa → Apps Empresa → Robô de Aderências. A mudança está no código local, sem publicação, atualização do VPS ou alteração de versão.
+- O problema informado de envios não realizados continua pendente de diagnóstico; esta tarefa mudou somente o local de acesso ao painel.
+

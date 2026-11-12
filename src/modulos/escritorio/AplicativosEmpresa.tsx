@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import { AppWindow, LoaderCircle, PackageOpen, RefreshCw, Wrench } from "lucide-react";
+import { AppWindow, ArrowLeft, FileSpreadsheet, LoaderCircle, PackageOpen, RefreshCw, Wrench } from "lucide-react";
 import { CabecalhoAba } from "../../componentes/CabecalhoAba";
 import { AvisoFaixa, Botao } from "../../componentes/basicos";
 import { cabecalhosNiko, useAuth, urlApi } from "../../estado/autenticacao";
 import { APLICATIVOS_EMPRESA } from "./aplicativosEmpresaConfig";
 import { SistemaEmpresaAberto } from "./SistemaEmpresaAberto";
+import { Aderencias } from "./Aderencias";
 
 interface SolicitacaoEmpresa {
   id: number | string;
@@ -20,6 +21,8 @@ interface SolicitacaoEmpresa {
 
 export default function AplicativosEmpresa() {
   const token = useAuth((s) => s.token);
+  const usuario = useAuth((s) => s.usuario);
+  const podeAderencias = usuario?.perfil === "dono" || (usuario?.perfil === "gerencia" && usuario.roboAderencias === true);
   const [appAberto, setAppAberto] = useState<string | null>(null);
   const [solicitacoes, setSolicitacoes] = useState<SolicitacaoEmpresa[]>([]);
   const [carregando, setCarregando] = useState(false);
@@ -43,6 +46,13 @@ export default function AplicativosEmpresa() {
 
   useEffect(() => { void carregarSolicitacoes(); }, [token]);
 
+  if (appAberto === "aderencias" && podeAderencias) {
+    return <>
+      <div><Botao icone={<ArrowLeft size={16} />} onClick={() => setAppAberto(null)}>Voltar aos apps</Botao></div>
+      <Aderencias />
+    </>;
+  }
+
   const selecionado = APLICATIVOS_EMPRESA.find((app) => app.id === appAberto && app.status === "disponivel" && app.url);
   if (selecionado) {
     return <SistemaEmpresaAberto key={selecionado.id} app={selecionado} aoVoltar={() => setAppAberto(null)} />;
@@ -53,6 +63,11 @@ export default function AplicativosEmpresa() {
       <CabecalhoAba titulo="Apps Empresa" subtitulo="Acesse os sistemas da empresa em um só lugar." />
       <div className="apps-empresa-painel">
         <div className="apps-empresa-grade">
+          {podeAderencias && <article className="apps-empresa-cartao" aria-label="Robô de Aderências">
+            <span className="apps-empresa-icone"><FileSpreadsheet size={21} /></span>
+            <div><h2>Robô de Aderências</h2><p>Configure as rotinas, acompanhe as planilhas e envie os resultados pelo WhatsApp.</p></div>
+            <Botao pequeno variante="secundario" icone={<FileSpreadsheet size={13} />} aria-label="Abrir Robô de Aderências" onClick={() => setAppAberto("aderencias")}>Abrir sistema</Botao>
+          </article>}
           {APLICATIVOS_EMPRESA.map((app) => {
             const emManutencao = app.status === "manutencao";
             return (

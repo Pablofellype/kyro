@@ -11,6 +11,12 @@ const RELEASE_MAIS_RECENTE = "https://api.github.com/repos/aldinokemal/go-whatsa
 const TAMANHO_MAXIMO_DO_DOWNLOAD = 120 * 1024 * 1024;
 const INTERVALO_MINIMO_ENTRE_INICIOS_MS = 60_000;
 
+export const EVENTOS_WHATSAPP = ["message", "message.revoked", "message.edited", "message.reaction", "message.ack", "chat_presence"] as const;
+
+export function eventosDoWhatsapp(atuais = ""): string {
+  return [...new Set([...atuais.split(",").map((e) => e.trim()).filter(Boolean), ...EVENTOS_WHATSAPP])].join(",");
+}
+
 export interface ArquivoDaRelease {
   nome: string;
   url: string;
@@ -173,7 +179,7 @@ export function ambienteDoGowa(o: OpcoesDoGowa, base: NodeJS.ProcessEnv = proces
     WHATSAPP_IGNORE_STATUS_MEDIA: "true",
     WHATSAPP_WEBHOOK: o.urlDoWebhook,
     WHATSAPP_WEBHOOK_SECRET: o.segredoDoWebhook,
-    WHATSAPP_WEBHOOK_EVENTS: "message",
+    WHATSAPP_WEBHOOK_EVENTS: eventosDoWhatsapp(base.WHATSAPP_WEBHOOK_EVENTS),
   };
 }
 

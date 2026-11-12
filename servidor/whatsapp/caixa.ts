@@ -314,7 +314,7 @@ export class LimiteDeEnvios {
   private maximo: number;
   private janelaMs: number;
 
-  constructor(maximo = 6, janelaMs = 60_000) {
+  constructor(maximo = 30, janelaMs = 60_000) {
     this.maximo = maximo;
     this.janelaMs = janelaMs;
   }
@@ -501,8 +501,10 @@ export type SituacaoDoVinculo = "conectado" | "precisa_qr" | "conectando";
 export function dispositivoDoGateway(corpo: unknown, preferido?: string): { id: string; vinculo: SituacaoDoVinculo; eu: string | null } | null {
   const lista = (corpo as Record<string, unknown> | null)?.results;
   if (!Array.isArray(lista) || lista.length === 0) return null;
-  const escolhido = (preferido ? lista.find((d: Record<string, unknown>) => d?.id === preferido) : undefined) ?? (lista.find((d: Record<string, unknown>) => d?.state === "logged_in") ?? lista[0]) as Record<string, unknown>;
-  const id = texto(escolhido?.id);
+  // Uma sessão solicitada nunca pode cair no dispositivo de outro usuário.
+  const escolhido = (preferido ? lista.find((d: Record<string, unknown>) => d?.id === preferido) : lista.find((d: Record<string, unknown>) => d?.state === "logged_in") ?? lista[0]) as Record<string, unknown> | undefined;
+  if (!escolhido) return null;
+  const id = texto(escolhido.id);
   if (!id) return null;
   const jid = texto(escolhido.jid) ?? null;
   const vinculo: SituacaoDoVinculo = escolhido.state === "logged_in" ? "conectado" : jid ? "conectando" : "precisa_qr";
@@ -515,7 +517,8 @@ export function caminhoDoQr(corpo: unknown): { caminho: string; segundos: number
   if (!link) return null;
   try {
     const caminho = new URL(link, "http://127.0.0.1").pathname;
-    return caminho ? { caminho, segundos: typeof r?.qr_duration === "number" ? r.qr_duration : 30 } : null;
+    const duracao = r?.qr_duration;
+    return caminho ? { caminho, segundos: typeof duracao === "number" && Number.isFinite(duracao) && duracao > 0 ? duracao : 30 } : null;
   } catch {
     return null;
   }

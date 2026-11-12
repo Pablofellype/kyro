@@ -83,6 +83,7 @@ export interface EstadoWhatsapp {
   vinculo: VinculoWhatsapp;
   eu: string | null;
   qr: string | null;
+  qrExpira?: number | null;
   erro: string;
   filtros: { silenciarGrupos: boolean; lerAoAbrir: boolean; esconderArquivadas: boolean; esconderGrupos: boolean; mostrarFotos: boolean; ignoradas: string[] };
   conversas: ConversaWhatsapp[];

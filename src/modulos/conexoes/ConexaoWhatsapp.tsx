@@ -60,6 +60,7 @@ export function ConfigWhatsapp({ aberto, aoFechar }: { aberto: boolean; aoFechar
   const definir = useWhatsapp((s) => s.definir);
   const [erro, setErro] = useState("");
   const [ocupado, setOcupado] = useState(false);
+  const [qrExpirado, setQrExpirado] = useState(false);
   const [confirmandoEsquecer, setConfirmandoEsquecer] = useState(false);
   const usuario = useAuth((s) => s.usuario);
   const remoto = whatsappRemotoAtivo(usuario);
@@ -71,6 +72,18 @@ export function ConfigWhatsapp({ aberto, aoFechar }: { aberto: boolean; aoFechar
     const relogio = window.setInterval(() => void carregar(), 1500);
     return () => window.clearInterval(relogio);
   }, [aberto, carregar, remoto]);
+
+  useEffect(() => {
+    setQrExpirado(false);
+    if (!aberto || !estado?.qr || !estado.qrExpira) return;
+    const restante = estado.qrExpira - Date.now();
+    if (restante <= 0) { setQrExpirado(true); return; }
+    const temporizador = window.setTimeout(() => {
+      setQrExpirado(true);
+      void carregar();
+    }, restante);
+    return () => window.clearTimeout(temporizador);
+  }, [aberto, estado?.qr, estado?.qrExpira, carregar]);
 
   const agir = async (acao: () => Promise<EstadoWhatsapp | unknown>) => {
     setErro("");
@@ -115,7 +128,7 @@ export function ConfigWhatsapp({ aberto, aoFechar }: { aberto: boolean; aoFechar
             {remoto && <LinhaAlternador rotulo={W.ligar} ligado={Boolean(estado?.ligado)} desativado={!estado?.instalado || ocupado} aoMudar={(v) => void agir(() => whatsappPonte.ligar(v))} />}
             {estado?.ligado && (
               <div className="whatsapp-vinculo">
-                {estado.vinculo === "precisa_qr" && estado.qr ? (
+                {estado.vinculo === "precisa_qr" && estado.qr && !qrExpirado && (!estado.qrExpira || estado.qrExpira > Date.now()) ? (
                   <img className="whatsapp-qr" src={estado.qr} alt={W.qrAlt} width={232} height={232} />
                 ) : estado.vinculo === "precisa_qr" || estado.vinculo === "iniciando" || estado.vinculo === "desligado" ? (
                   <div className="whatsapp-qr-preparando" role="status" aria-live="polite">
@@ -127,6 +140,7 @@ export function ConfigWhatsapp({ aberto, aoFechar }: { aberto: boolean; aoFechar
                   <span className="linha"><Smartphone size={14} />{estado.vinculo === "conectado" && estado.eu ? W.conectadoComo(numeroDoJid(estado.eu)) : W.vinculos[estado.vinculo]}</span>
                 )}
                 {estado.erro === "gateway_fora" && <AvisoFaixa tipo="alerta">{W.gatewayFora}</AvisoFaixa>}
+                {estado.erro && estado.erro !== "gateway_fora" && <AvisoFaixa tipo="erro"><span role="alert">{W.erros[estado.erro] ?? estado.erro}</span></AvisoFaixa>}
               </div>
             )}
             {estado && (

@@ -42,8 +42,34 @@ function armazenamentoIsolado(nativo = false, sessao = null) {
   const codigo = stripTypeScriptTypes(readFileSync("src/ponte/armazenamento.ts", "utf8")).replace(/^import .*;\r?\n/gm, "").replace(/^export /gm, "")
     .replaceAll('await import("@tauri-apps/api/event")', "globalThis.eventos").replaceAll('await import("@tauri-apps/api/core")', "globalThis.nativo");
   vm.runInContext(`${codigo}\nglobalThis.api = { iniciarArmazenamento, salvarAgora, gravarChave, lerChave, zerarTudo, aoPrepararSaida };`, contexto);
-  return { api: contexto.api, contexto, janela, timers, ouvintes, comandos, eventos };
+  return { api: contexto.api, contexto, janela, timers, ouvintes, comandos, eventos, memoria };
 }
+
+test("WhatsApp em tempo real descarta eventos da conta que já saiu", async () => {
+  const a = armazenamentoIsolado(false, { id: 7 });
+  const sockets = [];
+  const recebidos = [];
+  a.contexto.endpointTempoReal = () => "ws://127.0.0.1/teste";
+  a.contexto.useWhatsapp = { getState: () => ({ definir: (e) => recebidos.push(e) }) };
+  a.contexto.WebSocket = class extends EventTarget {
+    static OPEN = 1;
+    static CONNECTING = 0;
+    readyState = 1;
+    constructor() { super(); sockets.push(this); }
+    send() {}
+  };
+  await a.api.iniciarArmazenamento();
+  assert.equal(sockets.length, 1);
+  const publicar = (id) => sockets[0].dispatchEvent(new MessageEvent("message", { data: JSON.stringify({ tipo: "whatsapp", estado: { dono: id } }) }));
+  publicar(7);
+  assert.equal(recebidos.length, 1);
+  a.memoria.set("kyro_token", "sessao-da-conta-8");
+  publicar(7);
+  assert.equal(recebidos.length, 1);
+  a.memoria.delete("kyro_token");
+  publicar(7);
+  assert.equal(recebidos.length, 1);
+});
 
 test("saída nativa aguarda a ação pendente antes de travar escrita e confirmar gravação", async () => {
   const a = armazenamentoIsolado(true);

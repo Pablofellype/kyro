@@ -10,7 +10,7 @@ Rotina, estudos, finanças, metas e os serviços que você acompanha, reunidos e
 
 ![Windows 10 e 11](https://img.shields.io/badge/Windows-10%20%7C%2011-0b0d10?style=flat-square)
 ![Linux](https://img.shields.io/badge/Linux-Ubuntu%20%7C%20Fedora%20(GNOME)-0b0d10?style=flat-square)
-![Versão](https://img.shields.io/badge/versão-0.2.37-0b0d10?style=flat-square)
+![Versão](https://img.shields.io/badge/versão-0.2.38-0b0d10?style=flat-square)
 ![Licença](https://img.shields.io/badge/licença-proprietária-b42318?style=flat-square)
 
 <br />
@@ -355,6 +355,10 @@ curl -s -H "x-niko: 1" http://127.0.0.1:47831/api/health
 O resultado esperado do health check contém `"api":"ok"` e `"banco":"ok"`. A `DATABASE_URL` do Neon fica configurada uma única vez, fora do repositório, em `/etc/kyro-gateway/gowa.env`. Não publique esse arquivo nem a connection string. Só será necessário configurá-la novamente se o servidor for recriado, o arquivo for removido ou a credencial do banco mudar. O Neon armazena os dados e o schema; a versão do Kyro é controlada pelo repositório e pela Release.
 
 ### Sincronização remota sem polling agressivo
+
+O WhatsApp da ilha oferece busca, filtros de conversas e grupos, mensagens em fila com opção de tentar novamente e prévia de anexos. As preferências e sessões continuam separadas por usuário. No gateway local, os eventos de edição, exclusão, reação, confirmação de leitura e presença são habilitados junto com `message`, preservando outros eventos configurados.
+
+No VPS, confira `WHATSAPP_WEBHOOK_EVENTS` em `/etc/kyro-gateway/gowa.env` ao publicar esta melhoria. A lista deve incluir `message,message.revoked,message.edited,message.reaction,message.ack,chat_presence`; se já houver outros eventos, mantenha-os e acrescente apenas os ausentes. Faça uma cópia do arquivo antes de editar e reinicie `kyro-gowa.service` após salvar. Mantenha as demais variáveis, credenciais, diretórios e bancos de sessão. Atualizar somente o binário GOWA não altera essa lista de eventos.
 
 O navegador mantém uma conexão WebSocket autenticada com o gateway. O gateway envia dados e estado do WhatsApp somente quando há mudança; não use timers de 1 ou 5 segundos para consultar o Neon. Se o WebSocket cair, o cliente usa apenas o fallback HTTP espaçado. Para o aviso de dados funcionar, `KYRO_GATEWAY_URL` e `KYRO_GATEWAY_SECRET` precisam estar na Vercel, e `NIKO_GATEWAY_SECRET` no gateway deve ter o mesmo valor de `KYRO_GATEWAY_SECRET`. O agendador do VPS continua independente do navegador e segue executando mensagens e prints mesmo com o computador desligado.
 
