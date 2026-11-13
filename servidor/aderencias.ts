@@ -412,7 +412,7 @@ export async function enviarAderencia(configuracaoValor: unknown, planilhaValor:
   const planilha = validarPlanilha(planilhaValor);
   const captura = await capturar(planilha);
   const resultado = previa(planilha, captura);
-  await enviarImagemNoWhatsapp(configuracao.destinoJid, captura.bytes, `aderencia-${planilha.id}.png`, resultado.texto);
+  await enviarImagemNoWhatsapp(configuracao.destinoJid, captura.bytes, `aderencia-${planilha.id}.png`, resultado.texto, { altaQualidade: true });
   return {
     previa: resultado,
     resultado: { executadoEm: new Date().toISOString(), planilhasEnviadas: 1, alertas: resultado.alertas, urgentes: resultado.urgentes, erros: [] },
@@ -428,7 +428,7 @@ async function executarLista(destinoJid: string, itens: PlanilhaAderencia[]) {
       const planilha = validarPlanilha(item);
       const captura = await capturar(planilha);
       const resultado = previa(planilha, captura);
-      await enviarImagemNoWhatsapp(destinoJid, captura.bytes, `aderencia-${planilha.id}.png`, resultado.texto);
+      await enviarImagemNoWhatsapp(destinoJid, captura.bytes, `aderencia-${planilha.id}.png`, resultado.texto, { altaQualidade: true });
       previas.push(resultado); alertas += resultado.alertas; urgentes += resultado.urgentes; enviadas++;
     } catch (erro) {
       erros.push(`${item.nome || "Planilha"}: ${(erro as Error).message}`);

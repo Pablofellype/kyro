@@ -42,6 +42,8 @@ interface EstadoInterface {
   rota: Rota;
   historico: Rota[];
   parametros: Record<string, string>;
+  barraAppsRecolhida: boolean | null;
+  definirBarraAppsRecolhida: (recolhida: boolean | null) => void;
   buscaAberta: boolean;
   capturaAberta: boolean;
   estilosDaMidiaAbertos: boolean;
@@ -155,6 +157,8 @@ export const useInterface = create<EstadoInterface>()((set, get) => ({
   rota: "inicio",
   historico: [],
   parametros: {},
+  barraAppsRecolhida: null,
+  definirBarraAppsRecolhida: (recolhida) => set({ barraAppsRecolhida: recolhida }),
   buscaAberta: false,
   capturaAberta: false,
   estilosDaMidiaAbertos: false,

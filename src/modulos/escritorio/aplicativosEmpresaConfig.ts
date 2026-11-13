@@ -1,3 +1,5 @@
+import type { UsuarioAutenticado } from "../../estado/autenticacao";
+
 export interface AplicativoEmpresa {
   id: string;
   nome: string;
@@ -58,3 +60,18 @@ export const APLICATIVOS_EMPRESA: AplicativoEmpresa[] = [
     publico: true,
   },
 ];
+
+export interface ItemMenuAplicativoEmpresa {
+  id: string;
+  nome: string;
+  disponivel: boolean;
+}
+
+export function itensDoMenuAppsEmpresa(usuario: Pick<UsuarioAutenticado, "perfil" | "roboAderencias"> | null): ItemMenuAplicativoEmpresa[] {
+  const podeAderencias = usuario?.perfil === "dono" || (usuario?.perfil === "gerencia" && usuario.roboAderencias === true);
+  return [
+    ...(podeAderencias ? [{ id: "aderencias", nome: "Robô de Aderências", disponivel: true }] : []),
+    ...APLICATIVOS_EMPRESA.map((app) => ({ id: app.id, nome: app.nome, disponivel: app.status === "disponivel" && !!app.url })),
+    { id: "solicitacoes", nome: "Solicitações recebidas", disponivel: true },
+  ];
+}

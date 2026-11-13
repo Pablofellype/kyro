@@ -20,6 +20,7 @@ import { mudarTema } from "../area-de-trabalho/mudarTema";
 import { IndicadorSincronia } from "../../componentes/IndicadorSincronia";
 import { Marca } from "../../marcas/Marca";
 import { ehDono, podeAcessarArea, podeAcessarRota } from "../../servicos/permissoes";
+import { AppsEmpresaNoMenu } from "./AppsEmpresaNoMenu";
 
 function useContadores(): Partial<Record<Rota, { n: number; alerta?: boolean }>> {
   const hoje = hojeISO();
@@ -51,11 +52,11 @@ function mesmaCaixa(a: Caixa, b: Caixa) {
   return a.l === b.l && a.t === b.t && a.w === b.w && a.h === b.h;
 }
 
-function usarIndicador(rota: Rota, recolhida: boolean) {
+function usarIndicador(rota: string, recolhida: boolean) {
   const rolagem = useRef<HTMLDivElement>(null);
   const [caixa, setCaixa] = useState<Caixa | null>(null);
   const atual = useRef<Caixa | null>(null);
-  const rotaDoIndicador = useRef<Rota | null>(null);
+  const rotaDoIndicador = useRef<string | null>(null);
   const rotaViva = useRef(rota);
   const recolhidaViva = useRef(recolhida);
   const animando = useRef(false);
@@ -155,15 +156,15 @@ export function BarraLateral({ recolhida }: { recolhida: boolean }) {
   const nome = useConfig((s) => s.nome);
   const fechados = useConfig((s) => s.gruposFechados);
   const definir = useConfig((s) => s.definir);
-  const recolhidaManual = useConfig((s) => s.barraRecolhida);
   const rota = useInterface((s) => s.rota);
+  const appEmpresa = useInterface((s) => s.parametros.app ?? "");
   const area = useInterface((s) => s.area);
   const definirArea = useInterface((s) => s.definirArea);
   const irPara = useInterface((s) => s.irPara);
   const tarefas = useRotina((s) => s.tarefas);
   const mudarStatus = useRotina((s) => s.mudarStatus);
   const contadores = useContadores();
-  const { rolagem, caixa } = usarIndicador(rota, recolhida);
+  const { rolagem, caixa } = usarIndicador(rota === "appsEmpresa" ? `${rota}:${appEmpresa}` : rota, recolhida);
   const logout = useAuth((s) => s.logout);
   const usuario = useAuth((s) => s.usuario);
   const naoLidasWhatsapp = useWhatsapp((s) => s.estado?.naoLidas ?? 0);
@@ -189,6 +190,7 @@ export function BarraLateral({ recolhida }: { recolhida: boolean }) {
     el.addEventListener("scroll", medir, { passive: true });
     const obs = new ResizeObserver(medir);
     obs.observe(el);
+    el.querySelectorAll(".barra-grupo").forEach((grupo) => obs.observe(grupo));
     return () => {
       el.removeEventListener("scroll", medir);
       obs.disconnect();
@@ -201,6 +203,12 @@ export function BarraLateral({ recolhida }: { recolhida: boolean }) {
   }));
 
   const alternarGrupo = (g: string) => definir({ gruposFechados: fechados.includes(g) ? fechados.filter((x) => x !== g) : [...fechados, g] });
+
+  const recolherBarra = (proxima: boolean) => {
+    const ui = useInterface.getState();
+    if (ui.barraAppsRecolhida !== null) ui.definirBarraAppsRecolhida(proxima);
+    else definir({ barraRecolhida: proxima });
+  };
 
   const trocarArea = (proxima: AreaSistema) => {
     if (!podeAcessarArea(usuario, proxima)) return;
@@ -245,13 +253,13 @@ export function BarraLateral({ recolhida }: { recolhida: boolean }) {
         <LogoNiko tamanho={26} />
         {!recolhida && <span className="barra-marca">{T.app.nome}</span>}
         {!recolhida && (
-          <button type="button" className="botao botao-fantasma botao-pequeno botao-icone empurrar" aria-label={T.barraLateral.recolher} title={`${T.barraLateral.recolher} (Ctrl + B)`} onClick={() => definir({ barraRecolhida: !recolhidaManual })}>
+          <button type="button" className="botao botao-fantasma botao-pequeno botao-icone empurrar" aria-label={T.barraLateral.recolher} title={`${T.barraLateral.recolher} (Ctrl + B)`} onClick={() => recolherBarra(true)}>
             <PanelLeftClose size={15} />
           </button>
         )}
       </div>
       {recolhida && (
-        <button type="button" className="barra-icone barra-icone-largo" aria-label={T.barraLateral.expandir} title={`${T.barraLateral.expandir} (Ctrl + B)`} onClick={() => definir({ barraRecolhida: false })}>
+        <button type="button" className="barra-icone barra-icone-largo" aria-label={T.barraLateral.expandir} title={`${T.barraLateral.expandir} (Ctrl + B)`} onClick={() => recolherBarra(false)}>
           <PanelLeftOpen size={16} />
         </button>
       )}
@@ -282,7 +290,7 @@ export function BarraLateral({ recolhida }: { recolhida: boolean }) {
                   <ChevronDown size={12} className="barra-rotulo-seta" />
                 </button>
               )}
-              {!fechado && itens.flatMap((i) => (i.rota === "conexoes" ? [item(i.rota, i.nome), itemDoWhatsapp()] : [item(i.rota, i.nome)]))}
+              {!fechado && itens.flatMap((i) => i.rota === "appsEmpresa" ? [<AppsEmpresaNoMenu key="appsEmpresa" recolhida={recolhida} nome={i.nome} />] : i.rota === "conexoes" ? [item(i.rota, i.nome), itemDoWhatsapp()] : [item(i.rota, i.nome)])}
             </div>
           );
         })}

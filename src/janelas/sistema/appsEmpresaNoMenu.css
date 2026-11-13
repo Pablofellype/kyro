@@ -1,0 +1,48 @@
+.barra-apps,
+.barra-apps-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.barra-apps-lista[hidden] {
+  display: none;
+}
+
+.barra-apps-seta {
+  flex: none;
+  margin-left: auto;
+  transition: transform .18s ease;
+}
+
+.barra-apps-toggle[aria-expanded="true"] .barra-apps-seta {
+  transform: rotate(180deg);
+}
+
+.barra-apps-manutencao {
+  flex: none;
+  margin-left: auto;
+}
+
+.estilo-sistema .barra-apps-item:disabled {
+  opacity: .5;
+}
+
+.estilo-sistema .barra-recolhida .barra-apps-item {
+  width: 100%;
+  margin-left: 0;
+}
+
+.estilo-sistema .barra-recolhida .barra-apps-item::before {
+  display: none;
+}
+
+@media (max-width: 768px), (pointer: coarse) and (max-width: 1024px) {
+  .barra-apps,
+  .barra-apps-lista {
+    flex: 0 0 auto;
+    flex-direction: row;
+    align-items: stretch;
+  }
+}

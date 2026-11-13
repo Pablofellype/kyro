@@ -1366,3 +1366,154 @@ Resultado e pendências:
 - Solicitado `df -h /` para verificar espaço em disco antes de preparar swap. Nenhum arquivo swap, fstab ou configuração de serviço do VPS foi alterado nesta etapa.
 - Depois de publicar, atualizar o worker, verificar memória/journal durante uma captura e confirmar o recebimento real no destino. A frequência continua como estava configurada pelo usuário.
 
+## 2026-11-12 — v0.2.39 — Publicação, swap e ponto de retomada para o dia seguinte
+
+Objetivo:
+
+Registrar o que foi efetivamente publicado e configurado depois do diagnóstico de OOM, e salvar o ponto exato para o usuário continuar no dia seguinte antes de desligar o computador.
+
+Resultados confirmados pelas saídas enviadas pelo usuário:
+
+- Publicação de `main` no commit `bcb5541` — `Corrige aderencias e acesso web na 0.2.39` — e da tag `v0.2.39` no GitHub.
+- Pull no VPS em `/opt/kyro`, de `358837e` para `bcb5541`, com os 22 arquivos da correção. Dependências atualizadas com `pnpm install --frozen-lockfile --prod=false` e quatro versões confirmadas em 0.2.39 por `pnpm lancar:verificar`.
+- Disco consultado antes de criar swap: volume de 24 GB, aproximadamente 19 GB livres. Criado e ativado `/swapfile-kyro`, com 2 GiB e permissões 600.
+- Entrada confirmada na linha 5 do fstab: `/swapfile-kyro none swap sw,nofail 0 0`. Backup criado com prefixo `/etc/fstab.bak.`; `systemctl daemon-reload` concluído. Não houve reboot para testar a ativação automática.
+- Worker reiniciado depois da atualização. `kyro-worker.service` e `kyro-gowa.service` retornaram `active`.
+- Health do worker retornou `ok:true`, `api:"ok"`, `banco:"ok"`, com data `2026-11-12T20:43:52.117Z`.
+- Após esse reinício: RAM total 961 MiB, usados 386 MiB, disponíveis 574 MiB; swap total 2 GiB, usados 0 B. Ainda não é uma medição durante a captura.
+
+Resumo salvo:
+
+- Criado `RESUMO_KYRO/RETOMADA.md` com as correções da última versão, o estado do servidor, validações concluídas, limitações e sequência para o próximo teste.
+- `LEIA_PRIMEIRO.md` recebeu o link para o ponto de retomada. Entradas antigas deste histórico foram preservadas; suas pendências de publicação e swap foram superadas pelos resultados desta entrada.
+- As alterações de encerramento destes documentos foram salvas somente no computador, depois do push; não foi feito novo commit, push ou deploy por causa do resumo.
+
+Validação e limites:
+
+- Código da correção passou anteriormente por 404 testes, checagem de tipos, build web, build da ponte e captura de uma tabela de teste em Chrome isolado. Nenhum envio real de aderências foi confirmado com o código novo.
+- Nesta etapa de encerramento foram conferidos a versão local, o último commit e os documentos. As alterações novas são apenas de documentação; não foi repetida a suíte de testes nem executada nova ação no VPS.
+
+Pendências prioritárias para retomar:
+
+1. Atualizar o Kyro web com Ctrl + F5 e abrir Empresa → Apps Empresa → Robô de Aderências.
+2. Clicar no olho da primeira planilha para gerar uma prévia. Esse foi o último passo orientado e o usuário ainda não informou o resultado.
+3. Conferir memória e journal durante a captura; depois testar uma planilha e confirmar o recebimento no destino do WhatsApp.
+4. Verificar a frequência das rotinas: a captura mostrava Rotina Manhã em “Somente manual”, apesar do horário 16:31. Não foi alterada automaticamente para diária/semanal. Rotina Tarde estava sem planilhas.
+5. Conferir o console web e o deploy da Vercel após a atualização; conferir também o workflow/instaladores da v0.2.39 se for continuar pelo aplicativo desktop.
+
+O envio real, o agendamento e a estabilidade durante a captura continuam pendentes de validação. Serviços ativos e health positivo não são confirmação de envio. Continuar com orientações curtas, um bloco de comandos por vez.
+
+## 2026-11-13 — v0.2.39 local — Cards, cópia de aderências, edição explícita e imagem HD
+
+Objetivo e confirmação do usuário:
+
+- O usuário confirmou que os envios e os horários estão funcionando corretamente, inclusive com o sistema fechado. Essa informação supera as pendências de envio/agendamento registradas em 12/11; não foi um novo teste executado pelo assistente.
+- Pedido: painel com cards de rotinas, duplicação de todas as planilhas para outro horário, reaproveitamento seletivo de planilhas existentes, edição liberada pelo lápis e aplicação somente em “Salvar alterações”. Melhorar também a imagem recebida no WhatsApp, preservando o envio e o agendador.
+
+Alterações:
+
+- `Aderencias.tsx` e `aderencias.css`: painel inicial com cards, horário, frequência, situação e quantidade de planilhas. Cada card abre os detalhes em modo de consulta; o lápis libera a edição da rotina e das planilhas.
+- Retirado o efeito que enviava a configuração automaticamente a cada alteração. Nome, destino, ativação, frequência, dias, horário, inclusão, edição e remoção de planilhas ficam em um rascunho React. Apenas “Salvar alterações” aplica esse rascunho. Falha ao salvar conserva o rascunho; cancelar/voltar permite descartá-lo.
+- `edicaoAderencias.ts`: cópias independentes com novos IDs, preservando links, abas, intervalos, cabeçalho e alertas. Duplicar uma rotina copia todas as planilhas, deixa a nova rotina pausada e limpa seus resultados/marcadores. A origem não é alterada. “Copiar de outra rotina” permite selecionar uma ou todas as planilhas.
+- Salvamento relê a configuração remota e preserva resultados/marcadores recentes, demais rotinas e destino não editado. A exclusão da última rotina limpa também o espelho legado, para não manter uma rotina removida disponível ao worker.
+- Envios manuais continuam registrando seus resultados, sem restaurar o salvamento automático dos campos. Respostas de uma sessão anterior são descartadas.
+- `servidor/aderencias.ts`: apenas as duas chamadas de envio de imagem passaram a solicitar alta qualidade. `enviarImagemNoWhatsapp` aceita essa opção e acrescenta `hd=true` e `compress=false` ao formulário das aderências. Demais chamadas conservam o padrão anterior.
+- Compatibilidade conferida na documentação e no código oficiais do [GOWA v9.9.0](https://github.com/aldinokemal/go-whatsapp-web-multidevice/blob/v9.9.0/docs/openapi.yaml): modo HD com maior lado de até 2560 px. Não foram aumentados viewport, DPR ou orçamento de 4 milhões de pixels da captura; fila, prazos, horários e lógica do agendador permaneceram intactos.
+
+Validação:
+
+- `pnpm test`: **410 testes aprovados, 0 falhas**, incluindo cópias independentes, isolamento do rascunho, preservação dos marcadores/demais rotinas, limites e pedido HD com destinatário, legenda e bytes preservados. As tentativas iniciais de suíte/build no sandbox falharam com `spawn EPERM`; as repetições autorizadas fora do isolamento passaram.
+- `pnpm verificar`, `pnpm build`, `pnpm ponte:build` e `git diff --check`: aprovados.
+- A conferência visual não foi concluída: o Computer Use encerrou o acesso porque não conseguiu determinar a URL atual do Chrome no Windows com confiança suficiente. Não houve tentativa de contornar o bloqueio.
+- Preparado ensaio local com dados fictícios e envios desabilitados em `testes/aderencias-ui` (pasta ignorada pelo Git); o servidor de ensaio foi encerrado. Nenhum envio real ou alteração nas rotinas de produção foi feito nesta tarefa.
+
+Resultado e pendências:
+
+- Implementação somente no código local, versão mantida em 0.2.39. Sem commit, push, tag, publicação, atualização do VPS ou migração de banco.
+- Conferir visualmente desktop/celular e os fluxos de duplicar, copiar, cancelar e salvar quando o acesso ao navegador estiver disponível.
+- Depois da publicação autorizada do frontend e da ponte/worker, confirmar o recebimento em HD no WhatsApp. O teste simulado comprova os parâmetros do pedido, não a aparência final no aparelho.
+
+## 2026-11-13 — v0.2.39 local — Informações somente dentro da rotina
+
+Objetivo:
+
+- A pedido do usuário, retirar os três cartões de resumo da tela inicial e exibi-los somente ao abrir uma rotina, como Aderências Manhã. Esclarecer o aviso de gateway no localhost.
+
+Alterações e diagnóstico:
+
+- `Aderencias.tsx`: quantidade de planilhas, destino e último resultado ficam na área de detalhes, abaixo de “Todas as rotinas”. Quantidade e resultado usam a rotina aberta; a tela inicial mantém o painel de cards de rotinas. O destino continua compartilhado conforme a configuração existente.
+- Confirmadas ausentes/vazias no `.env.local` as variáveis de URL e segredo do gateway remoto. O encaminhamento local retorna `gateway_remoto_nao_configurado` nessa condição. Nenhum segredo foi exibido e nenhuma configuração local ou do VPS foi alterada.
+
+Validação:
+
+- `pnpm verificar`, `pnpm build` e `git diff --check`: aprovados. Alteração limitada à apresentação, sem repetir a suíte completa de 410 testes já aprovada na etapa anterior.
+- Conferência visual do novo posicionamento não realizada nesta etapa.
+
+Resultado e pendências:
+
+- Ajuste concluído no código local, versão 0.2.39, sem publicação. A lógica de envio e agendamento não foi modificada.
+- O localhost continua dependendo da configuração de acesso ao gateway para consultar/salvar rotinas remotas; configurar esse acesso não foi solicitado nesta etapa.
+
+## 2026-11-13 — v0.2.39 local — Apps Empresa na sublista do menu lateral
+
+Objetivo:
+
+- Substituir a seleção de apps por cards dentro do painel por uma sublista expansível em Apps Empresa no menu de navegação. Um clique no aplicativo deve abrir seu conteúdo diretamente na área principal.
+
+Alterações:
+
+- Novo `AppsEmpresaNoMenu.tsx` com botão expansível, ícones, seleção ativa, rótulos acessíveis e indicação de manutenção. Inclui Robô de Aderências conforme a permissão existente, os seis sistemas do catálogo e Solicitações recebidas, que antes ficavam na página de apps.
+- `aplicativosEmpresaConfig.ts`: catálogo dos itens do menu compartilhado com a seleção de conteúdo. O catálogo público e as URLs existentes foram preservados; o Robô continua restrito a dono ou gerência com permissão explícita.
+- `AplicativosEmpresa.tsx`: seleção pelo parâmetro `app` da rota; abertura direta do robô, das solicitações ou do sistema cadastrado. Retirados os cards intermediários e o botão Voltar aos apps. A lista de solicitações continua disponível em item próprio.
+- `BarraLateral.tsx` e `JanelaSistema.tsx`: integração da sublista, indicador ativo entre aplicativos, medição da altura dos grupos expandidos, nome do aplicativo no cabeçalho, retorno ao topo e reinício da página/barreira de erro ao trocar de app.
+- Estilos contemplam a lateral recolhida e a navegação horizontal já utilizada no celular. Sistemas externos continuam no visualizador principal com Recarregar e Nova aba, sem nova janela automática e sem modificar a integração existente.
+- Envios, agendador, rotinas e configurações do gateway não foram alterados nesta etapa.
+
+Validação:
+
+- `node --test scripts/interface.test.mjs`: 26 testes aprovados, incluindo quatro novos testes de catálogo/permissões, abertura direta, destinos inválidos/manutenção e navegação entre apps.
+- `node --test scripts/pre-lancamento.test.mjs`: 20 testes aprovados, inclusive a correspondência entre catálogo e origens permitidas na CSP.
+- `pnpm verificar`, `pnpm build` e `git diff --check`: aprovados.
+- O primeiro ensaio de renderização do robô no servidor de testes encontrou o uso de portais do navegador. O teste foi corrigido para validar a seleção do componente autorizado sem renderizar seus modais fora do navegador. BroadcastChannel foi isolado no ambiente de testes para não manter o processo aberto.
+
+Resultado e pendências:
+
+- Fluxo implementado somente no código local, versão mantida em 0.2.39. Sem commit, push, tag ou publicação.
+- Não foi feita conferência visual em navegador nesta etapa. Revisar o menu expandido/recolhido e o comportamento no celular quando o acesso visual estiver disponível.
+
+## 2026-11-13 — v0.2.39 local — Mais espaço nos apps e cópia do link
+
+Objetivo:
+
+- Recolher o menu ao abrir um aplicativo, retirar o aviso/botão Ir para o sistema, substituir Nova aba por uma ação de copiar link e investigar a opção de lembrar email/senha para preencher as telas de login.
+
+Alterações:
+
+- `JanelaSistema.tsx` e `estado/interface.ts`: ao abrir um app disponível, a lateral do desktop se recolhe temporariamente. A seta e Ctrl+B permitem expandir/recolher durante o uso; sair dos aplicativos devolve a preferência geral. Esse estado não é salvo na configuração nem sincronizado como preferência do usuário. O menu horizontal do celular permanece visível.
+- `BarraLateral.tsx`, `AppsEmpresaNoMenu.tsx` e `usarAtalhos.ts`: controles usam o estado temporário dentro dos apps e a configuração normal fora deles. Clicar em Apps Empresa com a lateral recolhida expande a navegação e apresenta sua sublista.
+- `SistemaEmpresaAberto.tsx`: retirados Ir para o sistema e a faixa de ajuda redundante. Nova aba foi substituída por Copiar link do sistema, com confirmação após sucesso. Se a API de clipboard não estiver disponível ou recusar a cópia, aparece o URL em um campo selecionável, sem anunciar sucesso falso.
+- `sistemaEmpresaAberto.css`: removidos os estilos da faixa retirada e acrescentado o espaço para cópia manual quando necessária.
+
+Login salvo — investigação e informação pendente:
+
+- Os sistemas externos estão em iframes de outros domínios. A [política de mesma origem](https://developer.mozilla.org/en-US/docs/Web/Security/Defenses/Same-origin_policy) impede o Kyro web de ler/preencher diretamente os campos dessas páginas. Comunicação autorizada pode ser implementada nos dois lados, mas requer acesso ao código dos sistemas.
+- O [WebView2 tem recursos próprios de salvar/preencher senhas](https://learn.microsoft.com/en-us/microsoft-edge/webview2/reference/win32/icorewebview2settings4), como alternativa específica do aplicativo Windows; o ajuste afeta o perfil compartilhado do WebView e precisa de desenho de isolamento por usuário antes de ser adotado. Nenhum ajuste nativo foi feito nesta etapa.
+- Perguntado ao usuário se tem acesso ao código das telas de login ou se precisa funcionar sem alterar os sistemas. Até este registro, resposta pendente. O recurso de salvar/preencher email e senha ainda não foi implementado; não foram solicitadas, lidas, copiadas ou armazenadas senhas reais.
+
+Validação:
+
+- `node --test scripts/interface.test.mjs`: 27 testes aprovados, incluindo navegação/permissões, ausência dos comandos retirados, presença do botão de copiar e Ctrl+B alternando o menu temporário sem gravar a preferência geral.
+- `pnpm verificar`, `pnpm build` e `git diff --check`: aprovados. Conferência visual não realizada nesta etapa.
+
+Resultado e pendências:
+
+- Ajustes de visualização e cópia implementados no código local, versão mantida em 0.2.39. Sem publicação e sem mudanças nos envios/agendador ou na configuração dos sistemas externos.
+- Definir com o usuário o acesso aos códigos dos aplicativos e o ambiente desejado para o login salvo antes de implementar o armazenamento/preenchimento. Não adicionar controles que prometam um preenchimento indisponível.
+
+## 2026-11-13 — v0.2.39 local — Decisão de manter os apps sem login salvo
+
+- Objetivo e decisão: o usuário optou por deixar os aplicativos sem salvar/preencher email e senha. A investigação de integração de login foi encerrada; não há mais informação pendente sobre os códigos das telas para esse pedido.
+- Alteração: registrada a decisão neste histórico e na retomada. Nenhuma mudança de código, credencial, configuração externa ou publicação.
+- Validação: apenas documentação alterada; permanecem os 27 testes de interface, tipos e build aprovados da etapa anterior, sem repetir verificações de código.
+- Resultado: ajustes de menu recolhido e Copiar link mantidos; login salvo não foi implementado. Código continua local, versão 0.2.39, ainda sem publicação. Conferência visual continua pendente.
+

@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import { AppWindow, ArrowLeft, FileSpreadsheet, LoaderCircle, PackageOpen, RefreshCw, Wrench } from "lucide-react";
+import { AppWindow, LoaderCircle, PackageOpen, RefreshCw } from "lucide-react";
 import { CabecalhoAba } from "../../componentes/CabecalhoAba";
 import { AvisoFaixa, Botao } from "../../componentes/basicos";
-import { cabecalhosNiko, useAuth, urlApi } from "../../estado/autenticacao";
-import { APLICATIVOS_EMPRESA } from "./aplicativosEmpresaConfig";
+import { cabecalhosNiko, useAuth, urlApi, type UsuarioAutenticado } from "../../estado/autenticacao";
+import { useInterface } from "../../estado/interface";
+import { APLICATIVOS_EMPRESA, itensDoMenuAppsEmpresa } from "./aplicativosEmpresaConfig";
 import { SistemaEmpresaAberto } from "./SistemaEmpresaAberto";
 import { Aderencias } from "./Aderencias";
 
@@ -19,11 +20,8 @@ interface SolicitacaoEmpresa {
   criado_em: string;
 }
 
-export default function AplicativosEmpresa() {
+function SolicitacoesRecebidas() {
   const token = useAuth((s) => s.token);
-  const usuario = useAuth((s) => s.usuario);
-  const podeAderencias = usuario?.perfil === "dono" || (usuario?.perfil === "gerencia" && usuario.roboAderencias === true);
-  const [appAberto, setAppAberto] = useState<string | null>(null);
   const [solicitacoes, setSolicitacoes] = useState<SolicitacaoEmpresa[]>([]);
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState("");
@@ -46,62 +44,41 @@ export default function AplicativosEmpresa() {
 
   useEffect(() => { void carregarSolicitacoes(); }, [token]);
 
-  if (appAberto === "aderencias" && podeAderencias) {
-    return <>
-      <div><Botao icone={<ArrowLeft size={16} />} onClick={() => setAppAberto(null)}>Voltar aos apps</Botao></div>
-      <Aderencias />
-    </>;
-  }
-
-  const selecionado = APLICATIVOS_EMPRESA.find((app) => app.id === appAberto && app.status === "disponivel" && app.url);
-  if (selecionado) {
-    return <SistemaEmpresaAberto key={selecionado.id} app={selecionado} aoVoltar={() => setAppAberto(null)} />;
-  }
-
-  return (
-    <>
-      <CabecalhoAba titulo="Apps Empresa" subtitulo="Acesse os sistemas da empresa em um só lugar." />
-      <div className="apps-empresa-painel">
-        <div className="apps-empresa-grade">
-          {podeAderencias && <article className="apps-empresa-cartao" aria-label="Robô de Aderências">
-            <span className="apps-empresa-icone"><FileSpreadsheet size={21} /></span>
-            <div><h2>Robô de Aderências</h2><p>Configure as rotinas, acompanhe as planilhas e envie os resultados pelo WhatsApp.</p></div>
-            <Botao pequeno variante="secundario" icone={<FileSpreadsheet size={13} />} aria-label="Abrir Robô de Aderências" onClick={() => setAppAberto("aderencias")}>Abrir sistema</Botao>
-          </article>}
-          {APLICATIVOS_EMPRESA.map((app) => {
-            const emManutencao = app.status === "manutencao";
-            return (
-              <article className="apps-empresa-cartao" key={app.id} aria-label={app.nome}>
-                <span className="apps-empresa-icone">{emManutencao ? <Wrench size={21} /> : <AppWindow size={21} />}</span>
-                <div><h2>{app.nome}</h2><p>{app.descricao}</p></div>
-                <Botao
-                  pequeno
-                  variante="secundario"
-                  icone={emManutencao ? <Wrench size={13} /> : <AppWindow size={13} />}
-                  disabled={emManutencao || !app.url}
-                  aria-label={emManutencao ? `${app.nome}: em manutenção` : `Abrir ${app.nome}`}
-                  onClick={() => { if (app.url && !emManutencao) setAppAberto(app.id); }}
-                >
-                  {emManutencao ? "Em manutenção" : "Abrir sistema"}
-                </Botao>
-              </article>
-            );
-          })}
+  return <>
+    <CabecalhoAba titulo="Solicitações recebidas" subtitulo="Acompanhe os pedidos de materiais recebidos pelo Kyro." />
+    <section className="apps-empresa-solicitacoes" aria-label="Solicitações de materiais">
+      <header className="apps-empresa-secao-cabecalho">
+        <div><span className="coordenacao-rotulo">Sistema de materiais</span><h2>Solicitações recebidas no Kyro</h2><p>Pedidos feitos pelo formulário público do Kyro.</p></div>
+        <Botao pequeno variante="fantasma" icone={carregando ? <LoaderCircle size={13} className="girando" /> : <RefreshCw size={13} />} onClick={() => void carregarSolicitacoes()} disabled={carregando}>Atualizar</Botao>
+      </header>
+      {erro && <AvisoFaixa tipo="erro">{erro}</AvisoFaixa>}
+      {!carregando && solicitacoes.length === 0 ? <div className="apps-empresa-vazio"><PackageOpen size={18} /><span>Nenhuma solicitação recebida ainda.</span></div> : (
+        <div className="apps-empresa-lista">
+          {solicitacoes.map((item) => <div className="apps-empresa-linha" key={item.id}><div><strong>{item.material_nome}</strong><small>{item.solicitante || item.visitante_nome || "Visitante"}{item.variacao ? ` · ${item.variacao}` : ""}</small></div><span>{item.quantidade} un.</span><small>{item.status}</small><time>{new Date(item.criado_em).toLocaleDateString("pt-BR")}</time></div>)}
         </div>
+      )}
+    </section>
+  </>;
+}
 
-        <section className="apps-empresa-solicitacoes" aria-label="Solicitações de materiais">
-          <header className="apps-empresa-secao-cabecalho">
-            <div><span className="coordenacao-rotulo">Sistema de materiais</span><h2>Solicitações recebidas no Kyro</h2><p>Pedidos feitos pelo formulário público do Kyro.</p></div>
-            <Botao pequeno variante="fantasma" icone={carregando ? <LoaderCircle size={13} className="girando" /> : <RefreshCw size={13} />} onClick={() => void carregarSolicitacoes()} disabled={carregando}>Atualizar</Botao>
-          </header>
-          {erro && <AvisoFaixa tipo="erro">{erro}</AvisoFaixa>}
-          {!carregando && solicitacoes.length === 0 ? <div className="apps-empresa-vazio"><PackageOpen size={18} /><span>Nenhuma solicitação recebida ainda.</span></div> : (
-            <div className="apps-empresa-lista">
-              {solicitacoes.map((item) => <div className="apps-empresa-linha" key={item.id}><div><strong>{item.material_nome}</strong><small>{item.solicitante || item.visitante_nome || "Visitante"}{item.variacao ? ` · ${item.variacao}` : ""}</small></div><span>{item.quantidade} un.</span><small>{item.status}</small><time>{new Date(item.criado_em).toLocaleDateString("pt-BR")}</time></div>)}
-            </div>
-          )}
-        </section>
-      </div>
-    </>
-  );
+export function ConteudoAplicativoEmpresa({ appId, usuario }: { appId: string; usuario: Pick<UsuarioAutenticado, "perfil" | "roboAderencias"> | null }) {
+  if (!appId) return <>
+    <CabecalhoAba titulo="Apps Empresa" subtitulo="Escolha um aplicativo na sublista de Apps Empresa no menu de navegação." />
+    <div className="apps-empresa-vazio"><AppWindow size={20} /><span>Os aplicativos abrem diretamente aqui ao selecioná-los no menu.</span></div>
+  </>;
+
+  const item = itensDoMenuAppsEmpresa(usuario).find((app) => app.id === appId);
+  if (!item) return <AvisoFaixa tipo="alerta">Este aplicativo não está disponível para sua conta.</AvisoFaixa>;
+  if (!item.disponivel) return <AvisoFaixa tipo="alerta">{item.nome} está em manutenção.</AvisoFaixa>;
+  if (appId === "aderencias") return <Aderencias />;
+  if (appId === "solicitacoes") return <SolicitacoesRecebidas />;
+
+  const app = APLICATIVOS_EMPRESA.find((atual) => atual.id === appId);
+  return app ? <SistemaEmpresaAberto key={app.id} app={app} /> : null;
+}
+
+export default function AplicativosEmpresa() {
+  const appId = useInterface((s) => s.parametros.app ?? "");
+  const usuario = useAuth((s) => s.usuario);
+  return <ConteudoAplicativoEmpresa appId={appId} usuario={usuario} />;
 }

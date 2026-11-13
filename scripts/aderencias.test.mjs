@@ -6,8 +6,100 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import { WebSocketServer } from "ws";
 import { ClienteCdp } from "../servidor/aderencias.ts";
 import { criarFilaDeCapturas, escalasDaCaptura, MAXIMO_PIXELS_DA_CAPTURA, TELA_DA_CAPTURA } from "../servidor/capturaAderencias.ts";
+import { aplicarRascunhoAderencias, copiarPlanilhasAderencias, criarRascunhoAderencias } from "../src/modulos/escritorio/edicaoAderencias.ts";
 
 const planilha = (parcial = {}) => planilhaAderenciaValida({ nome: "P1", ...parcial }, "p1");
+
+const configuracaoDeEdicao = () => configuracaoAderenciasValida({
+  destinoJid: "120363@g.us", destinoNome: "Grupo de teste",
+  grupos: [{ id: "manha", nome: "Manhã", ativo: true, frequencia: "diaria", hora: "07:00", diasSemana: [1, 3, 5],
+    ultimoAgendamento: "2026-11-13T07:00:manha:diaria", ultimoResultado: { executadoEm: "2026-11-13T10:00:00Z", planilhasEnviadas: 1 },
+    planilhas: [planilha({ sheetUrl: "https://docs.google.com/spreadsheets/d/teste/edit", tabUrl: "https://docs.google.com/spreadsheets/d/teste/edit#gid=42", colEnd: "G", rowEnd: 65, headerLinha: 3, yellowEnabled: false, soPrint: true })] }],
+});
+
+test("duplicação copia links, intervalos e alertas sem ativar ou alterar a rotina original", () => {
+  const config = configuracaoDeEdicao();
+  const antes = structuredClone(config);
+  const copia = criarRascunhoAderencias(config, config.grupos[0], true);
+  assert.equal(copia.novo, true);
+  assert.notEqual(copia.grupo.id, config.grupos[0].id);
+  assert.equal(copia.grupo.ativo, false);
+  assert.equal(copia.grupo.ultimoAgendamento, "");
+  assert.equal(copia.grupo.ultimoResultado, null);
+  assert.notEqual(copia.grupo.planilhas[0].id, config.grupos[0].planilhas[0].id);
+  assert.deepEqual({ ...copia.grupo.planilhas[0], id: "p1" }, config.grupos[0].planilhas[0]);
+  copia.grupo.nome = "Tarde"; copia.grupo.hora = "14:00"; copia.grupo.diasSemana.push(6);
+  copia.grupo.planilhas[0].rowEnd = 70;
+  assert.deepEqual(config, antes);
+  const salva = aplicarRascunhoAderencias(config, copia);
+  assert.deepEqual(salva.grupos[0], config.grupos[0]);
+  assert.equal(salva.grupos[1].hora, "14:00");
+  assert.equal(salva.grupos[1].planilhas[0].rowEnd, 70);
+});
+
+test("edição e remoção permanecem no rascunho até aplicar; preserva dados novos do agendador", () => {
+  const config = configuracaoDeEdicao();
+  const rascunho = criarRascunhoAderencias(config, config.grupos[0]);
+  rascunho.grupo.hora = "09:00";
+  rascunho.grupo.planilhas = [];
+  rascunho.destinoJid = "outro@g.us";
+  assert.equal(config.grupos[0].hora, "07:00");
+  assert.equal(config.grupos[0].planilhas.length, 1);
+  assert.equal(config.destinoJid, "120363@g.us");
+  config.grupos[0].ultimoAgendamento = "novo-slot";
+  config.grupos[0].ultimoResultado.planilhasEnviadas = 5;
+  const salva = aplicarRascunhoAderencias(config, rascunho);
+  assert.equal(salva.grupos[0].hora, "09:00");
+  assert.equal(salva.grupos[0].planilhas.length, 0);
+  assert.equal(salva.grupos[0].ultimoAgendamento, "novo-slot");
+  assert.equal(salva.grupos[0].ultimoResultado.planilhasEnviadas, 5);
+  rascunho.excluir = true;
+  assert.equal(config.grupos.length, 1);
+  const excluida = aplicarRascunhoAderencias(config, rascunho);
+  assert.equal(excluida.grupos.length, 0);
+  assert.equal(excluida.planilhas.length, 0);
+  assert.equal(excluida.ativo, false);
+  assert.equal(excluida.frequencia, "manual");
+  assert.equal(slotAderenciaDevido(excluida, { data: "2026-11-13", hora: "07:00", dia: 5 }), null);
+});
+
+test("nova rotina reutiliza somente as planilhas escolhidas, com IDs independentes", () => {
+  const config = configuracaoDeEdicao();
+  const nova = criarRascunhoAderencias(config);
+  nova.grupo.planilhas = copiarPlanilhasAderencias([config.grupos[0].planilhas[0]]);
+  nova.grupo.planilhas[0].nome = "Outro nome";
+  assert.equal(config.grupos.length, 1);
+  assert.equal(config.grupos[0].planilhas[0].nome, "P1");
+  const salva = aplicarRascunhoAderencias(config, nova);
+  assert.equal(salva.grupos.length, 2);
+  assert.equal(salva.grupos[1].ativo, false);
+  assert.equal(salva.grupos[1].planilhas[0].nome, "Outro nome");
+});
+
+test("salvamento rejeita excessos e rotina removida sem truncar as configurações", () => {
+  const config = configuracaoDeEdicao();
+  const nova = criarRascunhoAderencias(config);
+  nova.grupo.planilhas = Array.from({ length: 31 }, (_, i) => planilha({ id: `p${i}` }));
+  assert.throws(() => aplicarRascunhoAderencias(config, nova), /30 planilhas/);
+  nova.grupo.planilhas = [];
+  assert.throws(() => aplicarRascunhoAderencias({ ...config, grupos: Array.from({ length: 30 }, () => config.grupos[0]) }, nova), /30 rotinas/);
+  const edicao = criarRascunhoAderencias(config, config.grupos[0]);
+  assert.throws(() => aplicarRascunhoAderencias({ ...config, grupos: [] }, edicao), /não existe/);
+  edicao.grupo.hora = "29:80";
+  assert.throws(() => aplicarRascunhoAderencias(config, edicao), /horário/);
+});
+
+test("salvar uma rotina conserva as demais e um destino atualizado durante a edição", () => {
+  const config = configuracaoDeEdicao();
+  const edicao = criarRascunhoAderencias(config, config.grupos[0]);
+  edicao.grupo.nome = "Manhã revisada";
+  const baseNova = configuracaoAderenciasValida({ ...config, destinoJid: "novo@g.us", destinoNome: "Novo destino", grupos: [...config.grupos, { id: "noite", nome: "Noite", hora: "21:00", ativo: true, frequencia: "diaria" }] });
+  const salva = aplicarRascunhoAderencias(baseNova, edicao);
+  assert.equal(salva.destinoJid, "novo@g.us");
+  assert.equal(salva.destinoNome, "Novo destino");
+  assert.deepEqual(salva.grupos[1], baseNova.grupos[1]);
+  assert.equal(salva.grupos[0].nome, "Manhã revisada");
+});
 
 test("configuração do robô normaliza planilhas e preserva o agendamento", () => {
   const resultado = configuracaoAderenciasValida({

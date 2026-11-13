@@ -69,7 +69,8 @@ export function usarAtalhos() {
       }
       if (tecla === "b") {
         e.preventDefault();
-        cfg.definir({ barraRecolhida: !cfg.barraRecolhida });
+        if (typeof ui.barraAppsRecolhida === "boolean") ui.definirBarraAppsRecolhida(!ui.barraAppsRecolhida);
+        else cfg.definir({ barraRecolhida: !cfg.barraRecolhida });
         return;
       }
       if (/^[1-9]$/.test(e.key)) {

@@ -2,6 +2,8 @@
 
 Esta pasta é o resumo permanente do projeto e deve ser usada para continuar o trabalho mesmo quando a conversa não estiver disponível.
 
+O ponto de retomada mais recente está em [RETOMADA.md](RETOMADA.md), com o estado confirmado, as correções publicadas e os testes ainda pendentes. Consulte esse arquivo junto com o final do histórico para não tratar pendências antigas já concluídas como abertas.
+
 ## Regra obrigatória para qualquer continuação
 
 1. Ler este arquivo e depois o `HISTORICO.md` antes de alterar o Kyro.

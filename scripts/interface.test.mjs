@@ -4,6 +4,12 @@ import { existsSync, readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { criarServidorDeTeste } from "./vite-para-testes.mjs";
+import { stripTypeScriptTypes } from "node:module";
+import vm from "node:vm";
+
+const canalAnterior = globalThis.BroadcastChannel;
+globalThis.BroadcastChannel = class { postMessage() {} addEventListener() {} close() {} };
+after(() => { globalThis.BroadcastChannel = canalAnterior; });
 
 const opcoes = { configFile: false, server: { middlewareMode: true, hmr: false, watch: null }, appType: "custom", optimizeDeps: { noDiscovery: true } };
 const vite = await criarServidorDeTeste(opcoes);
@@ -237,7 +243,7 @@ test("falha de página oferece retorno ao início e mantém a navegação fora d
   arvore.props.children[3].props.children[0].props.onClick();
   assert.equal(voltou, true);
   const janela = readFileSync(new URL("../src/janelas/sistema/JanelaSistema.tsx", import.meta.url), "utf8");
-  assert.match(janela, /<BarraLateral[^]*<LimiteDeErro key=\{rota\}[^]*<Suspense[^]*<Pagina[^]*<\/LimiteDeErro>/);
+  assert.match(janela, /<BarraLateral[^]*<LimiteDeErro key=\{chavePagina\}[^]*<Suspense[^]*<Pagina[^]*<\/LimiteDeErro>/);
   const principal = readFileSync(new URL("../src/main.tsx", import.meta.url), "utf8");
   assert.match(principal, /<LimiteDeErro>\s*<Raiz\s*\/>\s*<\/LimiteDeErro>/);
 });
@@ -344,4 +350,95 @@ test("app nativo preserva fechamento, minimização e geometria independente da 
   useInterface.getState().definirSistema({ sistemaAberto: true, sistemaMinimizado: false });
   assert.deepEqual(retangulosAbertos(), [{ x: 70, y: 44, w: 960, h: 600 }]);
   assert.equal(memoria.get("niko:sistema-aberto"), "0");
+});
+
+test("menu de apps preserva o catálogo, identifica manutenção e respeita a permissão do robô", async () => {
+  const { APLICATIVOS_EMPRESA, itensDoMenuAppsEmpresa } = await import("../src/modulos/escritorio/aplicativosEmpresaConfig.ts");
+  const comum = itensDoMenuAppsEmpresa({ perfil: "gerencia", roboAderencias: false });
+  for (const app of APLICATIVOS_EMPRESA) {
+    const item = comum.find((atual) => atual.id === app.id);
+    assert.equal(item.nome, app.nome);
+    assert.equal(item.disponivel, app.status === "disponivel" && !!app.url);
+  }
+  assert.equal(comum.some((app) => app.id === "aderencias"), false);
+  assert.equal(comum.some((app) => app.id === "solicitacoes" && app.disponivel), true);
+  for (const usuario of [{ perfil: "dono", roboAderencias: false }, { perfil: "gerencia", roboAderencias: true }]) {
+    assert.equal(itensDoMenuAppsEmpresa(usuario).some((app) => app.id === "aderencias" && app.disponivel), true);
+  }
+  assert.equal(itensDoMenuAppsEmpresa(null).some((app) => app.id === "aderencias"), false);
+  assert.equal(itensDoMenuAppsEmpresa({ perfil: "visitante", roboAderencias: true }).some((app) => app.id === "aderencias"), false);
+  assert.equal(new Set(comum.map((app) => app.id)).size, comum.length);
+});
+
+test("selecionar um sistema abre sua página diretamente e bloqueia destinos desconhecidos", async () => {
+  const { ConteudoAplicativoEmpresa } = await vite.ssrLoadModule("/src/modulos/escritorio/AplicativosEmpresa.tsx");
+  const { APLICATIVOS_EMPRESA } = await import("../src/modulos/escritorio/aplicativosEmpresaConfig.ts");
+  const usuario = { perfil: "gerencia", roboAderencias: false };
+  for (const app of APLICATIVOS_EMPRESA.filter((item) => item.status === "disponivel" && item.url)) {
+    const html = renderToStaticMarkup(createElement(ConteudoAplicativoEmpresa, { appId: app.id, usuario }));
+    assert.ok(html.includes(`src="${app.url}"`), app.nome);
+    assert.equal((html.match(/<iframe\b/g) ?? []).length, 1);
+    assert.doesNotMatch(html, /Voltar aos apps|Abrir sistema|apps-empresa-grade|role="dialog"|Ir para o sistema|Nova aba/);
+    assert.match(html, /aria-label="Copiar link do sistema"/);
+  }
+  for (const appId of ["armarios", "https://destino.example", "inexistente"]) {
+    const html = renderToStaticMarkup(createElement(ConteudoAplicativoEmpresa, { appId, usuario }));
+    assert.doesNotMatch(html, /<iframe/);
+    assert.match(html, /manutenção|não está disponível/);
+  }
+});
+
+test("rota direta do robô continua protegida e solicitações têm acesso próprio", async () => {
+  const { ConteudoAplicativoEmpresa } = await vite.ssrLoadModule("/src/modulos/escritorio/AplicativosEmpresa.tsx");
+  const { Aderencias } = await vite.ssrLoadModule("/src/modulos/escritorio/Aderencias.tsx");
+  for (const usuario of [null, { perfil: "gerencia", roboAderencias: false }, { perfil: "visitante", roboAderencias: true }]) {
+    const html = renderToStaticMarkup(createElement(ConteudoAplicativoEmpresa, { appId: "aderencias", usuario }));
+    assert.match(html, /não está disponível/);
+    assert.doesNotMatch(html, /aria-label="Robô de Aderências"/);
+  }
+  for (const usuario of [{ perfil: "dono", roboAderencias: false }, { perfil: "gerencia", roboAderencias: true }]) {
+    const pagina = ConteudoAplicativoEmpresa({ appId: "aderencias", usuario });
+    assert.equal(pagina.type, Aderencias);
+  }
+  const solicitacoes = renderToStaticMarkup(createElement(ConteudoAplicativoEmpresa, { appId: "solicitacoes", usuario: { perfil: "gerencia", roboAderencias: false } }));
+  assert.match(solicitacoes, /Solicitações recebidas/);
+  assert.doesNotMatch(solicitacoes, /<iframe|apps-empresa-grade/);
+});
+
+test("navegação entre apps troca o aplicativo e limpa a seleção ao mudar de área do menu", async (t) => {
+  const { useInterface } = await prepararModoVisualizacao(t, false);
+  useInterface.getState().irParaLocal("appsEmpresa", { app: "registros-limpeza" });
+  assert.equal(useInterface.getState().rota, "appsEmpresa");
+  assert.deepEqual(useInterface.getState().parametros, { app: "registros-limpeza" });
+  useInterface.getState().irParaLocal("appsEmpresa", { app: "aderencias" });
+  assert.deepEqual(useInterface.getState().parametros, { app: "aderencias" });
+  useInterface.getState().irParaLocal("escritorio");
+  assert.deepEqual(useInterface.getState().parametros, {});
+});
+
+test("Ctrl+B expande o menu do app sem alterar a preferência geral e volta ao comportamento normal ao sair", async (t) => {
+  const { useInterface, memoria } = await prepararModoVisualizacao(t, false);
+  const antes = [...memoria];
+  let teclar;
+  let gravacoes = 0;
+  const cfg = { atalhosGlobais: {}, barraRecolhida: false, definir(parcial) { Object.assign(this, parcial); gravacoes++; } };
+  const codigo = stripTypeScriptTypes(readFileSync("src/janelas/area-de-trabalho/usarAtalhos.ts", "utf8"))
+    .replace(/^import .*;\r?\n/gm, "").replace(/^export /gm, "");
+  vm.runInNewContext(`${codigo}\nusarAtalhos();`, {
+    useEffect: (acao) => acao(), useInterface, useConfig: { getState: () => cfg }, ACOES_GLOBAIS: [],
+    window: { addEventListener: (_, fn) => { teclar = fn; }, removeEventListener() {} },
+  });
+  const ctrlB = () => teclar({ key: "b", ctrlKey: true, altKey: false, preventDefault() {} });
+  useInterface.getState().definirBarraAppsRecolhida(true);
+  ctrlB();
+  assert.equal(useInterface.getState().barraAppsRecolhida, false);
+  ctrlB();
+  assert.equal(useInterface.getState().barraAppsRecolhida, true);
+  assert.equal(gravacoes, 0);
+  assert.equal(cfg.barraRecolhida, false);
+  assert.deepEqual([...memoria], antes);
+  useInterface.getState().definirBarraAppsRecolhida(null);
+  ctrlB();
+  assert.equal(cfg.barraRecolhida, true);
+  assert.equal(gravacoes, 1);
 });

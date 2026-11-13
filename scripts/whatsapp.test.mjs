@@ -33,7 +33,7 @@ function conexaoIsolada(t, responder, configuracoes = {}) {
     fs.writeFileSync(path.join(diretorio, "whatsapp.json"), JSON.stringify(config));
   }
   const contexto = vm.createContext({
-    ...fs, ...path, ...caixa, AsyncLocalStorage, Buffer, URL, AbortSignal, queueMicrotask,
+    ...fs, ...path, ...caixa, AsyncLocalStorage, Buffer, URL, AbortSignal, Blob, FormData, queueMicrotask,
     Date: class extends Date { static now() { return agora; } },
     process: { pid: process.pid, env: { NIKO_GOWA_URL: "https://gateway.example", NIKO_GOWA_BASIC_AUTH: "teste:teste", NIKO_GOWA_WEBHOOK_SECRET: "teste" } },
     pastaDados: () => pasta, portaDaPonte: () => 1,
@@ -50,7 +50,7 @@ function conexaoIsolada(t, responder, configuracoes = {}) {
   });
   const codigo = stripTypeScriptTypes(fs.readFileSync("servidor/whatsapp/whatsapp.ts", "utf8"))
     .replace(/^import[\s\S]*?from ["'][^"']+["'];\r?\n/gm, "").replace(/^export /gm, "");
-  vm.runInContext(`${codigo}\nglobalThis.api = { comWhatsappUsuario, ligarWhatsapp, iniciarWhatsapp, estadoDoWhatsapp, passo, enviarMensagem, definirFiltrosDoWhatsapp, ignorarConversa, nomesDeGruposDoGateway };`, contexto);
+  vm.runInContext(`${codigo}\nglobalThis.api = { comWhatsappUsuario, ligarWhatsapp, iniciarWhatsapp, estadoDoWhatsapp, passo, enviarMensagem, enviarImagemNoWhatsapp, definirFiltrosDoWhatsapp, ignorarConversa, nomesDeGruposDoGateway };`, contexto);
   const api = contexto.api;
   return {
     chamadas,
@@ -204,6 +204,25 @@ function zipComArquivo(nome, conteudo, compactar) {
 const configPreservada = (extra = {}) => ({ ligado: true, silenciarGrupos: false, ignoradas: ["5511999990000@s.whatsapp.net"], lerAoAbrir: false, esconderArquivadas: false, esconderGrupos: false, mostrarFotos: false, ...extra });
 const JID_TESTE = "5511888880000@s.whatsapp.net";
 const GRUPO_TESTE = "120363@g.us";
+
+test("aderências solicitam HD sem compressão e preservam destinatário, PNG e legenda", async (t) => {
+  const normal = gatewayDeConversas();
+  const conexao = conexaoIsolada(t, (url, opcoes) => url.pathname === "/send/image" ? respostaJson({ results: { message_id: "imagem-teste" } }) : normal(url, opcoes), { "7": configPreservada() });
+  await conexao.ligar("7");
+  const png = Buffer.from("89504e470d0a1a0a0000000d49484452", "hex");
+  await conexao.api.comWhatsappUsuario("7", () => conexao.api.enviarImagemNoWhatsapp(GRUPO_TESTE, png, "aderencia.png", "Legenda de teste", { altaQualidade: true }));
+  const pedido = conexao.chamadas.find((c) => c.caminho === "/send/image");
+  assert.equal(pedido.dispositivo, "niko-user-7");
+  assert.equal(pedido.corpo.get("phone"), GRUPO_TESTE);
+  assert.equal(pedido.corpo.get("caption"), "Legenda de teste");
+  assert.equal(pedido.corpo.get("hd"), "true");
+  assert.equal(pedido.corpo.get("compress"), "false");
+  assert.deepEqual(Buffer.from(await pedido.corpo.get("image").arrayBuffer()), png);
+  await conexao.api.comWhatsappUsuario("7", () => conexao.api.enviarImagemNoWhatsapp(GRUPO_TESTE, png));
+  const comum = conexao.chamadas.filter((c) => c.caminho === "/send/image")[1];
+  assert.equal(comum.corpo.get("hd"), null);
+  assert.equal(comum.corpo.get("compress"), null);
+});
 
 function gatewayDeConversas({ conversas, mensagens, grupos, enviar } = {}) {
   return (url, opcoes) => {

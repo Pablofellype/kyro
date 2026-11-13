@@ -1115,7 +1115,7 @@ export async function cancelarAgendada(idBruto: unknown) {
 
 const TAMANHO_MAXIMO_DO_ENVIO = 16 * 1024 * 1024;
 
-export async function enviarImagemNoWhatsapp(jid: unknown, bytes: Buffer, nome = "imagem.png", legenda = "") {
+export async function enviarImagemNoWhatsapp(jid: unknown, bytes: Buffer, nome = "imagem.png", legenda = "", opcoes: { altaQualidade?: boolean } = {}) {
   if (typeof jid !== "string") throw new Error("pedido_invalido");
   const id = jidNormalizado(jid);
   if (!jid.includes("@") || !caixa.conversas.has(id)) throw new Error("resposta_sem_conversa");
@@ -1130,6 +1130,10 @@ export async function enviarImagemNoWhatsapp(jid: unknown, bytes: Buffer, nome =
   const formulario = new FormData();
   formulario.set("phone", id);
   if (texto) formulario.set("caption", texto);
+  if (opcoes.altaQualidade) {
+    formulario.set("hd", "true");
+    formulario.set("compress", "false");
+  }
   formulario.set("image", new Blob([new Uint8Array(bytes)], { type: tipo }), arquivo);
   const r = await fetch(urlDoGateway("/send/image"), {
     method: "POST",
