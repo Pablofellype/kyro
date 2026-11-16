@@ -38,7 +38,7 @@
 .escritorio-empresa .ee-link:disabled { color: var(--texto-3); }
 .escritorio-empresa :focus-visible { outline: 2px solid var(--destaque); outline-offset: 3px; }
 
-.escritorio-empresa .ee-resumo { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.escritorio-empresa .ee-resumo { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .escritorio-empresa .ee-metrica { position: relative; display: flex; align-items: flex-start; gap: 12px; min-width: 0; padding: 18px; border: 1px solid var(--borda-suave); border-radius: 14px; background: var(--superficie); color: var(--texto); text-align: left; transition: border-color .15s; }
 .escritorio-empresa .ee-metrica:hover { border-color: var(--destaque); }
 .escritorio-empresa .ee-icone { display: grid; place-items: center; flex: 0 0 40px; width: 40px; height: 40px; border-radius: 11px; background: color-mix(in srgb, var(--ee-cor, var(--ee-verde)) 11%, var(--superficie)); color: var(--ee-cor, var(--ee-verde)); }

@@ -572,6 +572,7 @@ export function Ilha() {
           aoFechar={fecharLaterais}
           escala={escala}
           larguraDaIlha={oculta ? larguraCompacta * escala : alvo.w * escala}
+          alturaDaIlha={oculta ? 0 : alvo.h * escala}
           aparencia={aparencia}
           aoUsar={setBarraEmUso}
         />

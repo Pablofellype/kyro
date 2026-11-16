@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowRight, ArrowUpRight, Building2, CalendarDays, Check, CheckCircle2, ChevronDown, ClipboardCheck, ClipboardList, History, ListTodo, LoaderCircle, MessageSquare, PackageOpen, RefreshCw, Settings2, Users, type LucideIcon } from "lucide-react";
+import { ArrowRight, ArrowUpRight, Building2, CalendarDays, Check, CheckCircle2, ChevronDown, ClipboardCheck, ClipboardList, History, ListTodo, MessageSquare, PackageOpen, RefreshCw, Settings2, Users, type LucideIcon } from "lucide-react";
 import { useAuth, type UsuarioAutenticado } from "../../estado/autenticacao";
 import { useConfig } from "../../estado/configuracoes";
 import { useInterface } from "../../estado/interface";
@@ -47,23 +47,20 @@ const SISTEMAS_PRINCIPAIS = ["registros-limpeza", "calendario-limpeza", "materia
 const ICONES_SISTEMAS: Record<string, LucideIcon> = { "registros-limpeza": ClipboardCheck, "calendario-limpeza": CalendarDays, materiais: PackageOpen, requisicoes: ClipboardList };
 
 export function VisaoDoEscritorio({ nome, usuario, agora, resumo, remoto, mensagens, whatsappComErro, aoNavegar, aoAtualizar, aoConcluir }: PropsPainel) {
-  const [filtro, setFiltro] = useState<"todas" | "tarefas" | "pedidos">("todas");
   const [mostrarTodas, setMostrarTodas] = useState(false);
   const dono = usuario.perfil === "dono";
   const primeiroNome = nome.trim().split(/\s+/)[0] || usuario.nome.trim().split(/\s+/)[0];
-  const prioridades = resumo.prioridades.filter((item) => filtro === "todas" || (filtro === "tarefas" ? item.tipo === "tarefa" : item.tipo === "pedido"));
+  const prioridades = resumo.prioridades;
   const exibidas = mostrarTodas ? prioridades : prioridades.slice(0, 5);
   const sistemas = SISTEMAS_PRINCIPAIS.flatMap((id) => APLICATIVOS_EMPRESA.find((app) => app.id === id) ?? []);
-  const outrosAcessos = itensDoMenuAppsEmpresa(usuario).filter((item) => !SISTEMAS_PRINCIPAIS.includes(item.id) && item.id !== "solicitacoes");
+  const outrosAcessos = itensDoMenuAppsEmpresa(usuario).filter((item) => !SISTEMAS_PRINCIPAIS.includes(item.id));
   const membrosAtivos = remoto.membros?.filter((membro) => membro.ativo && membro.perfil !== "visitante") ?? null;
-  const mudarFiltro = (valor: typeof filtro) => { setFiltro(valor); setMostrarTodas(false); };
-  const abrirSolicitacoes = () => aoNavegar("appsEmpresa", { app: "solicitacoes" });
 
   return <div className="escritorio-empresa">
     <header className="ee-abertura">
       <div><span className="ee-contexto"><Building2 size={14} aria-hidden="true" />{dono ? "Escritório da empresa" : "Painel da gerência"}</span>
         <h1>{saudacao()}{primeiroNome ? `, ${primeiroNome}` : ""}!</h1>
-        <p>{dono ? "Acompanhe os pedidos recebidos e o que precisa avançar na empresa." : "Organize suas prioridades de trabalho e acompanhe os pedidos recebidos."}</p>
+        <p>{dono ? "Acompanhe o que precisa avançar na empresa." : "Organize suas prioridades e ferramentas de trabalho."}</p>
       </div>
       <div className="ee-abertura-acoes">
         <time dateTime={agora.toISOString()}><CalendarDays size={14} aria-hidden="true" />{formatar(resumo.hoje, "EEEE, d 'de' MMMM")}</time>
@@ -72,35 +69,23 @@ export function VisaoDoEscritorio({ nome, usuario, agora, resumo, remoto, mensag
     </header>
 
     <section className="ee-resumo" aria-label="Resumo do trabalho">
-      <Metrica icone={PackageOpen} titulo="Pedidos no Kyro" valor={resumo.pedidosPendentes?.length ?? null} detalhe={remoto.erroPedidos ? "Consulta indisponível" : remoto.pedidos === null ? "Consultando solicitações" : "Pendentes entre os pedidos recentes"} tom="areia" aoClicar={() => mudarFiltro("pedidos")} />
-      <Metrica icone={ListTodo} titulo="Atividades abertas" valor={resumo.abertas.length} detalhe={resumo.atrasadas.length ? `${resumo.atrasadas.length} com prazo vencido` : resumo.paraHoje.length ? `${resumo.paraHoje.length} para hoje` : "Seus prazos e entregas da empresa"} tom="verde" aoClicar={() => mudarFiltro("tarefas")} />
+      <Metrica icone={ListTodo} titulo="Atividades abertas" valor={resumo.abertas.length} detalhe={resumo.atrasadas.length ? `${resumo.atrasadas.length} com prazo vencido` : resumo.paraHoje.length ? `${resumo.paraHoje.length} para hoje` : "Seus prazos e entregas da empresa"} tom="verde" aoClicar={() => aoNavegar("escritorio")} />
       <Metrica icone={MessageSquare} titulo="Mensagens não lidas" valor={mensagens} detalhe={whatsappComErro ? "Consulte o WhatsApp para atualizar" : mensagens === null ? "Abra ou conecte seu WhatsApp" : "Mensagens separadas das atividades"} tom="azul" aoClicar={() => aoNavegar("whatsapp")} />
     </section>
 
     <div className="ee-grade-principal">
       <section className="ee-cartao ee-prioridades" aria-labelledby="ee-prioridades-titulo">
-        <header className="ee-cabecalho-secao"><div><span className="ee-sobretitulo">Por onde começar</span><h2 id="ee-prioridades-titulo">Precisa da sua atenção</h2></div><span className="ee-contagem">{remoto.pedidos === null ? resumo.prioridades.length ? `${resumo.prioridades.length}+` : "—" : resumo.prioridades.length}</span></header>
-        <div className="ee-filtros" role="group" aria-label="Filtrar prioridades">
-          {([ ["todas", "Tudo"], ["tarefas", "Atividades"], ["pedidos", "Solicitações"] ] as const).map(([valor, rotulo]) => <button type="button" key={valor} aria-pressed={filtro === valor} aria-controls="ee-lista-prioridades" onClick={() => mudarFiltro(valor)}>{rotulo}</button>)}
-        </div>
-        {remoto.pedidos === null && <div className="ee-consulta" role="status">
-          {remoto.carregando ? <><LoaderCircle size={14} className="girando" aria-hidden="true" /><span>Consultando solicitações recebidas…</span></> : <><PackageOpen size={15} aria-hidden="true" /><span>As solicitações não estão disponíveis agora.</span><button type="button" onClick={aoAtualizar}>Tentar novamente</button></>}
-        </div>}
+        <header className="ee-cabecalho-secao"><div><span className="ee-sobretitulo">Por onde começar</span><h2 id="ee-prioridades-titulo">Precisa da sua atenção</h2></div><span className="ee-contagem">{resumo.prioridades.length}</span></header>
         <ul className="ee-lista-prioridades" id="ee-lista-prioridades">
-          {exibidas.map((item) => item.tipo === "pedido" ? <li className="ee-prioridade" key={`pedido-${item.pedido.id}`}>
-            <span className="ee-icone" data-tom="areia" aria-hidden="true"><PackageOpen size={18} /></span>
-            <div className="ee-prioridade-texto"><span className="ee-badge" data-tom="areia">Aguardando análise</span><h3>{item.pedido.material}</h3><p>{item.pedido.solicitante} · {item.pedido.quantidade} un.</p><small>Recebido em {formatarData(new Date(item.pedido.criadoEm), "dd/MM 'às' HH:mm")}</small></div>
-            <button type="button" className="ee-acao-linha" onClick={abrirSolicitacoes} aria-label={`Consultar solicitações: ${item.pedido.material}`}>Consultar <ArrowUpRight size={14} aria-hidden="true" /></button>
-          </li> : <li className="ee-prioridade" key={`tarefa-${item.tarefa.id}`}>
+          {exibidas.map((item) => <li className="ee-prioridade" key={`tarefa-${item.tarefa.id}`}>
             <span className="ee-icone" data-tom={item.atrasada ? "areia" : "verde"} aria-hidden="true"><ListTodo size={18} /></span>
             <div className="ee-prioridade-texto"><span className="ee-badge" data-tom={item.atrasada ? "areia" : "verde"}>{item.atrasada ? "Prazo vencido" : "Atividade da empresa"}</span><h3>{item.tarefa.titulo}</h3>{item.tarefa.descricao && <p>{item.tarefa.descricao}</p>}<small><PrazoDaTarefa item={item} hoje={resumo.hoje} /></small></div>
             <button type="button" className="ee-acao-linha" onClick={() => aoConcluir(item.tarefa.id)} aria-label={`Concluir atividade: ${item.tarefa.titulo}`}><Check size={14} aria-hidden="true" /> Concluir</button>
           </li>)}
         </ul>
-        {exibidas.length === 0 && <Vazio icone={remoto.pedidos === null && filtro !== "tarefas" ? ClipboardList : CheckCircle2} titulo={remoto.pedidos === null && filtro !== "tarefas" ? "Acompanhe suas prioridades aqui" : filtro === "pedidos" ? "Nenhum pedido pendente neste resumo" : "Nenhuma atividade pendente neste resumo"} texto={remoto.pedidos === null && filtro !== "tarefas" ? "Os pedidos aparecerão quando a consulta estiver disponível." : "Você pode conferir a agenda ou abrir um dos sistemas de trabalho abaixo."} />}
+        {exibidas.length === 0 && <Vazio icone={CheckCircle2} titulo="Nenhuma atividade pendente neste resumo" texto="Você pode conferir a agenda ou abrir um dos sistemas de trabalho abaixo." />}
         <div className="ee-rodape-secao">
           {prioridades.length > 5 && <button type="button" className="ee-link" onClick={() => setMostrarTodas((valor) => !valor)} aria-expanded={mostrarTodas} aria-controls="ee-lista-prioridades">{mostrarTodas ? "Mostrar menos" : `Ver mais ${prioridades.length - 5}`}<ChevronDown size={14} aria-hidden="true" /></button>}
-          <button type="button" className="ee-link" onClick={abrirSolicitacoes}>Ver solicitações do Kyro <ArrowRight size={14} aria-hidden="true" /></button>
         </div>
       </section>
 
@@ -131,18 +116,18 @@ export function VisaoDoEscritorio({ nome, usuario, agora, resumo, remoto, mensag
 
     <div className="ee-grade-secundaria">
       <section className="ee-cartao ee-historico" aria-labelledby="ee-historico-titulo"><header className="ee-cabecalho-secao"><div><span className="ee-sobretitulo">Movimentação de trabalho</span><h2 id="ee-historico-titulo">Últimos registros</h2></div><History size={18} aria-hidden="true" /></header>
-        {resumo.historico.length === 0 ? <p className="ee-nota-vazia">Solicitações recebidas e atividades concluídas aparecerão aqui.</p> : <ul className="ee-historico-lista">{resumo.historico.map((registro) => <li key={registro.id}><span className="ee-historico-icone" aria-hidden="true">{registro.tipo === "pedido" ? <PackageOpen size={15} /> : <CheckCircle2 size={15} />}</span><div><strong>{registro.titulo}</strong><span>{registro.detalhe}</span></div><time dateTime={registro.data}>{formatarData(new Date(registro.data), "dd/MM · HH:mm")}</time></li>)}</ul>}
+        {resumo.historico.length === 0 ? <p className="ee-nota-vazia">Atividades concluídas aparecerão aqui.</p> : <ul className="ee-historico-lista">{resumo.historico.map((registro) => <li key={registro.id}><span className="ee-historico-icone" aria-hidden="true"><CheckCircle2 size={15} /></span><div><strong>{registro.titulo}</strong><span>{registro.detalhe}</span></div><time dateTime={registro.data}>{formatarData(new Date(registro.data), "dd/MM · HH:mm")}</time></li>)}</ul>}
       </section>
 
       <section className="ee-cartao ee-equipe" aria-labelledby="ee-equipe-titulo"><header className="ee-cabecalho-secao"><div><span className="ee-sobretitulo">{dono ? "Pessoas e acessos" : "Seu espaço de trabalho"}</span><h2 id="ee-equipe-titulo">{dono ? "Equipe cadastrada" : "Seu acesso de gerência"}</h2></div><Users size={18} aria-hidden="true" /></header>
         {dono ? <>
           {membrosAtivos === null ? <p className="ee-nota-vazia">{remoto.erroMembros ? "Não foi possível consultar a equipe agora." : "Consultando as contas da empresa…"}</p> : membrosAtivos.length === 0 ? <p className="ee-nota-vazia">Nenhuma conta ativa nesta consulta.</p> : <ul className="ee-equipe-lista">{membrosAtivos.slice(0, 4).map((membro) => <li key={membro.id}><span className="ee-avatar" aria-hidden="true">{membro.nome.slice(0, 1).toUpperCase()}</span><div><strong>{membro.nome}</strong><span>{membro.setor || membro.cargo || (membro.perfil === "dono" ? "Dono" : "Gerência")}</span></div><small>Conta ativa</small></li>)}</ul>}
           <button type="button" className="ee-link" onClick={() => aoNavegar("configuracoes", { secao: "admin" })}>Gerenciar acessos <ArrowUpRight size={13} aria-hidden="true" /></button>
-        </> : <><div className="ee-identidade"><span className="ee-avatar" aria-hidden="true">{(nome || usuario.nome).trim().slice(0, 1).toUpperCase()}</span><div><strong>{nome || usuario.nome}</strong><span>Gerência da empresa</span></div></div><p className="ee-nota-vazia">Solicitações, agenda e ferramentas de trabalho reunidas para facilitar sua rotina.</p></>}
+        </> : <><div className="ee-identidade"><span className="ee-avatar" aria-hidden="true">{(nome || usuario.nome).trim().slice(0, 1).toUpperCase()}</span><div><strong>{nome || usuario.nome}</strong><span>Gerência da empresa</span></div></div><p className="ee-nota-vazia">Agenda e ferramentas de trabalho reunidas para facilitar sua rotina.</p></>}
       </section>
     </div>
 
-    <footer className="ee-rodape"><span>{remoto.atualizadoEm ? `Solicitações atualizadas às ${formatarData(remoto.atualizadoEm, "HH:mm")}` : "Escritório da empresa"}</span><button type="button" className="ee-link" onClick={() => aoNavegar("configuracoes", { secao: "aparencia" })}><Settings2 size={14} aria-hidden="true" /> Personalizar meu espaço</button></footer>
+    <footer className="ee-rodape"><span>{remoto.atualizadoEm ? `Dados atualizados às ${formatarData(remoto.atualizadoEm, "HH:mm")}` : "Escritório da empresa"}</span><button type="button" className="ee-link" onClick={() => aoNavegar("configuracoes", { secao: "aparencia" })}><Settings2 size={14} aria-hidden="true" /> Personalizar meu espaço</button></footer>
   </div>;
 }
 
@@ -180,7 +165,7 @@ export function PainelCoordenacao() {
     const intervalo = window.setInterval(() => setAgora(new Date()), 60000);
     return () => window.clearInterval(intervalo);
   }, [ativo]);
-  const resumo = useMemo(() => resumirPainelEmpresa(eventos, tarefas, remoto.pedidos, agora), [eventos, tarefas, remoto.pedidos, agora]);
+  const resumo = useMemo(() => resumirPainelEmpresa(eventos, tarefas, agora), [eventos, tarefas, agora]);
   if (!ativo || !usuario) return null;
 
   const mensagens = !whatsappComErro && whatsapp?.ligado && whatsapp.vinculo === "conectado" ? whatsapp.naoLidas : null;

@@ -307,8 +307,8 @@ fn abrir_lupa(app: &AppHandle) {
     let _ = dock.emit_to(dock.label(), "niko://lupa", ());
 }
 
-fn criar_sobreposta(app: &AppHandle, dona: &WebviewWindow, rotulo: &str, y: f64, x: f64, largura: f64, altura: f64) -> tauri::Result<WebviewWindow> {
-    let mut construtor = WebviewWindowBuilder::new(app, rotulo, WebviewUrl::App("index.html".into()))
+fn criar_sobreposta(app: &AppHandle, _dona: &WebviewWindow, rotulo: &str, y: f64, x: f64, largura: f64, altura: f64) -> tauri::Result<WebviewWindow> {
+    let construtor = WebviewWindowBuilder::new(app, rotulo, WebviewUrl::App("index.html".into()))
         .title("Niko")
         .transparent(true)
         .decorations(false)
@@ -323,17 +323,11 @@ fn criar_sobreposta(app: &AppHandle, dona: &WebviewWindow, rotulo: &str, y: f64,
         .position(x, y)
         .inner_size(largura, altura);
 
-    // As sobrepostas fazem parte do Niko, não são janelas independentes.
-    // Torná-las owned pelo sistema evita que o Windows crie miniaturas extras
-    // no preview da barra de tarefas sem mudar o comportamento visual delas.
-    #[cfg(windows)]
-    {
-        construtor = construtor.owner(dona)?;
-    }
+    // No Windows, uma janela owned desaparece ao minimizar sua dona.
+    // As sobrepostas precisam continuar visíveis com o sistema fechado ou minimizado;
+    // skip_taskbar já impede que elas tenham botões próprios na barra de tarefas.
     #[cfg(not(windows))]
-    {
-        construtor = construtor.parent(dona)?;
-    }
+    let construtor = construtor.parent(_dona)?;
 
     construtor.build()
 }

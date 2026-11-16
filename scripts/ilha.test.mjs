@@ -150,7 +150,7 @@ test("laterais começam recolhidas e cada seta revela somente o lado escolhido",
   }
   assert.deepEqual(clicados, ["esquerda", "direita"]);
   const html = renderToStaticMarkup(createElement(SetasLaterais, { aberta: "direita", expandida: true, aoAlternar() {} }));
-  assert.match(html, /aria-label="Recolher controles à direita"[^>]*aria-expanded="true"/);
+  assert.match(html, /aria-label="Recolher materiais à direita"[^>]*aria-expanded="true"/);
 });
 
 test("foco no localhost distingue área de trabalho, janelas e controles da ilha", () => {

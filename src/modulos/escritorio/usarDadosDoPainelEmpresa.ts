@@ -18,7 +18,7 @@ export function usarDadosDoPainelEmpresa(ativo: boolean) {
     void carregarDadosDoPainel(usuario.perfil, token, controle.signal).then((dados) => {
       const atual = useAuth.getState();
       if (!vivo || atual.token !== token || atual.usuario?.id !== usuario.id || atual.usuario.perfil !== usuario.perfil) return;
-      setEstado({ chave, dados, carregando: false, atualizadoEm: dados.pedidos ? new Date() : null });
+      setEstado({ chave, dados, carregando: false, atualizadoEm: new Date() });
     }).finally(() => window.clearTimeout(prazo));
     return () => { vivo = false; controle.abort(); window.clearTimeout(prazo); };
   }, [ativo, chave, versao, token, usuario?.id, usuario?.perfil]);

@@ -72,6 +72,5 @@ export function itensDoMenuAppsEmpresa(usuario: Pick<UsuarioAutenticado, "perfil
   return [
     ...(podeAderencias ? [{ id: "aderencias", nome: "Robô de Aderências", disponivel: true }] : []),
     ...APLICATIVOS_EMPRESA.map((app) => ({ id: app.id, nome: app.nome, disponivel: app.status === "disponivel" && !!app.url })),
-    { id: "solicitacoes", nome: "Solicitações recebidas", disponivel: true },
   ];
 }

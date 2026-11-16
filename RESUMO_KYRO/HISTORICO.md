@@ -1517,3 +1517,71 @@ Resultado e pendências:
 - Validação: apenas documentação alterada; permanecem os 27 testes de interface, tipos e build aprovados da etapa anterior, sem repetir verificações de código.
 - Resultado: ajustes de menu recolhido e Copiar link mantidos; login salvo não foi implementado. Código continua local, versão 0.2.39, ainda sem publicação. Conferência visual continua pendente.
 
+## 2026-11-16 — v0.2.41 — Perfis, visual, conexões e publicação confirmada
+
+Objetivo:
+
+- Consolidar as melhorias solicitadas em 15/11 e 16/11, publicar a versão nova e confirmar tanto as verificações do GitHub como a atualização do servidor DigitalOcean.
+- Atualizar a pasta de memória com o estado real, preservando as entradas anteriores. Os registros de 13/11 acima são históricos; as melhorias desta entrega já foram publicadas.
+
+Alterações de produto:
+
+- Gerência recebeu configurações pessoais de aparência e comportamento sem obter a administração do dono. Preferências do aplicativo e da ilha são persistidas e isoladas por conta, com proteção contra respostas antigas durante a troca de sessão.
+- Revisados menu lateral expandido/recolhido, identificação da aba ativa, tamanho comum da ilha, restauração das abas configuradas e revelação dos painéis laterais por setas. Retirada a faixa redundante de caminho no topo.
+- Após os pedidos sobre cores, ajustado o visual para fundos claros quentes e verde, retirando o efeito avermelhado decorativo. Mantida a distinção do vermelho de erro.
+- Gerência recebe saudação inicial. Escritório da empresa reorganizado com atividades, prioridades, agenda, solicitações e histórico baseados em dados reais, sem transportar dados pessoais para a empresa.
+- Portal do visitante com volta ao login, acessos mais claros e apresentação adaptada ao celular e ao desktop.
+- Conexões disponíveis no menu das áreas Pessoal e Empresa para o dono; gerência acessa apenas a Empresa.
+
+Novas integrações e permissões:
+
+- Teams: autenticação Microsoft com leitura das conversas da conta e mensagens recentes, tratamento de falhas parciais e apresentação segura do conteúdo.
+- Planner: leitura de tarefas atribuídas à conta, paginação, progresso/prazos e links para abrir no serviço. O suporte implementado usa os planos básicos expostos pela API; não prometer suporte a Planner Premium ou edição de tarefas.
+- Teams e Planner receberam os ícones próprios. Credenciais e escopos são separados por serviço; o acesso do Outlook não foi ampliado automaticamente.
+- Google Planilhas: autenticação própria com spreadsheets.readonly, até cinco links privados configurados, seleção de abas, prévia limitada de células formatadas, busca/paginação e abertura no Google para editar. Falhas não são apresentadas como planilhas vazias; links e abas são validados antes da consulta.
+- Gerência: ocultados GitHub, Vercel, Railway, Supabase, Cloudflare, Resend, n8n, Linear, Stripe, Cripto, Strava, Reddit e Discord no catálogo, ilha, janelas diretas e consultas da ponte. As credenciais foram preservadas e o dono mantém todas as conexões.
+- Documentação de configuração: docs/conexoes-microsoft.md e docs/conexoes-planilhas.md.
+
+Publicação e correção da verificação:
+
+- Versão sincronizada em 0.2.41 nos quatro arquivos de versão.
+- O usuário publicou main e a tag v0.2.41 no commit **5b19a97 — Prepara release 0.2.41**.
+- [Pacotes Windows #49](https://github.com/Pablofellype/kyro/actions/runs/43802888969) concluiu com sucesso. A [Release v0.2.41](https://github.com/Pablofellype/kyro/releases/tag/v0.2.41) contém EXE, MSI, assinaturas e latest.json.
+- A primeira verificação da main, #58, falhou no mesmo teste do Escritório no Windows e no Linux: o teste simulava 10h locais, mas a atividade concluída tinha horário fixo 11h UTC. Em São Paulo era um registro passado; nos runners era futuro e corretamente ficava fora do histórico.
+- Após o pedido explícito do usuário para resolver os dois resultados vermelhos, ajustado apenas scripts/escritorio.test.mjs: a conclusão passa a usar 8h no mesmo fuso local de agora, e um caso de conclusão às 11h locais verifica a exclusão dos registros futuros.
+- Commit **d4d9351 — Corrige fuso horario do teste do painel da empresa**, enviado pelo assistente para main. A tag v0.2.41 foi mantida no lançamento; nenhuma alteração de produção foi necessária para essa correção do teste.
+
+Validação:
+
+- Teste do painel aprovado em UTC e America/Sao_Paulo.
+- Suíte completa após a correção: **455 testes aprovados, zero falhas**.
+- [Verificar #59](https://github.com/Pablofellype/kyro/actions/runs/43804517859): jobs Windows e Linux concluídos com sucesso, incluindo tipos, testes e verificações Rust. Confirmado pela API do GitHub e pela captura posterior do usuário.
+- Build web e build da ponte aprovados durante a implementação; build dos instaladores assinados concluído pelo GitHub Actions.
+- A execução antiga #58 continua registrada com falha no histórico. Os resultados vigentes são o Verificar #59 e o Pacotes Windows #49, ambos verdes.
+
+DigitalOcean:
+
+- O usuário executou a atualização no Console do Droplet como root, no diretório /opt/kyro.
+- Saída de pnpm lancar:verificar confirmou package.json, tauri.conf.json, Cargo.toml e Cargo.lock em **0.2.41**. O hash exato do checkout do VPS não foi exibido.
+- Executado systemctl restart kyro-gowa.service kyro-worker.service. A consulta seguinte retornou **active** para ambos.
+- Health com cabeçalho x-niko: 1 em http://127.0.0.1:47831/api/health:
+
+    {"ok":true,"api":"ok","banco":"ok","data":"2026-11-16T04:38:45.469Z"}
+
+- O assistente conferiu as saídas fornecidas; não acessou o VPS diretamente. A versão, os serviços e a saúde da API/banco estão confirmados. Não houve novo reboot, medição de memória, criação de swap ou configuração de credenciais nesta etapa.
+
+Resultado e pendências:
+
+- Publicação da 0.2.41 e atualização da versão no VPS concluídas. Não tratar a publicação da 0.2.39, os testes antigos ou a criação de swap como pendências atuais.
+- A instalação da 0.2.41 no computador do usuário ainda não foi confirmada. Testar as novidades e a persistência real das preferências após fechar/reabrir.
+- Teams, Planner e Google Planilhas foram validados com testes e dados simulados; a autorização e leitura reais nas contas do usuário ainda precisam ser confirmadas.
+- Aderências e horários já haviam sido confirmados pelo usuário em 13/11, inclusive com o sistema fechado. Ainda falta confirmação específica da qualidade HD no WhatsApp e de estabilidade prolongada após esta versão.
+- O deploy do frontend na Vercel não foi inspecionado separadamente. Conferir se houver sinal de código antigo no site.
+- Mantida a decisão do usuário de deixar os sistemas externos sem salvar/preencher email e senha.
+
+Atualização desta pasta:
+
+- LEIA_PRIMEIRO.md recebeu o estado atual; RETOMADA.md passou a começar pelo lançamento de 16/11, pelas confirmações e pelas pendências reais. Registros antigos preservados e identificados como históricos.
+- Esta entrada foi acrescentada ao final do HISTORICO.md. Alterações somente de documentação nesta tarefa de encerramento; conferidos o diff e os links locais, sem repetir testes de código.
+- Documentação salva localmente depois da publicação. Nenhum novo commit, push, tag ou deploy foi realizado para estes resumos.
+

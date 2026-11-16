@@ -44,57 +44,48 @@ test("painel da empresa isola dados pessoais, ordena atrasos e usa ocorrências 
     { ...tarefa, id: "conclusao-futura", titulo: "Conclusão no futuro", status: "concluida", concluidaEm: new Date(2026, 10, 15, 11, 0).toISOString() },
     { ...tarefa, id: "cancelada", titulo: "Atividade cancelada", status: "cancelada", data: "2026-11-14" },
   ];
-  const pedidos = [{ id: "1", material: "Papel", solicitante: "Ana", quantidade: 2, status: "pendente", criadoEm: "2026-11-14T13:00:00Z" }, { id: "2", material: "Caneta", solicitante: "Bruno", quantidade: 1, status: "atendido", criadoEm: "2026-11-14T14:00:00Z" }];
-  const antes = structuredClone({ eventos, tarefas, pedidos });
-  const resumo = resumirPainelEmpresa(eventos, tarefas, pedidos, agora);
+  const antes = structuredClone({ eventos, tarefas });
+  const resumo = resumirPainelEmpresa(eventos, tarefas, agora);
   assert.deepEqual(resumo.atrasadas.map((item) => item.id), ["atrasada", "hora-vencida"]);
   assert.equal(resumo.abertas.length, 4);
-  assert.deepEqual(resumo.pedidosPendentes.map((item) => item.id), ["1"]);
   assert.equal(resumo.prioridades[0].tarefa.id, "atrasada");
-  assert.equal(resumo.prioridades[2].pedido.id, "1");
+  assert.equal(resumo.prioridades[2].tarefa.id, "hoje");
   assert.equal(resumo.agenda[0].titulo, "Reunião da empresa");
   assert.ok(resumo.agenda.some((item) => item.id === "repetido:2026-11-17"));
   assert.ok(!resumo.agenda.some((item) => item.id === "repetido:2026-11-16"));
   assert.doesNotMatch(JSON.stringify(resumo), /pessoal privado|pessoal privada|Horário anterior|Compromisso já concluído|Atividade cancelada/);
   assert.ok(resumo.historico.some((item) => item.titulo === "Atividade concluída: Atividade concluída"));
   assert.ok(!resumo.historico.some((item) => item.id === "tarefa-conclusao-futura"));
-  assert.deepEqual({ eventos, tarefas, pedidos }, antes);
+  assert.deepEqual({ eventos, tarefas }, antes);
 });
 
-test("consulta do escritório respeita o perfil e preserva erro em vez de fabricar zero solicitações", async () => {
-  const { carregarDadosDoPainel, validarPedidosDoPainel } = await vite.ssrLoadModule("/src/modulos/escritorio/dadosDoPainelEmpresa.ts");
+test("consulta do escritório busca apenas a equipe do dono e preserva falhas", async () => {
+  const { carregarDadosDoPainel } = await vite.ssrLoadModule("/src/modulos/escritorio/dadosDoPainelEmpresa.ts");
   const chamadas = [];
   const sinal = new AbortController().signal;
   const consultar = async (url, opcoes) => {
     chamadas.push({ url, opcoes });
-    return { ok: true, json: async () => String(url).includes("solicitacoes") ? { solicitacoes: [] } : { usuarios: [{ id: 1, nome: "Ana", ativo: true, perfil: "dono", setor: "Operação" }] } };
+    return { ok: true, json: async () => ({ usuarios: [{ id: 1, nome: "Ana", ativo: true, perfil: "dono", setor: "Operação" }] }) };
   };
   const gerencia = await carregarDadosDoPainel("gerencia", "token-teste", sinal, consultar);
+  assert.equal(chamadas.length, 0);
+  assert.equal(gerencia.membros, null);
+  const dono = await carregarDadosDoPainel("dono", "token-teste", sinal, consultar);
   assert.equal(chamadas.length, 1);
-  assert.ok(String(chamadas[0].url).endsWith("/api/solicitacoes"));
+  assert.ok(String(chamadas[0].url).endsWith("/api/auth?acao=usuarios"));
   assert.equal(chamadas[0].opcoes.headers.Authorization, "Bearer token-teste");
   assert.equal(chamadas[0].opcoes.signal, sinal);
-  assert.deepEqual(gerencia.pedidos, []);
-  assert.equal(gerencia.membros, null);
-  chamadas.length = 0;
-  const dono = await carregarDadosDoPainel("dono", "token-teste", sinal, consultar);
-  assert.equal(chamadas.length, 2);
   assert.equal(dono.membros[0].setor, "Operação");
   chamadas.length = 0;
   await carregarDadosDoPainel("visitante", "token-teste", sinal, consultar);
   await carregarDadosDoPainel("dono", "", sinal, consultar);
   assert.equal(chamadas.length, 0);
-  const parcial = await carregarDadosDoPainel("dono", "token-teste", sinal, async (url, opcoes) => {
-    if (String(url).includes("solicitacoes")) return { ok: false, status: 503 };
-    return consultar(url, opcoes);
-  });
-  assert.equal(parcial.pedidos, null);
-  assert.equal(parcial.erroPedidos, true);
-  assert.equal(parcial.membros[0].nome, "Ana");
-  const invalido = await carregarDadosDoPainel("gerencia", "token-teste", sinal, async () => ({ ok: true, json: async () => ({ solicitacoes: "inválido" }) }));
-  assert.equal(invalido.pedidos, null);
-  assert.equal(invalido.erroPedidos, true);
-  assert.throws(() => validarPedidosDoPainel([{ id: 1, material_nome: "Papel", status: "pendente", quantidade: 1, criado_em: "inválido" }]));
+  const falhou = await carregarDadosDoPainel("dono", "token-teste", sinal, async () => ({ ok: false, status: 503 }));
+  assert.equal(falhou.membros, null);
+  assert.equal(falhou.erroMembros, true);
+  const invalido = await carregarDadosDoPainel("dono", "token-teste", sinal, async () => ({ ok: true, json: async () => ({ usuarios: "inválido" }) }));
+  assert.equal(invalido.membros, null);
+  assert.equal(invalido.erroMembros, true);
 });
 
 test("concluir pelo escritório afeta apenas a atividade da empresa e permite desfazer sem sobrescrever mudanças posteriores", async () => {

@@ -123,7 +123,7 @@ test("menu e página de configurações da gerência mostram personalização e 
       } else {
         assert.match(menu, /data-app="materiais" aria-current="page"/);
         assert.match(menu, /barra-apps-estado">Manutenção/);
-        assert.match(menu, /Solicitações recebidas/);
+        assert.doesNotMatch(menu, /Solicitações recebidas/);
         assert.doesNotMatch(menu, /barra-subitem/);
       }
     }
@@ -481,18 +481,18 @@ test("painel da gerência recebe a pessoa pelo nome e oferece apenas atalhos per
   }
 });
 
-test("escritório diferencia os acessos do dono e mantém falhas de consulta distintas de listas vazias", async () => {
+test("escritório diferencia os acessos do dono e mantém falhas da equipe distintas de listas vazias", async () => {
   const { VisaoDoEscritorio } = await vite.ssrLoadModule("/src/modulos/escritorio/PainelCoordenacao.tsx");
   const { resumirPainelEmpresa, DADOS_REMOTOS_VAZIOS } = await vite.ssrLoadModule("/src/modulos/escritorio/dadosDoPainelEmpresa.ts");
   const agora = new Date(2026, 10, 15, 10, 0);
-  const props = { nome: "Ana", usuario: { perfil: "dono", nome: "Ana", roboAderencias: false }, agora, resumo: resumirPainelEmpresa([], [], null, agora), remoto: { ...DADOS_REMOTOS_VAZIOS, carregando: false, atualizadoEm: null, erroPedidos: true }, mensagens: null, whatsappComErro: false, aoNavegar() {}, aoAtualizar() {}, aoConcluir() {} };
+  const props = { nome: "Ana", usuario: { perfil: "dono", nome: "Ana", roboAderencias: false }, agora, resumo: resumirPainelEmpresa([], [], agora), remoto: { ...DADOS_REMOTOS_VAZIOS, carregando: false, atualizadoEm: null, erroMembros: true }, mensagens: null, whatsappComErro: false, aoNavegar() {}, aoAtualizar() {}, aoConcluir() {} };
   const falhou = renderToStaticMarkup(createElement(VisaoDoEscritorio, props));
-  for (const texto of ["Escritório da empresa", "Equipe cadastrada", "Gerenciar acessos", "Robô de Aderências", "Consulta indisponível", "Tentar novamente"]) assert.ok(falhou.includes(texto), texto);
-  assert.doesNotMatch(falhou, /Nenhum pedido pendente|online|Nenhuma conta ativa nesta consulta/);
-  const carregado = renderToStaticMarkup(createElement(VisaoDoEscritorio, { ...props, resumo: resumirPainelEmpresa([], [], [], agora), remoto: { ...props.remoto, pedidos: [], membros: [], erroPedidos: false } }));
+  for (const texto of ["Escritório da empresa", "Equipe cadastrada", "Gerenciar acessos", "Robô de Aderências", "Não foi possível consultar a equipe agora."]) assert.ok(falhou.includes(texto), texto);
+  assert.doesNotMatch(falhou, /Pedidos no Kyro|Solicitações recebidas|Ver solicitações|online|Nenhuma conta ativa nesta consulta/);
+  const carregado = renderToStaticMarkup(createElement(VisaoDoEscritorio, { ...props, resumo: resumirPainelEmpresa([], [], agora), remoto: { ...props.remoto, membros: [], erroMembros: false } }));
   assert.ok(carregado.includes("Nenhuma atividade pendente neste resumo"));
   assert.ok(carregado.includes("Nenhuma conta ativa nesta consulta"));
-  assert.ok(!carregado.includes("Tentar novamente"));
+  assert.doesNotMatch(carregado, /Pedidos no Kyro|Solicitações recebidas|Ver solicitações/);
 });
 
 test("portal visitante oferece volta direta ao login e acessos com os destinos do catálogo", async () => {
@@ -620,7 +620,7 @@ test("menu de apps preserva o catálogo, identifica manutenção e respeita a pe
     assert.equal(item.disponivel, app.status === "disponivel" && !!app.url);
   }
   assert.equal(comum.some((app) => app.id === "aderencias"), false);
-  assert.equal(comum.some((app) => app.id === "solicitacoes" && app.disponivel), true);
+  assert.equal(comum.some((app) => app.id === "solicitacoes"), false);
   for (const usuario of [{ perfil: "dono", roboAderencias: false }, { perfil: "gerencia", roboAderencias: true }]) {
     assert.equal(itensDoMenuAppsEmpresa(usuario).some((app) => app.id === "aderencias" && app.disponivel), true);
   }
@@ -647,7 +647,7 @@ test("selecionar um sistema abre sua página diretamente e bloqueia destinos des
   }
 });
 
-test("rota direta do robô continua protegida e solicitações têm acesso próprio", async () => {
+test("rota direta do robô continua protegida e solicitações recebidas ficam indisponíveis", async () => {
   const { ConteudoAplicativoEmpresa } = await vite.ssrLoadModule("/src/modulos/escritorio/AplicativosEmpresa.tsx");
   const { Aderencias } = await vite.ssrLoadModule("/src/modulos/escritorio/Aderencias.tsx");
   for (const usuario of [null, { perfil: "gerencia", roboAderencias: false }, { perfil: "visitante", roboAderencias: true }]) {
@@ -660,7 +660,8 @@ test("rota direta do robô continua protegida e solicitações têm acesso próp
     assert.equal(pagina.type, Aderencias);
   }
   const solicitacoes = renderToStaticMarkup(createElement(ConteudoAplicativoEmpresa, { appId: "solicitacoes", usuario: { perfil: "gerencia", roboAderencias: false } }));
-  assert.match(solicitacoes, /Solicitações recebidas/);
+  assert.match(solicitacoes, /não está disponível/);
+  assert.doesNotMatch(solicitacoes, /Solicitações recebidas/);
   assert.doesNotMatch(solicitacoes, /<iframe|apps-empresa-grade/);
 });
 

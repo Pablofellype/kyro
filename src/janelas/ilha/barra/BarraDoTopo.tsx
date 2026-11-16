@@ -15,6 +15,7 @@ import { BateriaDesenhada, IconeDeRede, IconeDeVolume, situacaoDaRede, wifiLigad
 import { atributosDoFundo, variaveisDaBorda } from "../../aparencia";
 import type { AparenciaDeBorda } from "../../../utilitarios/cores";
 import "./barra.css";
+import { posicaoDoPainel } from "./posicaoDoPainel";
 
 export const ALTURA_DA_FAIXA = 5;
 const ALTURA_DA_ABA = 42;
@@ -29,6 +30,7 @@ interface PropsBarra {
   aoFechar: () => void;
   escala: number;
   larguraDaIlha: number;
+  alturaDaIlha?: number;
   aparencia: AparenciaDeBorda;
   aoUsar: (emUso: boolean) => void;
 }
@@ -118,7 +120,7 @@ function LadoDireito({ pop, alternarPainel, alternarBandeja }: { pop: Pop; alter
   );
 }
 
-export function BarraDoTopo({ visivel, ladoAberto, aoFechar, escala, larguraDaIlha, aparencia, aoUsar }: PropsBarra) {
+export function BarraDoTopo({ visivel, ladoAberto, aoFechar, escala, larguraDaIlha, alturaDaIlha = 0, aparencia, aoUsar }: PropsBarra) {
   const [pop, setPop] = useState<Pop>(null);
   const ladoEsquerdo = useRef<HTMLDivElement>(null);
   const ladoDireito = useRef<HTMLDivElement>(null);
@@ -182,10 +184,11 @@ export function BarraDoTopo({ visivel, ladoAberto, aoFechar, escala, larguraDaIl
   };
 
   const altura = ALTURA_DA_ABA;
-  const topoDosPops = altura + MARGEM_DOS_POPS;
   const posicaoDaIlha = { ["--meia-ilha" as string]: `${Math.max(0, larguraDaIlha / 2)}px` } as CSSProperties;
-  const esquerdaDoPop = Math.max(MARGEM_DOS_POPS, Math.min(ladoEsquerdo.current?.getBoundingClientRect().left ?? MARGEM_DOS_POPS, window.innerWidth - 398 - MARGEM_DOS_POPS));
-  const direitaDoPop = Math.max(MARGEM_DOS_POPS, window.innerWidth - (ladoDireito.current?.getBoundingClientRect().right ?? window.innerWidth - MARGEM_DOS_POPS));
+  const dimensoesDaIlha = { largura: larguraDaIlha, altura: alturaDaIlha };
+  const controles = posicaoDoPainel("esquerda", 320, window.innerWidth, dimensoesDaIlha);
+  const materiais = posicaoDoPainel("direita", 398, window.innerWidth, dimensoesDaIlha);
+  const bandeja = posicaoDoPainel("esquerda", 240, window.innerWidth, dimensoesDaIlha);
   const variaveis = variaveisDaBorda(aparencia);
   return (
     <>
@@ -201,13 +204,13 @@ export function BarraDoTopo({ visivel, ladoAberto, aoFechar, escala, larguraDaIl
             exit={{ y: "-100%" }}
             transition={{ type: "spring", visualDuration: 0.35, bounce: 0.12 }}
           >
-            {ladoAberto === "esquerda" && <div id="ilha-lateral-esquerda" ref={ladoEsquerdo} className="ilha-barra-aba ilha-barra-aba-esquerda" role="region" aria-label="Materiais">
+            {ladoAberto === "direita" && <div id="ilha-lateral-direita" ref={ladoDireito} className="ilha-barra-aba ilha-barra-aba-direita" role="region" aria-label="Materiais">
               <LadoEsquerdo
                 pop={pop}
                 alternarMateriais={alternarMateriais}
               />
             </div>}
-            {ladoAberto === "direita" && <div id="ilha-lateral-direita" ref={ladoDireito} className="ilha-barra-aba ilha-barra-aba-direita" role="region" aria-label="Controles rápidos">
+            {ladoAberto === "esquerda" && <div id="ilha-lateral-esquerda" ref={ladoEsquerdo} className="ilha-barra-aba ilha-barra-aba-esquerda" role="region" aria-label="Controles rápidos">
               <LadoDireito pop={pop} alternarPainel={alternarPainel} alternarBandeja={alternarBandeja} />
             </div>}
           </motion.div>
@@ -215,9 +218,9 @@ export function BarraDoTopo({ visivel, ladoAberto, aoFechar, escala, larguraDaIl
       </AnimatePresence>
       <div className="ilha-pops" {...atributosDoFundo(aparencia)} style={variaveis}>
         <AnimatePresence>
-          {aberta && ladoAberto === "esquerda" && pop?.tipo === "materiais" && <MateriaisNaBarra key="materiais" topo={topoDosPops} esquerda={esquerdaDoPop} aoFechar={() => setPop(null)} />}
-          {aberta && ladoAberto === "direita" && pop?.tipo === "painel" && <PainelRapido key="painel" topo={topoDosPops} direita={direitaDoPop} aoFechar={() => setPop(null)} />}
-          {aberta && ladoAberto === "direita" && pop?.tipo === "bandeja" && <Bandeja key="bandeja" topo={topoDosPops} direita={pop.direita} aoFechar={() => setPop(null)} />}
+          {aberta && ladoAberto === "direita" && pop?.tipo === "materiais" && <MateriaisNaBarra key="materiais" topo={materiais.topo} esquerda={materiais.esquerda} aoFechar={() => setPop(null)} />}
+          {aberta && ladoAberto === "esquerda" && pop?.tipo === "painel" && <PainelRapido key="painel" topo={controles.topo} esquerda={controles.esquerda} aoFechar={() => setPop(null)} />}
+          {aberta && ladoAberto === "esquerda" && pop?.tipo === "bandeja" && <Bandeja key="bandeja" topo={bandeja.topo} direita={window.innerWidth - bandeja.esquerda - 240} aoFechar={() => setPop(null)} />}
         </AnimatePresence>
       </div>
     </>
