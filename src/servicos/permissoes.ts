@@ -3,7 +3,15 @@ import type { UsuarioAutenticado } from "../estado/autenticacao";
 
 export type PapelOrganizacional = UsuarioAutenticado["perfil"];
 
-export const ROTAS_DA_EMPRESA: Rota[] = ["escritorio", "appsEmpresa", "calendario", "conexoes", "whatsapp"];
+export const ROTAS_DA_EMPRESA: Rota[] = ["escritorio", "appsEmpresa", "calendario", "conexoes", "whatsapp", "configuracoes", "atualizacao"];
+
+const CONFIGURACOES_PESSOAIS = new Set([
+  "geral", "aparencia", "ilha", "dock", "assistive", "pomodoro", "sons", "tela", "atalhos", "privacidade", "sobre",
+]);
+
+export function podeAcessarConfiguracao(usuario: Pick<UsuarioAutenticado, "perfil"> | null | undefined, secao: string): boolean {
+  return usuario?.perfil === "dono" || (usuario?.perfil === "gerencia" && CONFIGURACOES_PESSOAIS.has(secao));
+}
 
 export function ehDono(usuario: Pick<UsuarioAutenticado, "perfil"> | null | undefined): boolean {
   return usuario?.perfil === "dono";

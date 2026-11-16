@@ -32,6 +32,7 @@ pub struct EstadoDaFrente {
     maximizada: bool,
     na_base: bool,
     frente: TipoDaFrente,
+    sistema_em_foco: bool,
     programa: String,
 }
 
@@ -119,7 +120,7 @@ fn janela_da_extensao() -> Option<Janela> {
 
 fn estado_de_janela_do_niko(app: &AppHandle, monitor: Monitor) -> EstadoDaFrente {
     if let Some(sistema) = app.get_webview_window("sistema").filter(|j| j.is_focused().unwrap_or(false)) {
-        return EstadoDaFrente { frente: TipoDaFrente::App, maximizada: sistema.is_maximized().unwrap_or(false), ..Default::default() };
+        return EstadoDaFrente { frente: TipoDaFrente::App, sistema_em_foco: true, maximizada: sistema.is_maximized().unwrap_or(false), ..Default::default() };
     }
     let atras = ULTIMO_APP.lock().ok().and_then(|g| g.clone()).filter(|(m, _)| *m == monitor).map(|(_, e)| e).unwrap_or_default();
     EstadoDaFrente { frente: TipoDaFrente::Sobreposta, ..atras }
@@ -145,7 +146,7 @@ fn ler(app: &AppHandle, monitor: Monitor) -> EstadoDaFrente {
     let cobre_monitor = janela.geometria.is_some_and(|g| monitor.coberto_por(g));
     let tela_cheia = janela.tela_cheia || (cobre_monitor && !janela.maximizada);
     let na_base = janela.geometria.is_some_and(|g| encosta_na_base(RECT { left: g.x, top: g.y, right: g.x + g.largura as i32, bottom: g.y + g.altura as i32 }, monitor.retangulo()));
-    let estado = EstadoDaFrente { cobre: janela.maximizada || tela_cheia, tela_cheia, maximizada: janela.maximizada, na_base, frente: TipoDaFrente::App, programa: programa_do_processo(janela.pid) };
+    let estado = EstadoDaFrente { cobre: janela.maximizada || tela_cheia, tela_cheia, maximizada: janela.maximizada, na_base, frente: TipoDaFrente::App, sistema_em_foco: false, programa: programa_do_processo(janela.pid) };
     if let Ok(mut ultimo) = ULTIMO_APP.lock() {
         *ultimo = Some((monitor, estado.clone()));
     }

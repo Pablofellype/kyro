@@ -128,7 +128,7 @@ export function TelaLogin({ aoSucesso }: Props) {
       const res = await fetch(urlApi("/api/auth?acao=redefinir"), { method: "POST", headers: { ...cabecalhosNiko(), "Content-Type": "application/json" }, body: JSON.stringify({ token: tokenAcesso, senha: senhaNova }) });
       const dados = await res.json();
       if (!res.ok || !dados.sucesso) throw new Error(dados.erro || "Não foi possível definir a senha.");
-      definirUsuario(dados.usuario, dados.token);
+      await definirUsuario(dados.usuario, dados.token);
       setFluxoAcesso(null);
       aoSucesso?.();
       window.history.replaceState({}, "", window.location.pathname);
@@ -157,7 +157,7 @@ export function TelaLogin({ aoSucesso }: Props) {
         setCarregando(false);
         return;
       }
-      definirUsuario(dados.usuario as Parameters<typeof definirUsuario>[0], dados.token);
+      await definirUsuario(dados.usuario as Parameters<typeof definirUsuario>[0], dados.token);
       aoSucesso?.();
       window.location.reload();
     } catch (e) {

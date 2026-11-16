@@ -51,7 +51,7 @@ const dinheiro = await vite.ssrLoadModule("/src/utilitarios/dinheiro.ts");
 const { useFinancas } = await vite.ssrLoadModule("/src/estado/financas.ts");
 const { useEstudos } = await vite.ssrLoadModule("/src/estado/estudos.ts");
 const { useOrganizacao } = await vite.ssrLoadModule("/src/estado/organizacao.ts");
-const { useConfig, CONFIG_PADRAO } = await vite.ssrLoadModule("/src/estado/configuracoes.ts");
+const { useConfig, CONFIG_PADRAO, VERSAO_CONFIGURACOES, FUNDO_PADRAO_DAS_BORDAS } = await vite.ssrLoadModule("/src/estado/configuracoes.ts");
 const { validarBackup } = await vite.ssrLoadModule("/src/utilitarios/backupValido.ts");
 const { configuracoesValidas } = await vite.ssrLoadModule("/src/utilitarios/configuracoesValidas.ts");
 const armazenamento = await vite.ssrLoadModule("/src/ponte/armazenamento.ts");
@@ -600,6 +600,24 @@ test("configurações corrompidas caem no padrão e preservam atalhos válidos",
 function backup(nome, state, version = 0) {
   return { tipo: "niko-backup", versao: 1, dados: { [`niko:${nome}`]: JSON.stringify({ state, version }) } };
 }
+
+test("fundos padrão antigos ficam brancos sem perder tamanho, transparência ou cores personalizadas", async () => {
+  const antigo = {
+    ...CONFIG_PADRAO, nome: "Ana", destaque: "#2367ab",
+    ilha: { ...CONFIG_PADRAO.ilha, fundo: "#232428", tamanho: "pequena", opacidade: .35, modo: "fixo" },
+    dock: { ...CONFIG_PADRAO.dock, fundo: "#232428", opacidade: .55, modo: "esconder" },
+  };
+  const migrar = useConfig.persist.getOptions().migrate;
+  assert.equal(FUNDO_PADRAO_DAS_BORDAS, "#ffffff");
+  for (const [versao, fundo] of [[10, "#232428"], [11, "#fff9fa"]]) {
+    const salvo = { ...antigo, ilha: { ...antigo.ilha, fundo }, dock: { ...antigo.dock, fundo } };
+    const atualizado = await migrar(structuredClone(salvo), versao);
+    assert.deepEqual(atualizado, { ...salvo, ilha: { ...salvo.ilha, fundo: FUNDO_PADRAO_DAS_BORDAS }, dock: { ...salvo.dock, fundo: FUNDO_PADRAO_DAS_BORDAS } });
+    assert.ok(validarBackup(backup("configuracoes", atualizado, VERSAO_CONFIGURACOES))["niko:configuracoes"]);
+  }
+  const personalizado = { ...antigo, ilha: { ...antigo.ilha, fundo: "#101820" }, dock: { ...antigo.dock, fundo: "#abcdef" } };
+  for (const versao of [10, 11]) assert.deepEqual(await migrar(structuredClone(personalizado), versao), personalizado);
+});
 
 test("backup exige versão conhecida e dados realmente estruturados", () => {
   for (const b of [null, [], { tipo: "niko-backup", versao: 2, dados: {} }, backup("financas", { transacoes: "erro" }), backup("configuracoes", { agentes: { cargos: { java: 123 } } }, 10), backup("estudos", { paginas: [{ id: "p" }] }), backup("financas", { contas: [] }, 99)]) assert.throws(() => validarBackup(b));

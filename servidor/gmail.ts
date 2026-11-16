@@ -31,7 +31,7 @@ export async function autorizarGoogle(clienteId: string, segredo: string, escopo
       const url = new URL(req.url ?? "/", "http://127.0.0.1");
       const codigoRecebido = url.searchParams.get("code");
       const estadoConfere = url.searchParams.get("state") === estado;
-      if (url.pathname !== "/" || !estadoConfere || (!codigoRecebido && !url.searchParams.get("error"))) {
+      if (req.method !== "GET" || url.pathname !== "/" || !estadoConfere || (!codigoRecebido && !url.searchParams.get("error"))) {
         res.writeHead(404);
         res.end();
         return;
@@ -49,6 +49,7 @@ export async function autorizarGoogle(clienteId: string, segredo: string, escopo
       servidor.close();
       rejeitar(new Error("tempo_esgotado"));
     }, 180000);
+    servidor.once("error", () => { clearTimeout(relogio); rejeitar(new Error("planilhas_retorno_indisponivel")); });
     servidor.listen(0, "127.0.0.1", () => {
       porta = (servidor.address() as AddressInfo).port;
       const parametros = new URLSearchParams({
@@ -111,13 +112,13 @@ async function renovarToken(c: CredencialGmail): Promise<string> {
   return json.access_token;
 }
 
-export async function apiGoogle<T>(c: CredencialGmail, caminho: string, corpo?: unknown, base = BASE): Promise<T> {
+export async function apiGoogle<T>(c: CredencialGmail, caminho: string, corpo?: unknown, base = BASE, sinal?: AbortSignal): Promise<T> {
   const token = await tokenDeAcesso(c);
   const r = await fetch(`${base}${caminho}`, {
     method: corpo === undefined ? "GET" : "POST",
     headers: { authorization: `Bearer ${token}`, ...(corpo === undefined ? {} : { "content-type": "application/json" }) },
     body: corpo === undefined ? undefined : JSON.stringify(corpo),
-    signal: AbortSignal.timeout(15000),
+    signal: sinal ? AbortSignal.any([sinal, AbortSignal.timeout(15000)]) : AbortSignal.timeout(15000),
   });
   if (!r.ok) throw new Error(`http_${r.status} ${(await r.text().catch(() => "")).slice(0, 160)}`);
   return (await r.json()) as T;

@@ -2,13 +2,15 @@ import {
   siStripe, siGithub, siVercel, siResend, siNotion, siCaldotcom, siN8n, siAnthropic, siOllama,
   siNvidia, siOpencode, siQwen, siGooglegemini, siOpenrouter, siMistralai, siHuggingface, siDeepseek, siLmstudio, siGmail, siGooglecalendar, siGoogle, siGoogledrive, siGoogletasks, siSupabase, siCloudflare, siClaudecode, siGithubcopilot, siKimi,
   siSpotify, siGooglechrome, siFirefoxbrowser, siZenbrowser, siYoutube, siYoutubemusic, siDeezer, siApplemusic, siTidal, siSoundcloud,
-  siLinear, siJira, siTrello, siRailway, siDiscord, siReddit, siStrava, siWhatsapp,
+  siLinear, siJira, siTrello, siRailway, siDiscord, siReddit, siStrava, siWhatsapp, siGooglesheets,
 } from "simple-icons";
 import { Bitcoin, CalendarDays, Mail } from "lucide-react";
 import type { ServicoId } from "../tipos";
 import logoCodex from "./lobe/codex.svg";
 import logoAntigravity from "./lobe/antigravity.svg";
 import logoAmp from "./lobe/amp.svg";
+import logoTeams from "./microsoft/teams.svg";
+import logoPlanner from "./microsoft/planner.svg";
 
 interface IconeMarca {
   title: string;
@@ -18,12 +20,14 @@ interface IconeMarca {
 
 export type MarcaId = ServicoId | "gmail" | "agenda" | "drive" | "tarefasGoogle" | "anthropic" | "ollama" | "nvidia" | "opencode" | "qwen" | "gemini" | "openrouter" | "mistral" | "huggingface" | "deepseek" | "lmstudio" | "claudecode" | "copilot" | "kimi" | "whatsapp" | MarcaDeMidia | MarcaColorida;
 
-export type MarcaColorida = "codex" | "antigravity" | "amp";
+export type MarcaColorida = "codex" | "antigravity" | "amp" | "teams" | "planner";
 
-const MARCAS_COLORIDAS: Record<MarcaColorida, { title: string; url: string }> = {
+const MARCAS_COLORIDAS: Record<MarcaColorida, { title: string; url: string; cor?: string }> = {
   codex: { title: "Codex", url: logoCodex },
   antigravity: { title: "Antigravity", url: logoAntigravity },
   amp: { title: "Amp", url: logoAmp },
+  teams: { title: "Microsoft Teams", url: logoTeams, cor: "#6264A7" },
+  planner: { title: "Microsoft Planner", url: logoPlanner, cor: "#8636C3" },
 };
 
 function ehColorida(marca: MarcaId): marca is MarcaColorida {
@@ -64,7 +68,7 @@ function ehGenerica(marca: MarcaId): marca is MarcaGenerica {
 
 export function corDaMarca(marca: MarcaId): string {
   if (ehGenerica(marca)) return `#${ICONES_GENERICOS[marca].hex}`;
-  if (ehColorida(marca)) return "currentColor";
+  if (ehColorida(marca)) return MARCAS_COLORIDAS[marca].cor ?? "currentColor";
   return `#${MARCAS[marca].hex}`;
 }
 
@@ -77,6 +81,7 @@ export const MARCAS: Record<Exclude<MarcaId, MarcaColorida | MarcaGenerica>, Ico
   calcom: siCaldotcom,
   n8n: siN8n,
   google: siGoogle,
+  planilhas: siGooglesheets,
   gmail: siGmail,
   agenda: siGooglecalendar,
   drive: siGoogledrive,

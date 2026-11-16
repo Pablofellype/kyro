@@ -1,0 +1,121 @@
+.barra-perfil-identidade {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 3px;
+  text-align: left;
+}
+
+.barra-perfil-identidade strong { font-size: 12px; font-weight: 550; }
+.barra-perfil-identidade small { color: var(--texto-3); font-size: 10px; }
+.barra-acoes { display: flex; align-items: center; gap: 4px; }
+
+.barra-contexto-identidade {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--texto-2);
+}
+
+.barra-contexto-identidade > span { display: flex; flex-direction: column; gap: 3px; }
+.barra-contexto-identidade strong { font-size: 12px; font-weight: 550; }
+.barra-contexto-identidade small { color: var(--texto-3); font-size: 10px; }
+.barra-conexoes { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+
+@media (min-width: 769px) and (pointer: fine), (min-width: 1025px) {
+  .estilo-sistema .sistema nav.barra-lateral {
+    width: 264px;
+    flex-basis: 264px;
+    padding: 22px 14px 14px;
+    gap: 18px;
+    background: var(--fundo-barra);
+    border-right-color: var(--borda-suave);
+  }
+
+  .estilo-sistema .sistema .barra-lateral .barra-topo { flex-basis: 36px; padding-inline: 10px; }
+  .estilo-sistema .sistema .barra-lateral .barra-marca { font-size: 25px; }
+  .estilo-sistema .sistema .barra-lateral .barra-topo > img { border-radius: 8px; }
+  .estilo-sistema .sistema .barra-lateral .barra-contexto { padding: 4px; border-color: var(--borda-suave); border-radius: 12px; }
+  .estilo-sistema .sistema .barra-lateral .barra-contexto-botao { height: 34px; border-radius: 8px; font-weight: 500; }
+  .estilo-sistema .sistema .barra-lateral .barra-contexto-identidade { padding: 10px 12px; border: 1px solid var(--borda-suave); border-radius: 12px; background: var(--superficie-2); }
+  .estilo-sistema .sistema .barra-lateral .barra-contexto-identidade > svg { color: var(--texto-2); }
+
+  .estilo-sistema .sistema .barra-lateral .barra-rolagem { gap: 18px; padding-top: 0; padding-bottom: 4px; }
+  .estilo-sistema .sistema .barra-lateral .barra-grupo { flex: 0 0 auto; gap: 4px; }
+  .estilo-sistema .sistema .barra-lateral .barra-rotulo { padding: 2px 12px 8px; }
+  .estilo-sistema .sistema .barra-lateral .barra-rotulo .rotulo-secao { font-family: var(--fonte-texto); font-weight: 500; font-size: 10px; letter-spacing: .08em; }
+
+  .estilo-sistema .sistema .barra-lateral .barra-item {
+    height: 42px;
+    flex: 0 0 42px;
+    gap: 11px;
+    padding: 0 12px;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 450;
+    color: var(--texto-2);
+  }
+
+  .estilo-sistema .sistema .barra-lateral .barra-item > svg,
+  .estilo-sistema .sistema .barra-lateral .barra-item > .marca { flex: 0 0 auto; }
+  .estilo-sistema .sistema .barra-lateral .barra-item-texto { min-width: 0; text-align: left; }
+  .estilo-sistema .sistema .barra-lateral .barra-item:hover { color: var(--texto); background: var(--superficie-2); }
+  .estilo-sistema .sistema .barra-lateral .barra-item[aria-current="page"] { color: var(--destaque-sobre); background: transparent; font-weight: 600; }
+  .estilo-sistema .sistema .barra-lateral .barra-item:focus-visible { outline: 2px solid var(--destaque); outline-offset: -2px; }
+
+  .estilo-sistema .sistema .barra-lateral .barra-conexoes { margin-top: 10px; padding-top: 12px; border-top: 1px solid var(--borda-suave); }
+  .estilo-sistema .sistema .barra-lateral .barra-whatsapp { width: 100%; margin-left: 0; }
+  .estilo-sistema .sistema .barra-lateral .barra-whatsapp::before { content: none; }
+  .estilo-sistema .sistema .barra-lateral .barra-base { padding-top: 12px; gap: 8px; border-top-color: var(--borda-suave); }
+  .estilo-sistema .sistema .barra-lateral .barra-base-linha { width: 100%; display: flex; flex-direction: column; align-items: stretch; gap: 10px; }
+  .estilo-sistema .sistema .barra-lateral .barra-perfil { width: 100%; min-width: 0; padding: 8px 10px; gap: 10px; border: 1px solid var(--borda-suave); border-radius: 12px; background: var(--superficie-2); }
+  .estilo-sistema .sistema .barra-lateral .barra-perfil:hover { background: var(--superficie-2); border-color: var(--borda); }
+  .estilo-sistema .sistema .barra-lateral .barra-perfil .avatar { flex-shrink: 0; }
+  .estilo-sistema .sistema .barra-lateral .barra-acoes { justify-content: space-between; gap: 6px; padding-inline: 6px; }
+  .estilo-sistema .sistema .barra-lateral .barra-acoes .barra-icone { width: 36px; height: 30px; border-radius: 8px; color: var(--texto-2); }
+  .estilo-sistema .sistema .barra-lateral .barra-acoes .barra-icone:hover { background: var(--superficie-2); color: var(--texto); }
+  .estilo-sistema .sistema .barra-lateral .barra-acoes .barra-sair:hover { color: var(--texto-2); }
+  .estilo-sistema .sistema .barra-lateral .barra-sincronia { padding-inline: 10px; min-height: 20px; font-size: 10px; }
+
+  /* A barra compacta mantém nomes e reúne os sistemas no painel de aplicativos. */
+  .estilo-sistema .sistema nav.barra-lateral.barra-recolhida { width: 84px; flex-basis: 84px; padding: 18px 10px 12px; gap: 10px; }
+  .estilo-sistema .sistema .barra-recolhida .barra-topo { padding: 0; flex-basis: 34px; }
+  .estilo-sistema .sistema .barra-recolhida .barra-expandir { width: 28px; height: 24px; flex-basis: 24px; color: var(--texto-2); }
+  .estilo-sistema .sistema .barra-recolhida .barra-contexto { width: 100%; gap: 3px; padding: 3px; background: var(--superficie-2); border-radius: 11px; }
+  .estilo-sistema .sistema .barra-recolhida .barra-contexto-botao { width: 100%; height: 40px; padding: 4px 0; gap: 3px; flex-direction: column; font-size: 8px; }
+  .estilo-sistema .sistema .barra-recolhida .barra-contexto-identidade { width: 100%; padding: 8px 0; gap: 5px; flex-direction: column; background: transparent; border: 0; }
+  .estilo-sistema .sistema .barra-recolhida .barra-contexto-identidade strong { color: var(--texto-2); font-size: 9px; font-weight: 500; }
+  .estilo-sistema .sistema .barra-recolhida .barra-rolagem { padding-top: 12px; gap: 10px; border-top: 1px solid var(--borda-suave); }
+  .estilo-sistema .sistema .barra-recolhida .barra-grupo { width: 100%; align-items: stretch; gap: 6px; }
+  .estilo-sistema .sistema .barra-recolhida .barra-item {
+    width: 100%;
+    height: 56px;
+    flex-basis: 56px;
+    padding: 8px 2px;
+    flex-direction: column;
+    justify-content: center;
+    gap: 6px;
+    border-radius: 11px;
+  }
+  .estilo-sistema .sistema .barra-recolhida .barra-item > svg.lucide { width: 19px; height: 19px; }
+  .estilo-sistema .sistema .barra-recolhida .barra-item-texto { display: block; max-width: 100%; font-size: 10px; font-weight: 500; line-height: 12px; text-align: center; }
+  .estilo-sistema .sistema .barra-recolhida .barra-conexoes { margin-top: 6px; padding-top: 12px; gap: 6px; }
+  .estilo-sistema .sistema .barra-recolhida .barra-base { width: 100%; gap: 7px; padding-top: 10px; }
+  .estilo-sistema .sistema .barra-recolhida .barra-base-linha { gap: 8px; }
+  .estilo-sistema .sistema .barra-recolhida .barra-perfil { width: 100%; padding: 6px; justify-content: center; border: 0; background: transparent; }
+  .estilo-sistema .sistema .barra-recolhida .barra-acoes { display: grid; grid-template-columns: repeat(2, 1fr); width: 100%; padding: 0; gap: 3px; }
+  .estilo-sistema .sistema .barra-recolhida .barra-acoes .barra-icone { width: 100%; height: 28px; }
+  .estilo-sistema .sistema .barra-recolhida .barra-acoes .barra-sair { grid-column: 1 / -1; }
+  .estilo-sistema .sistema .barra-recolhida .barra-sincronia { width: 100%; padding: 0; }
+  .estilo-sistema .sistema .barra-lateral.barra-recolhida .barra-item[aria-current="page"] .barra-contador { background: var(--destaque-sobre); }
+}
+
+@media (max-width: 768px), (pointer: coarse) and (max-width: 1024px) {
+  .barra-contexto-identidade { padding: 2px 0; }
+  .barra-contexto-identidade > span { flex-direction: row; align-items: center; gap: 8px; }
+  .barra-contexto-identidade small { font-size: 9px; }
+  .barra-conexoes { flex-direction: row; align-items: stretch; gap: 4px; }
+  .barra-perfil-identidade small { display: none; }
+  .barra-perfil-identidade strong { font-size: 10px; }
+  .barra-acoes { gap: 4px; }
+}

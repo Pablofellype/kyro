@@ -1,0 +1,31 @@
+.microsoft-conteudo { display: flex; flex-direction: column; gap: 16px; min-width: 0; --mc-alerta: #8c6226; }
+[data-tema="escuro"] .microsoft-conteudo { --mc-alerta: #e2ba7d; }
+.microsoft-conteudo .mc-conta { color: var(--texto-2); font-size: 12px; overflow-wrap: anywhere; }
+.microsoft-conteudo .mc-contexto { color: var(--texto-3); font-size: 12px; line-height: 1.6; }
+.microsoft-conteudo .mc-lista { list-style: none; margin: 0; padding: 0; }
+.microsoft-conteudo .mc-linha { display: flex; align-items: flex-start; gap: 12px; padding: 16px 0; border-bottom: 1px solid var(--borda-suave); }
+.microsoft-conteudo .mc-linha:first-child { padding-top: 0; }
+.microsoft-conteudo .mc-linha:last-child { border-bottom: 0; }
+.microsoft-conteudo .mc-icone { display: grid; place-items: center; flex-shrink: 0; width: 34px; height: 34px; border-radius: 10px; color: var(--destaque-claro); background: var(--destaque-suave); }
+.microsoft-conteudo .mc-texto { display: flex; flex: 1; min-width: 0; flex-direction: column; align-items: flex-start; gap: 7px; }
+.microsoft-conteudo .mc-texto strong { font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
+.microsoft-conteudo .mc-texto > small { color: var(--texto-3); font-size: 11px; overflow-wrap: anywhere; }
+.microsoft-conteudo .mc-texto > p { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; color: var(--texto-2); line-height: 1.65; }
+.microsoft-conteudo .mc-linha-topo { display: flex; width: 100%; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 5px 14px; }
+.microsoft-conteudo .mc-linha-topo time { color: var(--texto-3); font-size: 10px; }
+.microsoft-conteudo .mc-link { display: inline; color: var(--destaque-claro); text-decoration: none; overflow-wrap: anywhere; }
+.microsoft-conteudo .mc-link svg { display: inline; vertical-align: -2px; margin-left: 5px; }
+.microsoft-conteudo .mc-link:hover { text-decoration: underline; text-underline-offset: 3px; }
+.microsoft-conteudo .mc-etiqueta { display: inline-flex; padding: 3px 7px; border-radius: 5px; background: var(--superficie-2); color: var(--texto-2); font-size: 10px; }
+.microsoft-conteudo .mc-prazo { display: flex; align-items: flex-start; gap: 6px; color: var(--texto-3); font-size: 11px; }
+.microsoft-conteudo .mc-prazo svg { margin-top: 2px; flex-shrink: 0; }
+.microsoft-conteudo .mc-prazo[data-vencido="sim"], .microsoft-conteudo .mc-texto > .mc-aviso { color: var(--mc-alerta); }
+.microsoft-conteudo .mc-progresso { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 9px; color: var(--texto-2); font-size: 10px; }
+.microsoft-conteudo progress { appearance: none; width: 88px; height: 5px; border: 0; border-radius: 8px; overflow: hidden; background: var(--superficie-2); color: var(--destaque); accent-color: var(--destaque); }
+.microsoft-conteudo progress::-webkit-progress-bar { background: var(--superficie-2); }
+.microsoft-conteudo progress::-webkit-progress-value { background: var(--destaque); border-radius: 8px; }
+.microsoft-conteudo progress::-moz-progress-bar { background: var(--destaque); border-radius: 8px; }
+@media (max-width: 560px) {
+  .microsoft-conteudo .mc-linha { gap: 9px; }
+  .microsoft-conteudo .mc-icone { width: 29px; height: 29px; }
+}

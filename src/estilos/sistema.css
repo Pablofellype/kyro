@@ -2,22 +2,16 @@
   position: fixed;
   inset: 0;
   overflow: hidden;
-  background:
-    radial-gradient(1200px 700px at 20% 10%, color-mix(in srgb, var(--destaque) 18%, transparent), transparent 60%),
-    radial-gradient(900px 600px at 85% 85%, color-mix(in srgb, #e05a8a 12%, transparent), transparent 60%),
-    linear-gradient(160deg, #c9ccd3 0%, #a9aeb8 100%);
+  background: var(--fundo);
 }
 
 [data-tema="escuro"] .area-trabalho {
-  background:
-    radial-gradient(1200px 700px at 20% 10%, color-mix(in srgb, var(--destaque) 22%, transparent), transparent 60%),
-    radial-gradient(900px 600px at 85% 85%, color-mix(in srgb, #e05a8a 14%, transparent), transparent 60%),
-    linear-gradient(160deg, #1b1d22 0%, #0b0c0f 100%);
+  background: var(--fundo);
 }
 
 .area-trabalho:not(.area-nativa),
 [data-tema="escuro"] .area-trabalho:not(.area-nativa) {
-  background: #eef1f6 url("/fundo/papel-de-parede.jpg") center / cover no-repeat;
+  background: var(--fundo);
 }
 
 .barra-tarefas {
@@ -251,7 +245,7 @@
 .barra-contexto-botao[data-ativo="sim"] {
   color: var(--texto);
   background: var(--superficie-2);
-  box-shadow: inset 0 0 0 1px var(--borda-forte), 0 2px 8px color-mix(in srgb, var(--destaque) 8%, transparent);
+  box-shadow: inset 0 0 0 1px var(--borda-forte), 0 2px 8px rgb(0 0 0 / .04);
 }
 
 .barra-contexto-botao[data-ativo="sim"]::after {
@@ -1186,7 +1180,7 @@ html.janela-sobreposta #raiz {
 }
 
 .area-trabalho.area-nativa {
-  background: #eef1f6 url("/fundo/papel-de-parede.jpg") center / cover no-repeat !important;
+  background: var(--fundo) !important;
 }
 
 .janela.janela-nativa {
@@ -1225,7 +1219,7 @@ html.janela-sobreposta #raiz {
   [data-tema="escuro"] .area-trabalho,
   .area-trabalho:not(.area-nativa),
   [data-tema="escuro"] .area-trabalho:not(.area-nativa) {
-    background: #0e0e10 !important;
+    background: var(--fundo) !important;
     background-image: none !important;
   }
 

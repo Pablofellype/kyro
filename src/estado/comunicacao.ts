@@ -7,7 +7,7 @@ import { conexaoEmTestes } from "../utilitarios/disponibilidadeConexoes";
 
 export const SERVICOS: ServicoId[] = [
   "stripe", "github", "vercel", "google", "supabase", "cloudflare", "resend", "notion", "calcom", "n8n",
-  "email", "calendario", "outlook", "linear", "jira", "trello", "railway", "discord", "reddit", "strava", "cripto",
+  "email", "calendario", "outlook", "teams", "planner", "planilhas", "linear", "jira", "trello", "railway", "discord", "reddit", "strava", "cripto",
 ];
 
 export type CategoriaServico = "pagamentos" | "codigo" | "deploy" | "produtividade" | "comunicacao" | "pessoal";
@@ -34,6 +34,9 @@ export const CATEGORIA_SERVICO: Record<ServicoId, CategoriaServico> = {
   strava: "pessoal",
   cripto: "pagamentos",
   outlook: "comunicacao",
+  teams: "comunicacao",
+  planner: "produtividade",
+  planilhas: "produtividade",
 };
 
 export const INTERVALO_PADRAO: Record<ServicoId, number> = {
@@ -58,6 +61,9 @@ export const INTERVALO_PADRAO: Record<ServicoId, number> = {
   calendario: 900,
   cripto: 60,
   outlook: 120,
+  teams: 120,
+  planner: 300,
+  planilhas: 300,
 };
 
 function conexaoInicial(id: ServicoId): Conexao {
@@ -148,7 +154,7 @@ export const useComunicacao = create<EstadoComunicacao>()(
       registrarEventoConexao: (evento) =>
         set((s) => ({ eventosConexao: [{ ...evento, id: gerarId(), data: new Date().toISOString() }, ...s.eventosConexao].slice(0, 200) })),
       definirUsoIa: (usoIa) => set({ usoIa }),
-      substituir: (dados) => set({ ...dados, ...(dados.conexoes ? { conexoes: dados.conexoes.map(conexaoDisponivel) } : {}) }),
+      substituir: (dados) => set({ ...dados, ...(dados.conexoes ? { conexoes: SERVICOS.map((id) => conexaoDisponivel({ ...conexaoInicial(id), ...dados.conexoes?.find((c) => c.id === id) })) } : {}) }),
     }),
     {
       name: chave("comunicacao"),

@@ -1,0 +1,177 @@
+.escritorio-empresa {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  width: 100%;
+  min-width: 0;
+  container: escritorio-empresa / inline-size;
+  --ee-verde: #275f50;
+  --ee-areia: #8c6226;
+  --ee-azul: #456783;
+}
+
+[data-tema="escuro"] .escritorio-empresa {
+  --ee-verde: #a3caba;
+  --ee-areia: #e2ba7d;
+  --ee-azul: #a4c2dd;
+}
+
+.escritorio-empresa button { font-family: inherit; }
+.escritorio-empresa [data-tom="verde"] { --ee-cor: var(--ee-verde); }
+.escritorio-empresa [data-tom="areia"] { --ee-cor: var(--ee-areia); }
+.escritorio-empresa [data-tom="azul"] { --ee-cor: var(--ee-azul); }
+.escritorio-empresa .ee-abertura { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding-block: 2px 4px; }
+.escritorio-empresa .ee-abertura > div:first-child { min-width: 0; }
+.escritorio-empresa .ee-contexto { display: inline-flex; align-items: center; gap: 7px; color: var(--destaque-claro); font-size: 11px; font-weight: 600; }
+.escritorio-empresa .ee-abertura h1 { margin: 7px 0 8px; font-family: var(--fonte-titulo); font-size: clamp(26px, 3.5cqw, 36px); font-weight: 650; line-height: 1.15; letter-spacing: -.045em; overflow-wrap: anywhere; }
+.escritorio-empresa .ee-abertura p { max-width: 62ch; margin: 0; color: var(--texto-2); font-size: 13px; line-height: 1.6; }
+.escritorio-empresa .ee-abertura-acoes { display: flex; flex-shrink: 0; align-items: flex-end; flex-direction: column; gap: 10px; }
+.escritorio-empresa .ee-abertura-acoes time { display: inline-flex; align-items: center; gap: 7px; color: var(--texto-3); font-size: 11px; text-transform: capitalize; }
+.escritorio-empresa .ee-botao { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 38px; padding: 9px 13px; border: 1px solid var(--borda); border-radius: 9px; background: var(--superficie); color: var(--texto); font-size: 12px; font-weight: 550; line-height: 1.4; transition: border-color .15s, background .15s; }
+.escritorio-empresa .ee-botao:hover:not(:disabled) { border-color: var(--destaque); background: var(--superficie-2); }
+.escritorio-empresa .ee-botao:disabled { opacity: .65; }
+.escritorio-empresa .ee-botao-principal { background: var(--destaque); border-color: var(--destaque); color: var(--destaque-sobre); }
+.escritorio-empresa .ee-botao-principal:hover:not(:disabled) { background: var(--botao-primario-hover); border-color: var(--botao-primario-hover); }
+.escritorio-empresa .ee-botao-discreto { min-height: 32px; padding-block: 6px; font-size: 11px; }
+.escritorio-empresa .ee-link { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 34px; padding: 5px 0; color: var(--destaque-claro); font-size: 11px; font-weight: 550; text-align: left; line-height: 1.4; }
+.escritorio-empresa .ee-link:hover:not(:disabled) { text-decoration: underline; text-underline-offset: 3px; }
+.escritorio-empresa .ee-link:disabled { color: var(--texto-3); }
+.escritorio-empresa :focus-visible { outline: 2px solid var(--destaque); outline-offset: 3px; }
+
+.escritorio-empresa .ee-resumo { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.escritorio-empresa .ee-metrica { position: relative; display: flex; align-items: flex-start; gap: 12px; min-width: 0; padding: 18px; border: 1px solid var(--borda-suave); border-radius: 14px; background: var(--superficie); color: var(--texto); text-align: left; transition: border-color .15s; }
+.escritorio-empresa .ee-metrica:hover { border-color: var(--destaque); }
+.escritorio-empresa .ee-icone { display: grid; place-items: center; flex: 0 0 40px; width: 40px; height: 40px; border-radius: 11px; background: color-mix(in srgb, var(--ee-cor, var(--ee-verde)) 11%, var(--superficie)); color: var(--ee-cor, var(--ee-verde)); }
+.escritorio-empresa .ee-metrica-texto { display: grid; min-width: 0; gap: 5px; }
+.escritorio-empresa .ee-metrica-texto > span { padding-right: 12px; font-size: 11px; font-weight: 550; color: var(--texto-2); }
+.escritorio-empresa .ee-metrica-texto > strong { font-family: var(--fonte-titulo); font-size: 30px; line-height: 1; letter-spacing: -.04em; font-weight: 650; }
+.escritorio-empresa .ee-metrica-texto > small { color: var(--texto-3); font-size: 10px; line-height: 1.5; }
+.escritorio-empresa .ee-metrica-seta { position: absolute; top: 16px; right: 13px; color: var(--texto-3); }
+
+.escritorio-empresa .ee-grade-principal { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(255px, 1fr); gap: 18px; align-items: start; }
+.escritorio-empresa .ee-cartao { min-width: 0; padding: 22px; border: 1px solid var(--borda-suave); border-radius: 16px; background: var(--superficie); }
+.escritorio-empresa .ee-prioridades { border-top: 3px solid var(--destaque); padding-top: 20px; }
+.escritorio-empresa .ee-cabecalho-secao { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 17px; }
+.escritorio-empresa .ee-cabecalho-secao > div { min-width: 0; }
+.escritorio-empresa .ee-cabecalho-secao > svg { margin-top: 3px; color: var(--texto-3); }
+.escritorio-empresa .ee-sobretitulo { display: block; margin-bottom: 4px; color: var(--texto-3); font-size: 10px; line-height: 1.4; }
+.escritorio-empresa .ee-cabecalho-secao h2 { margin: 0; font-family: var(--fonte-titulo); font-size: 20px; font-weight: 600; line-height: 1.25; letter-spacing: -.03em; }
+.escritorio-empresa .ee-cabecalho-secao p { margin: 6px 0 0; color: var(--texto-3); font-size: 12px; line-height: 1.5; }
+.escritorio-empresa .ee-contagem { display: grid; place-items: center; min-width: 29px; height: 29px; padding-inline: 6px; border-radius: 8px; background: var(--superficie-2); color: var(--texto-2); font-size: 12px; font-weight: 600; }
+.escritorio-empresa .ee-filtros { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 8px; }
+.escritorio-empresa .ee-filtros button { min-height: 32px; padding: 7px 11px; border: 1px solid transparent; border-radius: 8px; color: var(--texto-3); font-size: 11px; font-weight: 500; }
+.escritorio-empresa .ee-filtros button:hover { background: var(--superficie-2); color: var(--texto); }
+.escritorio-empresa .ee-filtros button[aria-pressed="true"] { background: var(--destaque-suave); color: var(--destaque-claro); border-color: var(--destaque-borda); }
+.escritorio-empresa .ee-consulta { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; padding: 10px; margin-block: 12px; border-radius: 8px; background: var(--superficie-2); color: var(--texto-2); font-size: 11px; line-height: 1.5; }
+.escritorio-empresa .ee-consulta button { color: var(--destaque-claro); font-weight: 550; text-decoration: underline; text-underline-offset: 3px; min-height: 26px; }
+.escritorio-empresa .ee-lista-prioridades { list-style: none; margin: 0; padding: 0; }
+.escritorio-empresa .ee-prioridade { display: flex; align-items: center; gap: 12px; min-width: 0; padding-block: 16px; border-bottom: 1px solid var(--borda-suave); }
+.escritorio-empresa .ee-prioridade:last-child { border-bottom: 0; }
+.escritorio-empresa .ee-prioridade > .ee-icone { width: 34px; height: 34px; flex-basis: 34px; align-self: flex-start; margin-top: 4px; border-radius: 10px; }
+.escritorio-empresa .ee-prioridade-texto { flex: 1; min-width: 0; }
+.escritorio-empresa .ee-prioridade h3 { margin: 6px 0 3px; font-size: 13px; font-weight: 600; line-height: 1.4; overflow-wrap: anywhere; }
+.escritorio-empresa .ee-prioridade p { margin: 3px 0; color: var(--texto-2); font-size: 11px; line-height: 1.5; overflow-wrap: anywhere; }
+.escritorio-empresa .ee-prioridade small { color: var(--texto-3); font-size: 10px; line-height: 1.5; }
+.escritorio-empresa .ee-badge { display: inline-flex; padding: 3px 6px; border-radius: 5px; color: var(--ee-cor, var(--ee-verde)); background: color-mix(in srgb, var(--ee-cor, var(--ee-verde)) 10%, var(--superficie)); font-size: 9px; font-weight: 550; line-height: 1.3; }
+.escritorio-empresa .ee-acao-linha { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; gap: 5px; min-height: 34px; padding: 7px 9px; border: 1px solid var(--borda); border-radius: 8px; background: var(--superficie); color: var(--destaque-claro); font-size: 10px; font-weight: 550; }
+.escritorio-empresa .ee-acao-linha:hover { background: var(--destaque-suave); border-color: var(--destaque); }
+.escritorio-empresa .ee-rodape-secao { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--borda-suave); }
+.escritorio-empresa .ee-vazio { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; min-height: 165px; padding: 22px 10px; text-align: center; }
+.escritorio-empresa .ee-vazio > span { display: grid; place-items: center; width: 48px; height: 48px; margin-bottom: 2px; border-radius: 14px; background: var(--superficie-2); color: var(--destaque-claro); }
+.escritorio-empresa .ee-vazio > strong { font-size: 13px; font-weight: 550; }
+.escritorio-empresa .ee-vazio p { max-width: 37ch; margin: 0; color: var(--texto-3); font-size: 11px; line-height: 1.6; }
+
+.escritorio-empresa .ee-agenda { padding: 20px; }
+.escritorio-empresa .ee-agenda > .ee-botao { width: 100%; margin-top: 16px; }
+.escritorio-empresa .ee-agenda-lista { list-style: none; margin: 0; padding: 0; }
+.escritorio-empresa .ee-agenda-lista li + li { margin-top: 10px; }
+.escritorio-empresa .ee-compromisso { display: flex; flex-direction: column; gap: 9px; width: 100%; padding: 12px; border: 1px solid var(--borda-suave); border-radius: 10px; text-align: left; color: var(--texto); transition: border-color .15s, background .15s; }
+.escritorio-empresa .ee-compromisso:hover { border-color: var(--destaque); background: var(--superficie-2); }
+.escritorio-empresa .ee-proximo { padding: 16px 14px; border-left: 3px solid var(--destaque); background: var(--destaque-suave); }
+.escritorio-empresa .ee-proximo-rotulo { color: var(--destaque-claro); font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+.escritorio-empresa .ee-compromisso-quando { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 6px 12px; }
+.escritorio-empresa .ee-compromisso-quando strong { font-family: var(--fonte-titulo); font-size: 22px; font-weight: 600; letter-spacing: -.03em; line-height: 1.2; }
+.escritorio-empresa .ee-compromisso-quando > span { color: var(--texto-3); font-size: 10px; text-transform: capitalize; }
+.escritorio-empresa .ee-compromisso h3 { margin: 0; font-size: 12px; line-height: 1.45; font-weight: 600; overflow-wrap: anywhere; }
+.escritorio-empresa .ee-compromisso-tipo { display: flex; align-items: center; justify-content: space-between; color: var(--texto-3); font-size: 10px; }
+
+.escritorio-empresa .ee-sistemas { min-width: 0; }
+.escritorio-empresa .ee-sistemas-grade { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.escritorio-empresa .ee-sistema { display: flex; align-items: flex-start; flex-direction: column; gap: 11px; min-width: 0; padding: 18px; border: 1px solid var(--borda-suave); border-radius: 14px; background: var(--superficie); color: var(--texto); text-align: left; transition: border-color .15s, background .15s; }
+.escritorio-empresa .ee-sistema[data-sistema="registros-limpeza"], .escritorio-empresa .ee-sistema[data-sistema="calendario-limpeza"] { --ee-cor: var(--ee-azul); }
+.escritorio-empresa .ee-sistema[data-sistema="materiais"], .escritorio-empresa .ee-sistema[data-sistema="requisicoes"] { --ee-cor: var(--ee-areia); }
+.escritorio-empresa .ee-sistema:hover:not(:disabled) { border-color: var(--destaque); background: color-mix(in srgb, var(--superficie) 90%, var(--destaque-suave)); }
+.escritorio-empresa .ee-sistema > strong { font-size: 13px; font-weight: 600; line-height: 1.35; overflow-wrap: anywhere; }
+.escritorio-empresa .ee-sistema-descricao { flex: 1; color: var(--texto-3); font-size: 11px; line-height: 1.55; }
+.escritorio-empresa .ee-sistema-abrir { display: inline-flex; align-items: center; justify-content: space-between; gap: 8px; align-self: stretch; padding-top: 10px; margin-top: 2px; border-top: 1px solid var(--borda-suave); color: var(--destaque-claro); font-size: 11px; font-weight: 550; }
+.escritorio-empresa .ee-sistema:disabled { opacity: .7; }
+.escritorio-empresa .ee-outros-acessos { display: flex; align-items: center; flex-wrap: wrap; gap: 5px 18px; margin-top: 13px; }
+.escritorio-empresa .ee-outros-acessos > span { color: var(--texto-3); font-size: 10px; }
+.escritorio-empresa .ee-outros-acessos .ee-link { gap: 5px; }
+.escritorio-empresa .ee-outros-acessos small { padding: 3px 5px; border-radius: 4px; color: var(--texto-3); background: var(--superficie-2); font-size: 9px; font-weight: 400; }
+
+.escritorio-empresa .ee-grade-secundaria { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+.escritorio-empresa .ee-grade-secundaria .ee-cabecalho-secao h2 { font-size: 18px; }
+.escritorio-empresa .ee-nota-vazia { margin: 8px 0 0; color: var(--texto-3); font-size: 12px; line-height: 1.65; }
+.escritorio-empresa .ee-historico-lista, .escritorio-empresa .ee-equipe-lista { list-style: none; margin: 0; padding: 0; }
+.escritorio-empresa .ee-historico-lista li { display: flex; gap: 9px; align-items: flex-start; padding: 12px 0; border-bottom: 1px solid var(--borda-suave); }
+.escritorio-empresa .ee-historico-lista li:last-child { padding-bottom: 0; border: 0; }
+.escritorio-empresa .ee-historico-icone { display: grid; place-items: center; flex-shrink: 0; width: 27px; height: 27px; border-radius: 8px; color: var(--destaque-claro); background: var(--superficie-2); }
+.escritorio-empresa .ee-historico-lista li > div { display: grid; flex: 1; gap: 3px; min-width: 0; }
+.escritorio-empresa .ee-historico-lista strong { font-size: 11px; font-weight: 550; line-height: 1.45; overflow-wrap: anywhere; }
+.escritorio-empresa .ee-historico-lista li > div > span { color: var(--texto-3); font-size: 10px; }
+.escritorio-empresa .ee-historico-lista time { flex-shrink: 0; padding-top: 2px; color: var(--texto-3); font-size: 9px; }
+.escritorio-empresa .ee-equipe-lista li, .escritorio-empresa .ee-identidade { display: flex; align-items: center; gap: 9px; padding-block: 9px; }
+.escritorio-empresa .ee-avatar { display: grid; place-items: center; flex-shrink: 0; width: 31px; height: 31px; border-radius: 10px; background: var(--superficie-2); color: var(--destaque-claro); font-size: 12px; font-weight: 600; }
+.escritorio-empresa .ee-equipe-lista li > div, .escritorio-empresa .ee-identidade > div { display: grid; flex: 1; gap: 3px; min-width: 0; }
+.escritorio-empresa .ee-equipe-lista strong, .escritorio-empresa .ee-identidade strong { font-size: 12px; font-weight: 550; overflow-wrap: anywhere; }
+.escritorio-empresa .ee-equipe-lista li > div > span, .escritorio-empresa .ee-identidade > div > span { font-size: 10px; color: var(--texto-3); }
+.escritorio-empresa .ee-equipe-lista small { color: var(--texto-3); font-size: 9px; }
+.escritorio-empresa .ee-equipe > .ee-link { margin-top: 12px; }
+.escritorio-empresa .ee-rodape { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px 18px; padding-top: 5px; border-top: 1px solid var(--borda-suave); }
+.escritorio-empresa .ee-rodape > span { font-size: 10px; color: var(--texto-3); }
+
+@container escritorio-empresa (max-width: 880px) {
+  .escritorio-empresa .ee-abertura { align-items: flex-start; }
+  .escritorio-empresa .ee-abertura-acoes time { max-width: 150px; text-align: right; }
+  .escritorio-empresa .ee-grade-principal { grid-template-columns: minmax(0, 1fr); }
+  .escritorio-empresa .ee-agenda-lista { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .escritorio-empresa .ee-agenda-lista li + li { margin: 0; }
+  .escritorio-empresa .ee-compromisso { height: 100%; }
+  .escritorio-empresa .ee-sistemas-grade { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .escritorio-empresa .ee-metrica { flex-direction: column; padding: 15px; gap: 10px; }
+  .escritorio-empresa .ee-grade-secundaria { grid-template-columns: minmax(0, 1fr); }
+}
+
+@container escritorio-empresa (max-width: 520px) {
+  .escritorio-empresa .ee-abertura { flex-direction: column; gap: 14px; }
+  .escritorio-empresa .ee-abertura-acoes { width: 100%; align-items: center; justify-content: space-between; flex-direction: row; gap: 12px; }
+  .escritorio-empresa .ee-abertura-acoes time { max-width: none; text-align: left; font-size: 10px; }
+  .escritorio-empresa .ee-resumo { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .escritorio-empresa .ee-metrica { flex-direction: row; align-items: center; gap: 11px; padding: 13px; }
+  .escritorio-empresa .ee-metrica-texto { flex: 1; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 4px 10px; padding-right: 18px; }
+  .escritorio-empresa .ee-metrica-texto > strong { grid-column: 2; grid-row: 1 / 3; font-size: 27px; }
+  .escritorio-empresa .ee-metrica-texto > small { grid-column: 1; grid-row: 2; }
+  .escritorio-empresa .ee-cartao { padding: 17px; border-radius: 13px; }
+  .escritorio-empresa .ee-prioridade { display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 8px 10px; }
+  .escritorio-empresa .ee-prioridade > .ee-icone { width: 30px; height: 30px; }
+  .escritorio-empresa .ee-prioridade > .ee-acao-linha { grid-column: 2; justify-self: start; min-height: 40px; padding-inline: 12px; font-size: 11px; }
+  .escritorio-empresa .ee-filtros button { min-height: 40px; }
+  .escritorio-empresa .ee-agenda-lista { grid-template-columns: minmax(0, 1fr); }
+  .escritorio-empresa .ee-sistema { padding: 14px; }
+  .escritorio-empresa .ee-sistema > strong { font-size: 12px; }
+  .escritorio-empresa .ee-sistema-descricao { font-size: 10px; }
+  .escritorio-empresa .ee-sistema-abrir { font-size: 10px; }
+  .escritorio-empresa .ee-historico-lista li { display: grid; grid-template-columns: 27px minmax(0, 1fr); }
+  .escritorio-empresa .ee-historico-lista time { grid-column: 2; padding-top: 0; }
+  .escritorio-empresa .ee-link { min-height: 40px; }
+}
+
+@container escritorio-empresa (max-width: 300px) {
+  .escritorio-empresa .ee-sistemas-grade { grid-template-columns: minmax(0, 1fr); }
+  .escritorio-empresa .ee-equipe-lista small { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .escritorio-empresa button { transition: none; }
+}

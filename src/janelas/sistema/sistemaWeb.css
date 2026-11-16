@@ -18,17 +18,6 @@
   color: var(--texto);
 }
 
-.sistema-web-cabecalho {
-  display: flex;
-  align-items: center;
-  flex: 0 0 40px;
-  min-width: 0;
-  padding-inline: 18px;
-  border-bottom: 1px solid var(--borda);
-  background: var(--superficie);
-}
-
-.sistema-web-cabecalho > .migalha { min-width: 0; max-width: 100%; }
 .sistema-web > .janela-corpo { min-width: 0; }
 
 .sistema-web[data-mobile="sim"] {

@@ -106,7 +106,8 @@ export interface AppFixado {
 export const LIMITE_DE_FIXADOS = 20;
 export const ESCALAS_DO_DOCK = [0.7, 0.8, 0.9, 1, 1.1, 1.2] as const;
 
-export const FUNDO_PADRAO_DAS_BORDAS = "#232428";
+export const FUNDO_PADRAO_DAS_BORDAS = "#ffffff";
+export const VERSAO_CONFIGURACOES = 12;
 
 export interface ConfigIlha {
   ativa: boolean;
@@ -281,7 +282,7 @@ export const useConfig = create<Configuracoes & AcoesConfig>()(
     {
       name: chave("configuracoes"),
       storage: armazenamento,
-      version: 10,
+      version: VERSAO_CONFIGURACOES,
       migrate: (salvo, versao) => {
         const s = (objeto(salvo) ? { ...salvo } : {}) as Partial<Configuracoes>;
         if (s.ilha) s.ilha = {
@@ -333,6 +334,18 @@ export const useConfig = create<Configuracoes & AcoesConfig>()(
           s.ilha = { ...s.ilha, ordemAbas: ((s.ilha.ordemAbas as string[] | undefined) ?? []).filter((a) => a !== "agenda") as AbaIlha[], blocos: blocos as Configuracoes["ilha"]["blocos"] };
         }
         if (versao < 10 && s.ilha) s.ilha = { ...s.ilha, ...juntarAbasNoHoje((s.ilha.ordemAbas as string[] | undefined) ?? [], (s.ilha.blocos ?? {}) as Record<string, boolean>) };
+        if (versao < 11) {
+          // Atualiza apenas o antigo fundo padrão. Tamanho, transparência e
+          // cores escolhidas pela pessoa permanecem nas preferências da conta.
+          if (s.ilha?.fundo?.toLowerCase() === "#232428") s.ilha = { ...s.ilha, fundo: FUNDO_PADRAO_DAS_BORDAS };
+          if (s.dock?.fundo?.toLowerCase() === "#232428") s.dock = { ...s.dock, fundo: FUNDO_PADRAO_DAS_BORDAS };
+        }
+        if (versao < 12) {
+          // O fundo padrão anterior tinha um tom rosado. Só esse valor é
+          // atualizado; as cores próprias, a opacidade e o tamanho são mantidos.
+          if (s.ilha?.fundo?.toLowerCase() === "#fff9fa") s.ilha = { ...s.ilha, fundo: FUNDO_PADRAO_DAS_BORDAS };
+          if (s.dock?.fundo?.toLowerCase() === "#fff9fa") s.dock = { ...s.dock, fundo: FUNDO_PADRAO_DAS_BORDAS };
+        }
         if (s.ia) s.ia = { ...s.ia, reservas: s.ia.reservas ?? [], modelos: s.ia.modelos ?? (s.ia.provedorId && s.ia.modelo ? { [s.ia.provedorId]: s.ia.modelo } : {}) };
         return s as Configuracoes & AcoesConfig;
       },

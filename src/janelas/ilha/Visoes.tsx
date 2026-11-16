@@ -39,6 +39,8 @@ import { formatarDinheiro } from "../../utilitarios/dinheiro";
 import { tocarSom } from "../../ponte/sons";
 import { addMonths, eachDayOfInterval, endOfMonth, endOfWeek, isSameMonth, startOfMonth, startOfWeek } from "date-fns";
 import type { CartaoConfirmacao, EtapaPomodoro, ServicoId } from "../../tipos";
+import { useAuth } from "../../estado/autenticacao";
+import { conexaoVisivelPara } from "../../utilitarios/visibilidadeConexoes";
 
 function Cartao({ veu, children }: { veu?: string; children: React.ReactNode }) {
   return (
@@ -486,14 +488,16 @@ function SecaoHabitos() {
 }
 
 export function VisaoConexoes({ aberta, aoSelecionar }: { aberta: ServicoId | null; aoSelecionar: (servico: ServicoId | null) => void }) {
+  const usuario = useAuth((s) => s.usuario);
   const conexoes = useComunicacao((s) => s.conexoes);
   const eventos = useComunicacao((s) => s.eventosConexao);
   const marcarFalhasVistas = useComunicacao((s) => s.marcarFalhasVistas);
   const abrirJanela = useInterface((s) => s.abrirJanelaConexao);
   const irPara = useInterface((s) => s.irPara);
-  const lista = [...conexoes].sort((a, b) => Number(b.ligada) - Number(a.ligada) || Number(b.fixadaNaIlha) - Number(a.fixadaNaIlha));
-  const ligadas = conexoes.filter((c) => c.ligada).length;
-  const atual = conexoes.find((c) => c.id === aberta);
+  const visiveis = conexoes.filter((c) => conexaoVisivelPara(usuario, c.id));
+  const lista = [...visiveis].sort((a, b) => Number(b.ligada) - Number(a.ligada) || Number(b.fixadaNaIlha) - Number(a.fixadaNaIlha));
+  const ligadas = visiveis.filter((c) => c.ligada).length;
+  const atual = visiveis.find((c) => c.id === aberta);
   const whatsapp = useWhatsapp((s) => s.estado);
 
   return (
@@ -503,7 +507,7 @@ export function VisaoConexoes({ aberta, aoSelecionar }: { aberta: ServicoId | nu
           <motion.div key="grade" className="coluna" style={{ gap: 8, minHeight: 0, flex: 1 }} initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }} transition={{ duration: 0.18 }}>
             <div className="linha-entre">
               <span className="ilha-titulo">{T.ilha.abas.conexoes}</span>
-              <span className="ilha-mini numero">{T.ilha.conexoesLigadas(ligadas, conexoes.length)}</span>
+              <span className="ilha-mini numero">{T.ilha.conexoesLigadas(ligadas, visiveis.length)}</span>
             </div>
             <div className="ilha-rolagem">
               <div className="ilha-conexoes-grade">
@@ -725,7 +729,9 @@ function SecaoAgenda() {
 }
 
 export function VisaoAvisos() {
-  const alertas = useAgentes((s) => s.alertas);
+  const usuario = useAuth((s) => s.usuario);
+  const todosAlertas = useAgentes((s) => s.alertas);
+  const alertas = todosAlertas.filter((a) => !a.servico || conexaoVisivelPara(usuario, a.servico));
   const resolver = useAgentes((s) => s.resolverAlerta);
   const nomes = useConfig((c) => c.agentes.nomes);
   const irPara = useInterface((i) => i.irPara);

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { ChevronUp, Package, SlidersHorizontal } from "lucide-react";
 import { useConfig } from "../../../estado/configuracoes";
@@ -6,7 +6,6 @@ import { useMateriais } from "../../../estado/materiais";
 import { useControleRapido, usarAudio, usarRede } from "../../../estado/controleRapido";
 import { T } from "../../../textos/textos";
 import { tocarSom } from "../../../ponte/sons";
-import { usarCursorFora } from "../../../desktop/desktop";
 import { type EstadoSistema } from "../../../ponte/ponteLocal";
 import { PainelRapido } from "./PainelRapido";
 import { Bandeja } from "./Bandeja";
@@ -19,7 +18,6 @@ import "./barra.css";
 
 export const ALTURA_DA_FAIXA = 5;
 const ALTURA_DA_ABA = 42;
-const RAIO_DAS_ORELHAS = 10;
 const PASSO_DA_RODA = 2;
 const MARGEM_DOS_POPS = 6;
 
@@ -27,7 +25,8 @@ type Pop = { tipo: "painel" } | { tipo: "materiais" } | { tipo: "bandeja"; direi
 
 interface PropsBarra {
   visivel: boolean;
-  revelarAoPassar: boolean;
+  ladoAberto: "esquerda" | "direita" | null;
+  aoFechar: () => void;
   escala: number;
   larguraDaIlha: number;
   aparencia: AparenciaDeBorda;
@@ -119,29 +118,18 @@ function LadoDireito({ pop, alternarPainel, alternarBandeja }: { pop: Pop; alter
   );
 }
 
-export function BarraDoTopo({ visivel, revelarAoPassar, escala, larguraDaIlha, aparencia, aoUsar }: PropsBarra) {
+export function BarraDoTopo({ visivel, ladoAberto, aoFechar, escala, larguraDaIlha, aparencia, aoUsar }: PropsBarra) {
   const [pop, setPop] = useState<Pop>(null);
-  const [sobre, setSobre] = useState(false);
-  const relogioSaida = useRef<number | undefined>(undefined);
+  const ladoEsquerdo = useRef<HTMLDivElement>(null);
+  const ladoDireito = useRef<HTMLDivElement>(null);
   const playerAberto = useIlha((s) => s.estado === "expandida" && s.aba === "midia");
-  usarAudio(visivel || playerAberto, pop?.tipo === "painel" ? 1000 : 3000);
-  usarRede(visivel, pop?.tipo === "painel" ? 8000 : 30000);
-  usarCursorFora(useCallback(() => {
-    window.clearTimeout(relogioSaida.current);
-    setSobre(false);
-  }, []));
+  const aberta = visivel && ladoAberto !== null;
+  usarAudio(aberta || playerAberto, pop?.tipo === "painel" ? 1000 : 3000);
+  usarRede(aberta, pop?.tipo === "painel" ? 8000 : 30000);
 
   useEffect(() => () => {
-    window.clearTimeout(relogioSaida.current);
     aoUsar(false);
   }, [aoUsar]);
-
-  useEffect(() => {
-    if (!revelarAoPassar && !visivel) {
-      window.clearTimeout(relogioSaida.current);
-      setSobre(false);
-    }
-  }, [revelarAoPassar, visivel]);
 
   useEffect(() => {
     const { audio, rede, sincronizarAudio, sincronizarRede } = useControleRapido.getState();
@@ -150,18 +138,23 @@ export function BarraDoTopo({ visivel, revelarAoPassar, escala, larguraDaIlha, a
   }, []);
 
   useEffect(() => {
-    if (!visivel) setPop(null);
-  }, [visivel]);
+    setPop(null);
+    if (!visivel) aoFechar();
+  }, [visivel, ladoAberto, aoFechar]);
 
-  useEffect(() => aoUsar(sobre || pop !== null), [sobre, pop, aoUsar]);
+  useEffect(() => aoUsar(aberta), [aberta, aoUsar]);
 
   useEffect(() => {
-    if (!pop) return;
-    const fechar = () => setPop(null);
-    const aoTeclar = (e: KeyboardEvent) => e.key === "Escape" && fechar();
+    if (!aberta) return;
+    const aoTeclar = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (pop) setPop(null);
+      else aoFechar();
+      document.querySelector<HTMLButtonElement>(`.ilha-seta-lateral[data-lado="${ladoAberto}"]`)?.focus();
+    };
     const aoClicarFora = (e: PointerEvent) => {
       const alvo = e.target as Element | null;
-      if (!alvo?.closest(".ilha-pop, .ilha-barra")) fechar();
+      if (!alvo?.closest(".ilha-pop, .ilha-barra, .ilha-seta-lateral")) aoFechar();
     };
     window.addEventListener("keydown", aoTeclar);
     window.addEventListener("pointerdown", aoClicarFora, true);
@@ -169,7 +162,7 @@ export function BarraDoTopo({ visivel, revelarAoPassar, escala, larguraDaIlha, a
       window.removeEventListener("keydown", aoTeclar);
       window.removeEventListener("pointerdown", aoClicarFora, true);
     };
-  }, [pop]);
+  }, [aberta, ladoAberto, pop, aoFechar]);
 
   const alternarPainel = () => {
     void tocarSom(pop?.tipo === "painel" ? "close" : "open");
@@ -184,64 +177,47 @@ export function BarraDoTopo({ visivel, revelarAoPassar, escala, larguraDaIlha, a
   const alternarBandeja = (botao: HTMLElement) => {
     void tocarSom(pop?.tipo === "bandeja" ? "close" : "open");
     const r = botao.getBoundingClientRect();
-    const direita = Math.max(MARGEM_DOS_POPS, window.innerWidth - r.right - 40);
+    const direita = Math.min(window.innerWidth - 240 - MARGEM_DOS_POPS, Math.max(MARGEM_DOS_POPS, window.innerWidth - r.right));
     setPop((atual) => (atual?.tipo === "bandeja" ? null : { tipo: "bandeja", direita }));
   };
 
-  const altura = ALTURA_DA_ABA * escala;
+  const altura = ALTURA_DA_ABA;
   const topoDosPops = altura + MARGEM_DOS_POPS;
-  const meiaIlha = Math.max(0, larguraDaIlha / 2 - 1);
-  const recorteDaIlha = larguraDaIlha > 0
-    ? `linear-gradient(to right, #000 calc(50% - ${meiaIlha}px), transparent calc(50% - ${meiaIlha}px), transparent calc(50% + ${meiaIlha}px), #000 calc(50% + ${meiaIlha}px))`
-    : "none";
+  const posicaoDaIlha = { ["--meia-ilha" as string]: `${Math.max(0, larguraDaIlha / 2)}px` } as CSSProperties;
+  const esquerdaDoPop = Math.max(MARGEM_DOS_POPS, Math.min(ladoEsquerdo.current?.getBoundingClientRect().left ?? MARGEM_DOS_POPS, window.innerWidth - 398 - MARGEM_DOS_POPS));
+  const direitaDoPop = Math.max(MARGEM_DOS_POPS, window.innerWidth - (ladoDireito.current?.getBoundingClientRect().right ?? window.innerWidth - MARGEM_DOS_POPS));
   const variaveis = variaveisDaBorda(aparencia);
-  const aoEntrar = () => {
-    window.clearTimeout(relogioSaida.current);
-    setSobre(true);
-  };
-  const aoSair = () => {
-    window.clearTimeout(relogioSaida.current);
-    relogioSaida.current = window.setTimeout(() => setSobre(false), 250);
-  };
-
   return (
     <>
-      {revelarAoPassar && (
-        <div className="ilha-barra ilha-barra-gatilhos" data-visivel={visivel ? "sim" : "nao"} aria-hidden="true">
-          <div className="ilha-barra-gatilho ilha-barra-gatilho-esquerdo" onPointerEnter={aoEntrar} onPointerLeave={aoSair} />
-          <div className="ilha-barra-gatilho ilha-barra-gatilho-direito" onPointerEnter={aoEntrar} onPointerLeave={aoSair} />
-        </div>
-      )}
       <AnimatePresence>
-        {visivel && (
+        {aberta && (
           <motion.div
-            key="barra"
+            key={ladoAberto}
             className="ilha-barra"
             {...atributosDoFundo(aparencia)}
-            style={{ ...variaveis, height: altura, ["--escala-barra" as string]: escala, ["--faixa" as string]: `${ALTURA_DA_FAIXA * escala}px`, ["--raio-aba" as string]: `${RAIO_DAS_ORELHAS * escala}px` }}
+            style={{ ...variaveis, ...posicaoDaIlha, height: altura, ["--escala-barra" as string]: Math.min(escala, 1) }}
             initial={{ y: "-100%" }}
             animate={{ y: 0 }}
             exit={{ y: "-100%" }}
             transition={{ type: "spring", visualDuration: 0.35, bounce: 0.12 }}
           >
-            <span className="ilha-barra-faixa" style={{ maskImage: recorteDaIlha, WebkitMaskImage: recorteDaIlha }} aria-hidden="true" />
-            <div className="ilha-barra-aba ilha-barra-aba-esquerda" onPointerEnter={aoEntrar} onPointerLeave={aoSair}>
+            {ladoAberto === "esquerda" && <div id="ilha-lateral-esquerda" ref={ladoEsquerdo} className="ilha-barra-aba ilha-barra-aba-esquerda" role="region" aria-label="Materiais">
               <LadoEsquerdo
                 pop={pop}
                 alternarMateriais={alternarMateriais}
               />
-            </div>
-            <div className="ilha-barra-aba ilha-barra-aba-direita" onPointerEnter={aoEntrar} onPointerLeave={aoSair}>
+            </div>}
+            {ladoAberto === "direita" && <div id="ilha-lateral-direita" ref={ladoDireito} className="ilha-barra-aba ilha-barra-aba-direita" role="region" aria-label="Controles rápidos">
               <LadoDireito pop={pop} alternarPainel={alternarPainel} alternarBandeja={alternarBandeja} />
-            </div>
+            </div>}
           </motion.div>
         )}
       </AnimatePresence>
       <div className="ilha-pops" {...atributosDoFundo(aparencia)} style={variaveis}>
         <AnimatePresence>
-          {visivel && pop?.tipo === "materiais" && <MateriaisNaBarra key="materiais" topo={topoDosPops} aoFechar={() => setPop(null)} />}
-          {visivel && pop?.tipo === "painel" && <PainelRapido key="painel" topo={topoDosPops} aoFechar={() => setPop(null)} />}
-          {visivel && pop?.tipo === "bandeja" && <Bandeja key="bandeja" topo={topoDosPops} direita={pop.direita} aoFechar={() => setPop(null)} />}
+          {aberta && ladoAberto === "esquerda" && pop?.tipo === "materiais" && <MateriaisNaBarra key="materiais" topo={topoDosPops} esquerda={esquerdaDoPop} aoFechar={() => setPop(null)} />}
+          {aberta && ladoAberto === "direita" && pop?.tipo === "painel" && <PainelRapido key="painel" topo={topoDosPops} direita={direitaDoPop} aoFechar={() => setPop(null)} />}
+          {aberta && ladoAberto === "direita" && pop?.tipo === "bandeja" && <Bandeja key="bandeja" topo={topoDosPops} direita={pop.direita} aoFechar={() => setPop(null)} />}
         </AnimatePresence>
       </div>
     </>

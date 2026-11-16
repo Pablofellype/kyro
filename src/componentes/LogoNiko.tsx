@@ -13,7 +13,7 @@ export function LogoNiko({ tamanho = 28, brilho }: { tamanho?: number; brilho?: 
         objectFit: "contain",
         display: "block",
         flex: "0 0 auto",
-        filter: comBrilho ? "drop-shadow(0 0 10px rgba(255, 42, 58, 0.5))" : undefined,
+        filter: comBrilho ? "drop-shadow(0 2px 5px rgba(0, 0, 0, 0.12))" : undefined,
       }}
     />
   );

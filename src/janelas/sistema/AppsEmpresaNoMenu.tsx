@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
-import { AppWindow, CalendarDays, ChartNoAxesCombined, ChevronDown, ClipboardCheck, ClipboardList, FileSpreadsheet, LockKeyhole, PackageOpen, Wrench, type LucideIcon } from "lucide-react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { AppWindow, CalendarDays, ChartNoAxesCombined, ChevronDown, ClipboardCheck, ClipboardList, FileSpreadsheet, LayoutGrid, LockKeyhole, PackageOpen, X, type LucideIcon } from "lucide-react";
 import { useAuth } from "../../estado/autenticacao";
-import { useConfig } from "../../estado/configuracoes";
 import { useInterface } from "../../estado/interface";
 import { itensDoMenuAppsEmpresa } from "../../modulos/escritorio/aplicativosEmpresaConfig";
 import "./appsEmpresaNoMenu.css";
@@ -17,43 +17,112 @@ const ICONES: Record<string, LucideIcon> = {
   solicitacoes: ClipboardList,
 };
 
-export function AppsEmpresaNoMenu({ recolhida, nome = "Apps Empresa" }: { recolhida: boolean; nome?: string }) {
+export function AppsEmpresaNoMenu({ recolhida, nome = "Aplicativos" }: { recolhida: boolean; nome?: string }) {
   const rota = useInterface((s) => s.rota);
   const appId = useInterface((s) => s.parametros.app ?? "");
   const irPara = useInterface((s) => s.irPara);
   const usuario = useAuth((s) => s.usuario);
-  const [aberto, setAberto] = useState(rota === "appsEmpresa");
+  const [aberto, setAberto] = useState(true);
+  const [painelAberto, setPainelAberto] = useState(false);
+  const botao = useRef<HTMLButtonElement>(null);
+  const painel = useRef<HTMLDivElement>(null);
   const itens = itensDoMenuAppsEmpresa(usuario);
   const nestaArea = rota === "appsEmpresa";
   const selecionado = itens.some((app) => app.id === appId && app.disponivel);
+  const quantidade = itens.filter((app) => app.disponivel).length;
+  const appAtual = itens.find((app) => app.id === appId && app.disponivel);
 
   useEffect(() => {
     if (rota === "appsEmpresa") setAberto(true);
   }, [rota, appId]);
 
-  return <div className="barra-apps">
-    <button type="button" className="barra-item barra-apps-toggle" data-rota="appsEmpresa" aria-label={nome} title={nome} aria-expanded={aberto} aria-controls="barra-apps-lista" aria-current={nestaArea && (!aberto || !selecionado) ? "page" : undefined} onClick={() => {
-      setAberto(recolhida ? true : !aberto);
-      if (recolhida) {
-        const ui = useInterface.getState();
-        if (ui.barraAppsRecolhida !== null) ui.definirBarraAppsRecolhida(false);
-        else if (useConfig.getState().barraRecolhida) useConfig.getState().definir({ barraRecolhida: false });
+  useEffect(() => setPainelAberto(false), [recolhida, rota, appId]);
+
+  useLayoutEffect(() => {
+    if (!painelAberto) return;
+    const posicionar = () => {
+      const origem = botao.current?.getBoundingClientRect();
+      const menu = painel.current;
+      if (!origem || !menu) return;
+      menu.style.maxHeight = `${Math.max(120, window.innerHeight - 24)}px`;
+      menu.style.left = `${Math.max(12, Math.min(origem.right + 12, window.innerWidth - menu.offsetWidth - 12))}px`;
+      menu.style.top = `${Math.max(12, Math.min(origem.top, window.innerHeight - menu.offsetHeight - 12))}px`;
+      menu.style.visibility = "visible";
+    };
+    posicionar();
+    window.addEventListener("resize", posicionar);
+    window.addEventListener("scroll", posicionar, true);
+    return () => {
+      window.removeEventListener("resize", posicionar);
+      window.removeEventListener("scroll", posicionar, true);
+    };
+  }, [painelAberto, quantidade]);
+
+  useEffect(() => {
+    if (!painelAberto) return;
+    painel.current?.querySelector<HTMLButtonElement>('button[data-app]:not(:disabled)')?.focus();
+    const fecharDeFora = (evento: PointerEvent) => {
+      if (evento.target instanceof Node && !painel.current?.contains(evento.target) && !botao.current?.contains(evento.target)) setPainelAberto(false);
+    };
+    const aoMudarFoco = (evento: FocusEvent) => {
+      if (evento.target instanceof Node && !painel.current?.contains(evento.target) && !botao.current?.contains(evento.target)) setPainelAberto(false);
+    };
+    const aoTeclar = (evento: KeyboardEvent) => {
+      if (evento.key === "Escape") {
+        evento.preventDefault();
+        setPainelAberto(false);
+        botao.current?.focus();
       }
+      if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(evento.key)) return;
+      if (!painel.current?.contains(document.activeElement)) return;
+      const opcoes = [...(painel.current?.querySelectorAll<HTMLButtonElement>('button[data-app]:not(:disabled)') ?? [])];
+      if (!opcoes.length) return;
+      evento.preventDefault();
+      const atual = opcoes.indexOf(document.activeElement as HTMLButtonElement);
+      const proxima = evento.key === "Home" ? 0 : evento.key === "End" ? opcoes.length - 1 : (atual + (evento.key === "ArrowDown" ? 1 : -1) + opcoes.length) % opcoes.length;
+      opcoes[proxima].focus();
+    };
+    document.addEventListener("pointerdown", fecharDeFora);
+    document.addEventListener("focusin", aoMudarFoco);
+    document.addEventListener("keydown", aoTeclar);
+    return () => {
+      document.removeEventListener("pointerdown", fecharDeFora);
+      document.removeEventListener("focusin", aoMudarFoco);
+      document.removeEventListener("keydown", aoTeclar);
+    };
+  }, [painelAberto]);
+
+  const lista = (flutuante: boolean) => itens.map((app) => {
+    const Icone = ICONES[app.id] ?? AppWindow;
+    const ativo = nestaArea && appId === app.id && app.disponivel;
+    const rotulo = app.disponivel ? app.nome : `${app.nome}: em manutenção`;
+    return <button key={app.id} type="button" className={flutuante ? "barra-apps-opcao" : "barra-item barra-apps-item"} data-rota="appsEmpresa" data-app={app.id} aria-current={ativo ? "page" : undefined} aria-label={rotulo} title={rotulo} disabled={!app.disponivel} onClick={() => {
+      setPainelAberto(false);
+      if (flutuante) botao.current?.focus();
+      irPara("appsEmpresa", { app: app.id });
     }}>
-      <AppWindow size={16} />
-      {!recolhida && <><span className="cortar">{nome}</span><ChevronDown size={13} className="barra-apps-seta" /></>}
+      <span className="barra-apps-icone"><Icone size={16} /></span>
+      <span className="cortar">{app.nome}</span>
+      {!app.disponivel && <span className="barra-apps-estado">Manutenção</span>}
+    </button>;
+  });
+
+  return <div className="barra-apps">
+    <button ref={botao} type="button" className="barra-item barra-apps-toggle" data-rota="appsEmpresa" aria-label={nome} title={recolhida && appAtual ? `${nome} · ${appAtual.nome}` : nome} aria-haspopup={recolhida ? "dialog" : undefined} aria-expanded={recolhida ? painelAberto : aberto} aria-controls={recolhida ? "barra-apps-painel" : "barra-apps-lista"} aria-current={nestaArea && (recolhida || !aberto || !selecionado) ? "page" : undefined} onClick={() => {
+      if (recolhida) setPainelAberto((atual) => !atual);
+      else setAberto((atual) => !atual);
+    }}>
+      <LayoutGrid size={17} />
+      <span className="barra-item-texto cortar">{recolhida ? "Apps" : nome}</span>
+      {!recolhida && <><span className="barra-apps-quantidade">{quantidade}</span><ChevronDown size={12} className="barra-apps-seta" /></>}
     </button>
-    <div id="barra-apps-lista" className="barra-apps-lista" role="group" aria-label="Aplicativos da empresa" hidden={!aberto}>
-      {itens.map((app) => {
-        const Icone = ICONES[app.id] ?? AppWindow;
-        const ativo = nestaArea && appId === app.id && app.disponivel;
-        const rotulo = app.disponivel ? app.nome : `${app.nome}: em manutenção`;
-        return <button key={app.id} type="button" className="barra-item barra-subitem barra-apps-item" data-rota="appsEmpresa" data-app={app.id} aria-current={ativo ? "page" : undefined} aria-label={rotulo} title={rotulo} disabled={!app.disponivel} onClick={() => irPara("appsEmpresa", { app: app.id })}>
-          <Icone size={15} />
-          {!recolhida && <span className="cortar">{app.nome}</span>}
-          {!app.disponivel && !recolhida && <Wrench size={12} className="barra-apps-manutencao" />}
-        </button>;
-      })}
-    </div>
+    {!recolhida && <div id="barra-apps-lista" className="barra-apps-lista" role="group" aria-label="Aplicativos da empresa" hidden={!aberto}>{lista(false)}</div>}
+    {recolhida && painelAberto && createPortal(<div ref={painel} id="barra-apps-painel" className="barra-apps-painel" role="dialog" aria-label="Aplicativos da empresa" style={{ visibility: "hidden" }}>
+      <div className="barra-apps-painel-cabecalho">
+        <div><strong>Aplicativos</strong><span>Empresa · {quantidade} disponíveis</span></div>
+        <button type="button" className="barra-apps-fechar" aria-label="Fechar aplicativos" onClick={() => { setPainelAberto(false); botao.current?.focus(); }}><X size={16} /></button>
+      </div>
+      <div className="barra-apps-painel-lista">{lista(true)}</div>
+    </div>, document.body)}
   </div>;
 }

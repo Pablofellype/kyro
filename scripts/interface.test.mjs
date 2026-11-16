@@ -17,6 +17,138 @@ after(() => vite.close());
 const { LimiteDeErro } = await vite.ssrLoadModule("/src/componentes/LimiteDeErro.tsx");
 const { circuloDoTema, animarTrocaDeTema } = await vite.ssrLoadModule("/src/utilitarios/transicaoTema.ts");
 
+test("gerência acessa configurações pessoais sem receber acesso administrativo ou à área pessoal", async () => {
+  const { podeAcessarRota, podeAcessarConfiguracao } = await vite.ssrLoadModule("/src/servicos/permissoes.ts");
+  const gerencia = { perfil: "gerencia" };
+  for (const rota of ["configuracoes", "atualizacao", "escritorio", "calendario", "conexoes", "whatsapp"]) {
+    assert.equal(podeAcessarRota(gerencia, rota, "empresa"), true, rota);
+    assert.equal(podeAcessarRota(gerencia, rota, "pessoal"), false, rota);
+  }
+  for (const rota of ["financas", "ia", "consumo", "agentes"]) assert.equal(podeAcessarRota(gerencia, rota, "empresa"), false, rota);
+  for (const secao of ["geral", "aparencia", "ilha", "dock", "assistive", "sons", "atalhos", "privacidade", "sobre"]) {
+    assert.equal(podeAcessarConfiguracao(gerencia, secao), true, secao);
+    assert.equal(podeAcessarConfiguracao({ perfil: "visitante" }, secao), false, secao);
+  }
+  for (const secao of ["admin", "dados", "desenvolvedor", "agentes"]) {
+    assert.equal(podeAcessarConfiguracao(gerencia, secao), false, secao);
+    assert.equal(podeAcessarConfiguracao({ perfil: "dono" }, secao), true, secao);
+  }
+});
+
+test("dono encontra conexões nas duas áreas e gerência mantém o acesso apenas na empresa", async (t) => {
+  const janelaAnterior = Object.getOwnPropertyDescriptor(globalThis, "window");
+  t.after(() => {
+    if (janelaAnterior) Object.defineProperty(globalThis, "window", janelaAnterior);
+    else delete globalThis.window;
+  });
+  const { BarraLateral } = await vite.ssrLoadModule("/src/janelas/sistema/BarraLateral.tsx");
+  const { useAuth } = await vite.ssrLoadModule("/src/estado/autenticacao.ts");
+  const { useInterface } = await vite.ssrLoadModule("/src/estado/interface.ts");
+  const { rotaDisponivelNaArea } = await vite.ssrLoadModule("/src/janelas/sistema/areas.ts");
+  const { podeAcessarRota } = await vite.ssrLoadModule("/src/servicos/permissoes.ts");
+  globalThis.window = { matchMedia: () => ({ matches: false }) };
+  const auth = useAuth.getInitialState(), ui = useInterface.getInitialState();
+  const usuarioAnterior = auth.usuario, areaAnterior = ui.area, rotaAnterior = ui.rota;
+  t.after(() => { auth.usuario = usuarioAnterior; ui.area = areaAnterior; ui.rota = rotaAnterior; });
+
+  for (const perfil of ["dono", "gerencia"]) {
+    auth.usuario = { id: 7, nome: "Pessoa de teste", perfil };
+    for (const area of ["pessoal", "empresa"]) {
+      ui.area = area;
+      for (const rota of ["conexoes", "whatsapp"]) {
+        const permitido = perfil === "dono" || area === "empresa";
+        assert.equal(rotaDisponivelNaArea(rota, area) && podeAcessarRota(auth.usuario, rota, area), permitido, `${perfil}/${area}/${rota}`);
+        if (!permitido) continue;
+        ui.rota = rota;
+        for (const recolhida of [false, true]) {
+          const menu = renderToStaticMarkup(createElement(BarraLateral, { recolhida }));
+          assert.equal((menu.match(/data-rota="conexoes"/g) ?? []).length, 1);
+          assert.equal((menu.match(/data-rota="whatsapp"/g) ?? []).length, 1);
+          assert.match(menu, new RegExp(`data-rota="${rota}"[^>]*aria-current="page"`));
+          assert.equal((menu.match(/aria-current="page"/g) ?? []).length, 1);
+          if (perfil === "gerencia") assert.doesNotMatch(menu, /role="tab"[^>]*title="Pessoal"|title="Pessoal"[^>]*role="tab"/);
+        }
+      }
+    }
+  }
+  for (const rota of ["conexoes", "whatsapp"]) {
+    for (const area of ["pessoal", "empresa"]) assert.equal(podeAcessarRota({ perfil: "visitante" }, rota, area), false);
+  }
+});
+
+test("menu e página de configurações da gerência mostram personalização e protegem links diretos", async (t) => {
+  const nomes = ["window", "document", "getComputedStyle", "localStorage"];
+  const anteriores = nomes.map((nome) => Object.getOwnPropertyDescriptor(globalThis, nome));
+  globalThis.window = Object.assign(new EventTarget(), { location: { search: "" }, innerWidth: 1366, innerHeight: 768, matchMedia: () => ({ matches: false, addEventListener() {}, removeEventListener() {} }) });
+  globalThis.document = Object.assign(new EventTarget(), { documentElement: { dataset: { tema: "claro" } }, getElementById: () => null });
+  globalThis.getComputedStyle = () => ({ getPropertyValue: () => "#ffffff" });
+  const memoria = new Map();
+  globalThis.localStorage = { getItem: (k) => memoria.get(k) ?? null, setItem: (k, v) => memoria.set(k, v), removeItem: (k) => memoria.delete(k) };
+  const servidor = await criarServidorDeTeste({ ...opcoes, plugins: [{
+    name: "portais-no-render-estatico", enforce: "pre",
+    transform(codigo, id) {
+      if (id.replaceAll("\\", "/").endsWith("/src/componentes/basicos.tsx")) {
+        return codigo.replace('import { createPortal } from "react-dom";', "const createPortal = (conteudo: ReactNode) => conteudo;");
+      }
+    },
+  }] });
+  t.after(() => servidor.close());
+  t.after(() => nomes.forEach((nome, i) => {
+    if (anteriores[i]) Object.defineProperty(globalThis, nome, anteriores[i]);
+    else delete globalThis[nome];
+  }));
+  const { useAuth } = await servidor.ssrLoadModule("/src/estado/autenticacao.ts");
+  const { useInterface } = await servidor.ssrLoadModule("/src/estado/interface.ts");
+  const { BarraLateral } = await servidor.ssrLoadModule("/src/janelas/sistema/BarraLateral.tsx");
+  const { default: Configuracoes } = await servidor.ssrLoadModule("/src/modulos/configuracoes/Configuracoes.tsx");
+  const auth = useAuth.getInitialState(), ui = useInterface.getInitialState();
+  const usuarioAnterior = auth.usuario, areaAnterior = ui.area, parametrosAnteriores = ui.parametros, rotaAnterior = ui.rota;
+  try {
+    auth.usuario = { id: 7, nome: "Gerente", email: "gerente@example.com", perfil: "gerencia" };
+    ui.area = "empresa";
+    ui.rota = "appsEmpresa";
+    ui.parametros = { app: "materiais" };
+    for (const recolhida of [false, true]) {
+      const menu = renderToStaticMarkup(createElement(BarraLateral, { recolhida }));
+      assert.match(menu, /data-tour="ajustes"/);
+      assert.match(menu, /title="Editar perfil"/);
+      assert.doesNotMatch(menu, /class="barra-perfil"[^>]*disabled/);
+      assert.match(menu, /barra-item-texto cortar">WhatsApp<\/span>/);
+      assert.match(menu, /barra-item-texto cortar">Escritório<\/span>/);
+      if (recolhida) {
+        assert.match(menu, /aria-label="Aplicativos"[^>]*aria-haspopup="dialog"/);
+        assert.match(menu, /barra-item-texto cortar">Apps<\/span>/);
+        assert.doesNotMatch(menu, /data-app=/);
+        assert.equal((menu.match(/aria-current="page"/g) ?? []).length, 1);
+      } else {
+        assert.match(menu, /data-app="materiais" aria-current="page"/);
+        assert.match(menu, /barra-apps-estado">Manutenção/);
+        assert.match(menu, /Solicitações recebidas/);
+        assert.doesNotMatch(menu, /barra-subitem/);
+      }
+    }
+    for (const secao of ["geral", "aparencia", "ilha", "dock", "admin", "dados", "desenvolvedor"]) {
+      ui.parametros = { secao };
+      const html = renderToStaticMarkup(createElement(Configuracoes));
+      assert.doesNotMatch(html, /Administração|Desenvolvedor|Contas autorizadas|Apagar todos os dados/);
+      assert.match(html, />Aparência<|>Aparência<\/h2>/);
+      if (["admin", "dados", "desenvolvedor"].includes(secao)) assert.match(html, /id="ajustes-cartao-titulo"[^>]*>Geral<\/h2>/);
+      if (secao === "ilha") assert.match(html, /aria-label="Tamanho"/);
+      if (secao === "dock") assert.match(html, /Opacidade/);
+    }
+    auth.usuario = { ...auth.usuario, perfil: "dono" };
+    ui.parametros = { secao: "admin" };
+    const dono = renderToStaticMarkup(createElement(Configuracoes));
+    assert.match(dono, /Administração/);
+    assert.match(dono, /Desenvolvedor/);
+  } finally {
+    auth.usuario = usuarioAnterior;
+    ui.area = areaAnterior;
+    ui.parametros = parametrosAnteriores;
+    ui.rota = rotaAnterior;
+  }
+});
+
 test("novidades da 0.2.2 incluem o time, segurança e agradecimentos, sem antecipar a instalação", async () => {
   const { novidadesAte, temNovidadesDe } = await vite.ssrLoadModule('/src/utilitarios/novidades.ts');
   assert.equal(temNovidadesDe('0.2.2'), true);
@@ -270,9 +402,16 @@ function luminancia(cor) {
   return r * 0.2126 + g * 0.7152 + b * 0.0722;
 }
 
+function verificarTomAcolhedor(cor) {
+  const canais = cor.slice(1).match(/../g).map((canal) => parseInt(canal, 16));
+  assert.equal(canais.length, 3, cor);
+  assert.ok(canais[0] >= canais[1] && canais[1] >= canais[2], `A base ${cor} deve ter um tom quente sem puxar para rosa`);
+}
+
 test("tema claro mantém textos secundários legíveis sobre fundos suaves em todas as paletas", () => {
   const arquivo = "../src/estilos/estilo-sistema.css";
   const claro = coresDoBloco(arquivo, '[data-tema="claro"] .estilo-sistema');
+  for (const token of ["--p-f", "--p-s", "--texto", "--texto-corpo", "--texto-2", "--texto-3", "--texto-4"]) verificarTomAcolhedor(claro[token]);
   const fundos = [claro["--p-f"], claro["--p-s"]];
   for (const paleta of ["areia", "grafite", "floresta", "oceano"]) {
     const cores = coresDoBloco(arquivo, `[data-tema="claro"][data-paleta="${paleta}"] .estilo-sistema`);
@@ -284,20 +423,113 @@ test("tema claro mantém textos secundários legíveis sobre fundos suaves em to
       assert.ok(contraste >= 4.5, `${token} sobre ${fundo}: ${contraste}`);
     }
   }
-  assert.notEqual(claro["--p-s"], "#ffffff");
+  assert.equal(claro["--p-s"], "#ffffff");
   assert.equal(claro["--borda"], "color-mix(in srgb, var(--p-f), #000 18%)");
   assert.equal(claro["--borda-controle"], "color-mix(in srgb, var(--p-f), #000 22%)");
 });
 
-test("ajustes do calendário claro preservam as cores base do tema escuro", () => {
+test("tema escuro mantém tons quentes com leitura legível e calendário claro isolado", () => {
   const escuro = coresDoBloco("../src/estilos/estilo-sistema.css", '[data-tema="escuro"] .estilo-sistema');
-  assert.equal(escuro["--p-f"], "#0e0e10");
-  assert.equal(escuro["--p-s"], "#161618");
-  assert.equal(escuro["--texto"], "#f2efe9");
-  assert.equal(escuro["--texto-3"], "#6f6d69");
+  for (const token of ["--p-f", "--p-s", "--texto", "--texto-corpo", "--texto-2", "--texto-3", "--texto-4"]) verificarTomAcolhedor(escuro[token]);
+  for (const token of ["--texto", "--texto-corpo", "--texto-2", "--texto-3", "--texto-4"]) {
+    for (const fundo of [escuro["--p-f"], escuro["--p-s"]]) {
+      assert.ok((luminancia(escuro[token]) + .05) / (luminancia(fundo) + .05) >= 4.5, `${token} sobre ${fundo}`);
+    }
+  }
   const css = readFileSync(new URL("../src/estilos/telas/calendario.css", import.meta.url), "utf8");
   assert.match(css, /\[data-tema="claro"\] \.estilo-sistema \.cl-mes\s*\{\s*background: var\(--borda\)/);
   assert.match(css, /\[data-tema="claro"\] \.estilo-sistema \.cl-dia\[data-fora="sim"\] \.cl-dia-numero\s*\{\s*color: var\(--texto-4\)/);
+});
+
+test("verde principal mantém leitura nos botões e se distingue do vermelho de erro", () => {
+  const cores = coresDoBloco("../src/estilos/tokens.css", ":root");
+  for (const verde of [cores["--marca-primaria"], cores["--marca-primaria-hover"], cores["--marca-primaria-profunda"]]) {
+    assert.ok(1.05 / (luminancia(verde) + .05) >= 4.5, verde);
+    const [r, g] = verde.slice(1).match(/../g).map((canal) => parseInt(canal, 16));
+    assert.ok(g > r, verde);
+  }
+  assert.notEqual(cores["--marca-primaria"], cores["--erro"]);
+});
+
+test("painel da gerência recebe a pessoa pelo nome e oferece apenas atalhos permitidos", async () => {
+  const { PainelCoordenacao } = await vite.ssrLoadModule("/src/modulos/escritorio/PainelCoordenacao.tsx");
+  const { useAuth } = await vite.ssrLoadModule("/src/estado/autenticacao.ts");
+  const { useConfig } = await vite.ssrLoadModule("/src/estado/configuracoes.ts");
+  const { useInterface } = await vite.ssrLoadModule("/src/estado/interface.ts");
+  const { saudacao } = await vite.ssrLoadModule("/src/utilitarios/datas.ts");
+  const auth = useAuth.getInitialState(), config = useConfig.getInitialState(), ui = useInterface.getInitialState();
+  const usuarioAnterior = auth.usuario, nomeAnterior = config.nome, areaAnterior = ui.area;
+  try {
+    auth.usuario = { id: 7, perfil: "gerencia", nome: "Mariana Silva" };
+    ui.area = "empresa";
+    config.nome = "";
+    const html = renderToStaticMarkup(createElement(PainelCoordenacao));
+    assert.ok(html.includes(`${saudacao()}, Mariana!`));
+    for (const texto of ["Painel da gerência", "Personalizar meu espaço", "Precisa da sua atenção", "Na sua agenda", "Seus sistemas", "Registros de limpeza", "Sistema de requisições"]) assert.ok(html.includes(texto), texto);
+    assert.doesNotMatch(html, /Abrir conversa|Administração|Provedores de IA|Gerenciar acessos|Equipe cadastrada|Robô de Aderências|Últimas atividades do Kyro|Membros cadastrados|Avisos e mensagens/);
+    config.nome = "Mari";
+    assert.ok(renderToStaticMarkup(createElement(PainelCoordenacao)).includes(`${saudacao()}, Mari!`));
+    ui.area = "pessoal";
+    assert.equal(renderToStaticMarkup(createElement(PainelCoordenacao)), "");
+    ui.area = "empresa";
+    auth.usuario = { id: 8, perfil: "visitante", nome: "Visitante" };
+    assert.equal(renderToStaticMarkup(createElement(PainelCoordenacao)), "");
+  } finally {
+    auth.usuario = usuarioAnterior;
+    config.nome = nomeAnterior;
+    ui.area = areaAnterior;
+  }
+});
+
+test("escritório diferencia os acessos do dono e mantém falhas de consulta distintas de listas vazias", async () => {
+  const { VisaoDoEscritorio } = await vite.ssrLoadModule("/src/modulos/escritorio/PainelCoordenacao.tsx");
+  const { resumirPainelEmpresa, DADOS_REMOTOS_VAZIOS } = await vite.ssrLoadModule("/src/modulos/escritorio/dadosDoPainelEmpresa.ts");
+  const agora = new Date(2026, 10, 15, 10, 0);
+  const props = { nome: "Ana", usuario: { perfil: "dono", nome: "Ana", roboAderencias: false }, agora, resumo: resumirPainelEmpresa([], [], null, agora), remoto: { ...DADOS_REMOTOS_VAZIOS, carregando: false, atualizadoEm: null, erroPedidos: true }, mensagens: null, whatsappComErro: false, aoNavegar() {}, aoAtualizar() {}, aoConcluir() {} };
+  const falhou = renderToStaticMarkup(createElement(VisaoDoEscritorio, props));
+  for (const texto of ["Escritório da empresa", "Equipe cadastrada", "Gerenciar acessos", "Robô de Aderências", "Consulta indisponível", "Tentar novamente"]) assert.ok(falhou.includes(texto), texto);
+  assert.doesNotMatch(falhou, /Nenhum pedido pendente|online|Nenhuma conta ativa nesta consulta/);
+  const carregado = renderToStaticMarkup(createElement(VisaoDoEscritorio, { ...props, resumo: resumirPainelEmpresa([], [], [], agora), remoto: { ...props.remoto, pedidos: [], membros: [], erroPedidos: false } }));
+  assert.ok(carregado.includes("Nenhuma atividade pendente neste resumo"));
+  assert.ok(carregado.includes("Nenhuma conta ativa nesta consulta"));
+  assert.ok(!carregado.includes("Tentar novamente"));
+});
+
+test("portal visitante oferece volta direta ao login e acessos com os destinos do catálogo", async () => {
+  const { default: VisitantePublico } = await vite.ssrLoadModule("/src/modulos/publico/VisitantePublico.tsx");
+  const { APLICATIVOS_EMPRESA } = await vite.ssrLoadModule("/src/modulos/escritorio/aplicativosEmpresaConfig.ts");
+  const html = renderToStaticMarkup(createElement(VisitantePublico));
+  const links = [...html.matchAll(/<a\b[^>]*href="([^"]+)"[^>]*>/g)].map(([tag, href]) => ({ tag, href }));
+  assert.equal(links.filter((link) => link.href === "/").length, 2);
+  assert.match(html, /Voltar ao login/);
+  const disponiveis = APLICATIVOS_EMPRESA.filter((app) => app.publico && app.status === "disponivel" && app.url);
+  assert.equal(links.filter((link) => /^https:/.test(link.href)).length, disponiveis.length);
+  for (const app of disponiveis) {
+    const link = links.find((item) => item.href === app.url);
+    assert.ok(link, app.nome);
+    assert.match(link.tag, /target="_blank"/);
+    assert.match(link.tag, /rel="noopener noreferrer"/);
+  }
+  assert.equal((html.match(/Acessar sistema/g) ?? []).length, disponiveis.length);
+  assert.match(html, /<article[^>]*aria-label="Armários geral: em manutenção"/);
+  assert.doesNotMatch(html, /<form|visitante-material|<button/);
+});
+
+test("portal público não exibe sistemas privados nem oferece link para sistemas em manutenção", async () => {
+  const { default: VisitantePublico } = await vite.ssrLoadModule("/src/modulos/publico/VisitantePublico.tsx");
+  const { APLICATIVOS_EMPRESA } = await vite.ssrLoadModule("/src/modulos/escritorio/aplicativosEmpresaConfig.ts");
+  const tamanho = APLICATIVOS_EMPRESA.length;
+  try {
+    APLICATIVOS_EMPRESA.push(
+      { id: "privado-teste", nome: "Sistema privado de teste", descricao: "Privado", url: "https://privado.example/", status: "disponivel", publico: false },
+      { id: "manutencao-teste", nome: "Manutenção de teste", descricao: "Manutenção", url: "https://manutencao.example/", status: "manutencao", publico: true },
+    );
+    const html = renderToStaticMarkup(createElement(VisitantePublico));
+    assert.doesNotMatch(html, /Sistema privado de teste|privado\.example|manutencao\.example/);
+    assert.match(html, /aria-label="Manutenção de teste: em manutenção"/);
+  } finally {
+    APLICATIVOS_EMPRESA.splice(tamanho);
+  }
 });
 
 async function prepararModoVisualizacao(t, nativo) {
@@ -325,8 +557,35 @@ async function prepararModoVisualizacao(t, nativo) {
   });
   const { useInterface } = await servidor.ssrLoadModule("/src/estado/interface.ts");
   const { retangulosAbertos } = await servidor.ssrLoadModule("/src/janelas/geometria.ts");
-  return { useInterface, retangulosAbertos, memoria };
+  return { useInterface, retangulosAbertos, memoria, servidor };
 }
+
+test("no desktop, o link do sistema abre no navegador e a volta ao login permanece no Kyro", async (t) => {
+  const { servidor } = await prepararModoVisualizacao(t, true);
+  window.location.origin = "http://tauri.localhost";
+  const chamadas = [];
+  let confirmarAbertura;
+  const abertura = new Promise((resolve) => { confirmarAbertura = resolve; });
+  window.__TAURI_INTERNALS__.invoke = async (comando, dados) => { chamadas.push({ comando, dados }); confirmarAbertura(); };
+  const { desviarLinksExternos } = await servidor.ssrLoadModule("/src/desktop/desktop.ts");
+  desviarLinksExternos();
+  const clicar = (href) => {
+    const evento = new Event("click", { cancelable: true });
+    Object.defineProperty(evento, "target", { value: { closest: () => ({ href }) } });
+    document.dispatchEvent(evento);
+    return evento.defaultPrevented;
+  };
+  assert.equal(clicar("http://tauri.localhost/"), false);
+  assert.deepEqual(chamadas, []);
+  assert.equal(clicar("https://calendario-dpa.vercel.app/"), true);
+  let prazo;
+  try {
+    await Promise.race([abertura, new Promise((_, reject) => { prazo = setTimeout(() => reject(new Error("O link externo não foi encaminhado ao navegador")), 2000); })]);
+    assert.deepEqual(chamadas, [{ comando: "abrir_link", dados: { url: "https://calendario-dpa.vercel.app/" } }]);
+  } finally {
+    clearTimeout(prazo);
+  }
+});
 
 test("web abre o painel inteiro mesmo com sessão antiga fechada e não permite ocultá-lo", async (t) => {
   const { useInterface, retangulosAbertos } = await prepararModoVisualizacao(t, false);

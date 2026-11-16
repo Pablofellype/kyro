@@ -17,6 +17,10 @@ import { conexaoEmTestes } from "../../utilitarios/disponibilidadeConexoes";
 import { Tabela, Estado, Metrica, dataCurta } from "./pecasDaJanela";
 import { ConteudoExtra, ehServicoExtra } from "./ConteudoExtra";
 import { mensagemDeErroDaConexao } from "../../utilitarios/errosDeConexao";
+import { ConteudoTeams, ConteudoPlanner } from "./ConteudoMicrosoft";
+import { useAuth } from "../../estado/autenticacao";
+import { conexaoVisivelPara } from "../../utilitarios/visibilidadeConexoes";
+import { ConteudoPlanilhas } from "./ConteudoPlanilhas";
 
 const MINIMO = { w: 560, h: 420 };
 const INTERVALOS = [30, 60, 120, 300, 600];
@@ -26,6 +30,9 @@ const E = T.janelaConexao.estados;
 const data = dataCurta;
 
 function ConteudoServico({ servico, aba, filtro, dados }: { servico: ServicoId; aba: string; filtro: string; dados: DadosServico[ServicoId] }) {
+  if (servico === "planilhas") return <ConteudoPlanilhas dados={dados as DadosServico["planilhas"]} filtro={filtro} />;
+  if (servico === "teams") return <ConteudoTeams dados={dados as DadosServico["teams"]} aba={aba} filtro={filtro} />;
+  if (servico === "planner") return <ConteudoPlanner dados={dados as DadosServico["planner"]} aba={aba} filtro={filtro} />;
   if (ehServicoExtra(servico)) return <ConteudoExtra servico={servico} aba={aba} filtro={filtro} dados={dados} />;
 
   if (servico === "stripe") {
@@ -497,6 +504,11 @@ function ConteudoServico({ servico, aba, filtro, dados }: { servico: ServicoId; 
 }
 
 export function JanelaConexao({ janela }: { janela: EstadoJanela }) {
+  const token = useAuth((s) => s.token);
+  const usuarioId = useAuth((s) => s.usuario?.id);
+  const usuario = useAuth((s) => s.usuario);
+  const permitida = conexaoVisivelPara(usuario, janela.id);
+  const chaveSessao = `${usuarioId ?? ""}:${token ?? ""}`;
   const conexao = useComunicacao((s) => s.conexoes.find((c) => c.id === janela.id));
   const conexaoAtual = conexao;
   const atualizarConexao = useComunicacao((s) => s.atualizarConexao);
@@ -512,27 +524,29 @@ export function JanelaConexao({ janela }: { janela: EstadoJanela }) {
   const abas = T.janelaConexao.abas[janela.id] as Record<string, string>;
   const [aba, setAba] = useState(Object.keys(abas)[0]);
   const [filtro, setFiltro] = useState("");
-  const [dados, setDados] = useState<DadosServico[ServicoId] | null>(null);
+  const [resposta, setResposta] = useState<{ chave: string; dados: DadosServico[ServicoId] } | null>(null);
+  const dados = resposta?.chave === chaveSessao ? resposta.dados : null;
   const [erro, setErro] = useState("");
   const [buscando, setBuscando] = useState(false);
   const [confirmandoRemocao, setConfirmandoRemocao] = useState(false);
   const todas = useComunicacao((s) => s.conexoes);
-  const ativaAgora = !conexaoEmTestes(janela.id) && Boolean(conexaoAtual?.ligada && conexaoAtual?.chaveSalva);
+  const ativaAgora = permitida && !conexaoEmTestes(janela.id) && Boolean(conexaoAtual?.ligada && conexaoAtual?.chaveSalva);
   const buscar = useCallback(
     async (forcar: boolean) => {
       setBuscando(true);
       setErro("");
       try {
         const d = await conexoesPonte.ler(janela.id, forcar);
-        setDados(d);
+        setResposta({ chave: chaveSessao, dados: d });
         atualizarConexao(janela.id, { ultimaAtualizacao: new Date().toISOString(), resumo: resumoDe(janela.id, d), status: "conectado" });
       } catch (e) {
+        if ((e as Error).message === "conexao_sessao_alterada") return;
         setErro((e as Error).message);
       } finally {
         setBuscando(false);
       }
     },
-    [janela.id, atualizarConexao],
+    [janela.id, atualizarConexao, chaveSessao],
   );
   useEffect(() => {
     if (ativaAgora) void buscar(false);
@@ -542,13 +556,13 @@ export function JanelaConexao({ janela }: { janela: EstadoJanela }) {
   }, [janela.id, janela.minimizada]);
   const aoMudarGeometria = useCallback((g: EstadoJanela["geometria"]) => atualizarJanela(janela.id, { geometria: g }), [atualizarJanela, janela.id]);
 
-  if (!conexao || janela.minimizada) return null;
+  if (!conexao || janela.minimizada || !permitida) return null;
   const servico = T.conexoes.servicos[janela.id];
   if (conexaoEmTestes(janela.id)) return <Janela className="estilo-sistema" titulo={servico.nome} rotuloAcessivel={servico.nome} geometria={janela.geometria} maximizada={janela.maximizada} z={janela.z} minimo={MINIMO} aoFocar={() => focar(janela.id)} aoFechar={() => fechar(janela.id)} aoMinimizar={() => atualizarJanela(janela.id, { minimizada: true })} aoMaximizar={() => atualizarJanela(janela.id, { maximizada: !janela.maximizada })} aoMudarGeometria={aoMudarGeometria}><AvisoFaixa>{T.conexoes.emTestesDica}</AvisoFaixa></Janela>;
   const ativa = conexao.ligada && conexao.chaveSalva;
   const status = conexao.status;
   const tomStatus = status === "conectado" ? "etiqueta-sucesso" : status === "erro" ? "etiqueta-erro" : "";
-  const fixadas = todas.filter((c) => c.fixadaNaIlha).length;
+  const fixadas = todas.filter((c) => c.fixadaNaIlha && conexaoVisivelPara(usuario, c.id)).length;
   const removerChave = async () => {
     if (!confirmandoRemocao) {
       setConfirmandoRemocao(true);

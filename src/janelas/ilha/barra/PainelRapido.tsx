@@ -370,7 +370,7 @@ function MenuDeEnergia({ aoFechar }: { aoFechar: () => void }) {
   );
 }
 
-export function PainelRapido({ topo, aoFechar }: { topo: number; aoFechar: () => void }) {
+export function PainelRapido({ topo, direita = 8, aoFechar }: { topo: number; direita?: number; aoFechar: () => void }) {
   const nome = useConfig((s) => s.nome);
   const foto = useConfig((s) => s.foto);
   const naoPerturbe = useConfig((s) => s.naoPerturbe);
@@ -399,7 +399,7 @@ export function PainelRapido({ topo, aoFechar }: { topo: number; aoFechar: () =>
   return (
     <motion.div
       className="ilha-pop ilha-rapido"
-      style={{ top: topo, maxHeight: `calc(100vh - ${topo + 12}px)` }}
+      style={{ top: topo, right: direita, maxHeight: `calc(100vh - ${topo + 12}px)` }}
       role="dialog"
       aria-label={B.painel}
       data-privacidade={privacidade ? "sim" : "nao"}

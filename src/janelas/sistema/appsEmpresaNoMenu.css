@@ -20,23 +20,59 @@
   transform: rotate(180deg);
 }
 
-.barra-apps-manutencao {
-  flex: none;
-  margin-left: auto;
+.barra-apps-quantidade { margin-left: auto; font-size: 10px; font-variant-numeric: tabular-nums; color: var(--texto-3); }
+.barra-apps-seta { margin-left: 0; }
+.barra-apps-icone { display: grid; place-items: center; flex: 0 0 26px; width: 26px; height: 26px; border-radius: 7px; color: var(--texto-2); background: var(--superficie-2); }
+.barra-apps-estado { flex-shrink: 0; margin-left: auto; font-size: 9px; font-weight: 500; color: inherit; }
+
+@media (min-width: 769px) and (pointer: fine), (min-width: 1025px) {
+  .estilo-sistema .sistema .barra-lateral .barra-apps { margin-top: 12px; gap: 5px; }
+  .estilo-sistema .sistema .barra-lateral .barra-apps-toggle { height: 30px; flex-basis: 30px; gap: 8px; color: var(--texto-2); }
+  .estilo-sistema .sistema .barra-lateral .barra-apps-toggle .barra-item-texto { font-size: 10px; font-weight: 550; letter-spacing: .06em; text-transform: uppercase; }
+  .estilo-sistema .sistema .barra-lateral .barra-apps-lista { gap: 3px; }
+  .estilo-sistema .sistema .barra-lateral .barra-apps-item { height: 38px; flex-basis: 38px; gap: 10px; padding-inline: 10px; font-size: 12px; }
+  .estilo-sistema .sistema .barra-lateral .barra-apps-item::before { content: none; }
+  .estilo-sistema .sistema .barra-lateral .barra-apps-item:disabled { color: var(--texto-3); opacity: .65; }
+  .estilo-sistema .sistema .barra-lateral .barra-apps-item[aria-current="page"] .barra-apps-icone { background: rgb(255 255 255 / .16); color: inherit; }
+  .estilo-sistema .sistema .barra-recolhida .barra-apps { width: 100%; margin-top: 0; }
+  .estilo-sistema .sistema .barra-recolhida .barra-apps-toggle { height: 56px; flex-basis: 56px; padding: 8px 2px; gap: 6px; }
+  .estilo-sistema .sistema .barra-recolhida .barra-apps-toggle .barra-item-texto { font-size: 10px; font-weight: 500; letter-spacing: 0; text-transform: none; }
 }
 
-.estilo-sistema .barra-apps-item:disabled {
-  opacity: .5;
+.barra-apps-painel {
+  position: fixed;
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  width: min(290px, calc(100vw - 24px));
+  overflow: hidden;
+  padding: 8px;
+  border: 1px solid var(--marca-borda);
+  border-radius: 16px;
+  background: #ffffff;
+  color: var(--marca-texto);
+  box-shadow: 0 16px 44px rgb(0 0 0 / .16), 0 3px 10px rgb(0 0 0 / .08);
+  font-family: var(--fonte-texto);
+  animation: barra-apps-aparecer .16s ease-out;
 }
-
-.estilo-sistema .barra-recolhida .barra-apps-item {
-  width: 100%;
-  margin-left: 0;
-}
-
-.estilo-sistema .barra-recolhida .barra-apps-item::before {
-  display: none;
-}
+.barra-apps-painel-cabecalho { display: flex; align-items: center; justify-content: space-between; padding: 10px 10px 14px; margin-bottom: 5px; border-bottom: 1px solid var(--marca-borda); }
+.barra-apps-painel-cabecalho > div { display: flex; flex-direction: column; gap: 5px; }
+.barra-apps-painel-cabecalho strong { font-size: 14px; font-weight: 550; }
+.barra-apps-painel-cabecalho span { color: #6c6458; font-size: 10px; }
+.barra-apps-fechar { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 7px; color: #6c6458; }
+.barra-apps-fechar:hover { background: var(--marca-suave); color: var(--marca-primaria-hover); }
+.barra-apps-painel-lista { display: flex; flex-direction: column; gap: 3px; min-height: 0; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #b9b9b9 transparent; }
+.barra-apps-opcao { display: flex; align-items: center; gap: 10px; min-height: 42px; flex-shrink: 0; padding: 7px 9px; border-radius: 9px; color: #625b50; font-size: 12px; text-align: left; }
+.barra-apps-opcao .barra-apps-icone { color: var(--marca-primaria); background: var(--marca-suave); }
+.barra-apps-opcao .cortar { min-width: 0; }
+.barra-apps-opcao:hover { color: var(--marca-primaria-hover); background: var(--marca-suave); }
+.barra-apps-opcao[aria-current="page"] { color: var(--marca-primaria-hover); background: var(--marca-suave); }
+.barra-apps-opcao[aria-current="page"] .barra-apps-icone { color: inherit; background: #fff; }
+.barra-apps-opcao:disabled { opacity: .55; cursor: default; }
+.barra-apps-opcao:disabled:hover { color: #625b50; background: transparent; }
+.barra-apps-opcao:focus-visible, .barra-apps-fechar:focus-visible { outline: 2px solid var(--marca-primaria); outline-offset: -2px; }
+@keyframes barra-apps-aparecer { from { opacity: 0; translate: -5px 0; } to { opacity: 1; translate: 0 0; } }
+@media (prefers-reduced-motion: reduce) { .barra-apps-painel { animation: none; } }
 
 @media (max-width: 768px), (pointer: coarse) and (max-width: 1024px) {
   .barra-apps,
@@ -45,4 +81,6 @@
     flex-direction: row;
     align-items: stretch;
   }
+  .barra-apps-icone { width: auto; height: auto; flex-basis: auto; background: transparent; }
+  .barra-apps-quantidade { display: none; }
 }

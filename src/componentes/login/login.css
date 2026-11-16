@@ -132,7 +132,7 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
-  background: radial-gradient(500px 180px at 50% 0%, color-mix(in srgb, var(--destaque) 6%, transparent), transparent 70%);
+  background: var(--superficie);
 }
 
 .kyro-instalador-titulo-linha {
@@ -145,8 +145,8 @@
   width: 44px;
   height: 44px;
   border-radius: 12px;
-  background: color-mix(in srgb, var(--destaque, #ff3b47) 12%, transparent);
-  border: 1px solid color-mix(in srgb, var(--destaque, #ff3b47) 24%, transparent);
+  background: var(--superficie-2);
+  border: 1px solid var(--borda);
   color: var(--destaque, #ff3b47);
   display: flex;
   align-items: center;
@@ -309,7 +309,7 @@
   font-weight: 600;
   padding: 1px 6px;
   border-radius: 4px;
-  background: color-mix(in srgb, var(--destaque, #ff3b47) 18%, transparent);
+  background: var(--superficie-2);
   color: var(--destaque, #ff3b47);
   border: 1px solid color-mix(in srgb, var(--destaque, #ff3b47) 32%, transparent);
   text-transform: uppercase;
@@ -378,7 +378,7 @@
   background: var(--destaque, #ff3b47);
   border-color: var(--destaque, #ff3b47);
   color: #ffffff;
-  box-shadow: 0 3px 10px color-mix(in srgb, var(--destaque) 35%, transparent);
+  box-shadow: 0 3px 10px rgb(0 0 0 / .12);
 }
 
 .kyro-instalador-btn-baixar.baixado {
@@ -392,8 +392,8 @@
   margin: 0 20px 12px;
   padding: 10px 12px;
   border-radius: 9px;
-  background: color-mix(in srgb, var(--destaque, #ff3b47) 7%, transparent);
-  border: 1px solid color-mix(in srgb, var(--destaque, #ff3b47) 20%, transparent);
+  background: var(--superficie-2);
+  border: 1px solid var(--borda);
   display: flex;
   align-items: flex-start;
   gap: 10px;

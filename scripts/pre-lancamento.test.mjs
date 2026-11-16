@@ -9,11 +9,11 @@ import { DatabaseSync } from "node:sqlite";
 import { Unzip, UnzipInflate, zipSync, strToU8, strFromU8 } from "fflate";
 import { stripTypeScriptTypes } from "node:module";
 import vm from "node:vm";
+import { create } from "zustand";
 
 const estabilizar = () => new Promise((r) => setImmediate(r));
 
-function armazenamentoIsolado(nativo = false, sessao = null) {
-  const memoria = new Map();
+function armazenamentoIsolado(nativo = false, sessao = null, memoria = new Map()) {
   const timers = new Map();
   let proximo = 0;
   const janela = Object.assign(new EventTarget(), {
@@ -36,12 +36,15 @@ function armazenamentoIsolado(nativo = false, sessao = null) {
     window: janela, document: Object.assign(new EventTarget(), { body: { inert: false } }), URLSearchParams, AbortController, AbortSignal, CustomEvent, TextEncoder,
     eventos, nativo: { invoke: async (nome, dados) => { comandos.push({ nome, dados }); } }, urlApi: (caminho) => caminho,
     BroadcastChannel: undefined, createJSONStorage: (fn) => fn(), objeto: (v) => v !== null && typeof v === "object" && !Array.isArray(v),
-    localStorage: { getItem: (k) => memoria.get(k) ?? null, setItem: (k, v) => memoria.set(k, v), removeItem: (k) => memoria.delete(k) },
+    localStorage: new Proxy({ getItem: (k) => memoria.get(k) ?? null, setItem: (k, v) => memoria.set(k, v), removeItem: (k) => memoria.delete(k) }, {
+      ownKeys: () => [...memoria.keys()],
+      getOwnPropertyDescriptor: () => ({ configurable: true, enumerable: true }),
+    }),
     fetch: async () => ({ ok: true, json: async () => ({ dados: {} }) }),
   });
   const codigo = stripTypeScriptTypes(readFileSync("src/ponte/armazenamento.ts", "utf8")).replace(/^import .*;\r?\n/gm, "").replace(/^export /gm, "")
     .replaceAll('await import("@tauri-apps/api/event")', "globalThis.eventos").replaceAll('await import("@tauri-apps/api/core")', "globalThis.nativo");
-  vm.runInContext(`${codigo}\nglobalThis.api = { iniciarArmazenamento, salvarAgora, gravarChave, lerChave, zerarTudo, aoPrepararSaida };`, contexto);
+  vm.runInContext(`${codigo}\nglobalThis.api = { iniciarArmazenamento, salvarAgora, gravarChave, lerChave, zerarTudo, aoPrepararSaida, aoMudarDeFora };`, contexto);
   return { api: contexto.api, contexto, janela, timers, ouvintes, comandos, eventos, memoria };
 }
 
@@ -160,6 +163,167 @@ test("fila persistida é reenviada depois de reabrir o armazenamento remoto", as
   await estabilizar();
   await estabilizar();
   assert.ok(chamadas.some((chamada) => chamada.metodo === "POST" && chamada.corpo.itens["niko:pendente"] === "retentar"));
+});
+
+const visualPessoal = JSON.stringify({ version: 10, state: {
+  tema: "escuro", paleta: "grafite", escala: 1.1,
+  ilha: { ativa: true, tamanho: "pequena", opacidade: 0.35, fundo: "#101820", modo: "fixo" },
+  dock: { ativo: true, escala: 0.8, opacidade: 0.45, mostrarBusca: false },
+} });
+
+test("visual nativo sobrevive ao fechamento antes do envio e volta no próximo login", async () => {
+  const memoria = new Map();
+  const primeira = armazenamentoIsolado(true, { id: 7 }, memoria);
+  await primeira.api.iniciarArmazenamento();
+  primeira.api.gravarChave("niko:configuracoes", visualPessoal);
+  assert.equal(memoria.get("kyro:usuario:7:niko:configuracoes"), visualPessoal);
+  assert.equal(memoria.has("niko:configuracoes"), false);
+
+  const segunda = armazenamentoIsolado(true, { id: 7 }, memoria);
+  const gravados = [];
+  segunda.contexto.fetch = async (_url, opcoes = {}) => {
+    if (opcoes.method === "POST") gravados.push(JSON.parse(opcoes.body).itens);
+    return { ok: true, json: async () => ({ dados: {}, versao: "1" }) };
+  };
+  assert.equal(await segunda.api.iniciarArmazenamento(), "banco");
+  assert.equal(segunda.api.lerChave("niko:configuracoes"), visualPessoal);
+  assert.equal(gravados[0]["niko:configuracoes"], visualPessoal);
+  assert.ok(gravados.every((itens) => Object.keys(itens).every((k) => /^niko:[a-z0-9_-]{1,60}$/.test(k))));
+});
+
+test("sem rede, preferências locais ficam separadas por conta e voltam para a fila", async () => {
+  const memoria = new Map([["niko:configuracoes", "visual antigo do dono"]]);
+  const gerencia = armazenamentoIsolado(false, { id: 7 }, memoria);
+  gerencia.contexto.fetch = async () => { throw new Error("offline"); };
+  assert.equal(await gerencia.api.iniciarArmazenamento(), "local");
+  assert.equal(gerencia.api.lerChave("niko:configuracoes"), null);
+  gerencia.api.gravarChave("niko:configuracoes", visualPessoal);
+  assert.equal(JSON.parse(memoria.get("niko:sincronia-pendente:7")).itens["niko:configuracoes"], visualPessoal);
+
+  const outra = armazenamentoIsolado(false, { id: 8 }, memoria);
+  outra.contexto.fetch = gerencia.contexto.fetch;
+  await outra.api.iniciarArmazenamento();
+  assert.equal(outra.api.lerChave("niko:configuracoes"), null);
+
+  const retorno = armazenamentoIsolado(false, { id: 7 }, memoria);
+  retorno.contexto.fetch = gerencia.contexto.fetch;
+  await retorno.api.iniciarArmazenamento();
+  assert.equal(retorno.api.lerChave("niko:configuracoes"), visualPessoal);
+});
+
+test("janela ignora configurações de outra conta e para de gravar depois da troca de sessão", async () => {
+  const a = armazenamentoIsolado(true, { id: 7 });
+  await a.api.iniciarArmazenamento();
+  const mudou = [];
+  a.api.aoMudarDeFora((chave) => mudou.push(chave));
+  const receber = (usuarioId, valor) => a.ouvintes.get("niko-dados")({ payload: { origem: "outra-janela", banco: "", usuarioId, chave: "niko:configuracoes", valor } });
+  receber("8", "de outra conta");
+  assert.equal(a.api.lerChave("niko:configuracoes"), null);
+  receber("7", visualPessoal);
+  assert.equal(a.api.lerChave("niko:configuracoes"), visualPessoal);
+  assert.equal(mudou.length, 1);
+
+  a.memoria.set("kyro_token", "outro-token");
+  a.memoria.set("kyro_usuario", JSON.stringify({ id: 8 }));
+  a.api.gravarChave("niko:configuracoes", "valor da loja antiga");
+  receber("8", "resposta atrasada");
+  assert.equal(a.api.lerChave("niko:configuracoes"), null);
+  assert.equal(a.memoria.has("kyro:usuario:8:niko:configuracoes"), false);
+  assert.equal(a.memoria.get("kyro:usuario:7:niko:configuracoes"), visualPessoal);
+});
+
+test("resposta remota iniciada na conta anterior não substitui o visual da sessão nova", async () => {
+  const a = armazenamentoIsolado(true, { id: 7 });
+  await a.api.iniciarArmazenamento();
+  let responder;
+  a.contexto.fetch = () => new Promise((r) => { responder = r; });
+  a.janela.dispatchEvent(new Event("focus"));
+  a.memoria.set("kyro_token", "outro-token");
+  a.memoria.set("kyro_usuario", JSON.stringify({ id: 8 }));
+  responder({ ok: true, json: async () => ({ dados: { "niko:configuracoes": "atrasado" } }) });
+  await estabilizar();
+  assert.equal(a.memoria.has("kyro:usuario:8:niko:configuracoes"), false);
+});
+
+test("salvar agora inclui preferências pendentes nas outras janelas da mesma conta", async () => {
+  const memoria = new Map();
+  const principal = armazenamentoIsolado(true, { id: 7 }, memoria);
+  const ilha = armazenamentoIsolado(true, { id: 7 }, memoria);
+  await principal.api.iniciarArmazenamento();
+  await ilha.api.iniciarArmazenamento();
+  ilha.api.gravarChave("niko:configuracoes", visualPessoal);
+  principal.api.gravarChave("niko:rotina", "tarefas da conta");
+  let enviado;
+  principal.contexto.fetch = async (_url, opcoes) => { enviado = JSON.parse(opcoes.body).itens; return { ok: true }; };
+  await principal.api.salvarAgora();
+  assert.equal(enviado["niko:configuracoes"], visualPessoal);
+  assert.equal(enviado["niko:rotina"], "tarefas da conta");
+  assert.equal(memoria.has("niko:sincronia-pendente:7"), false);
+});
+
+test("confirmação de visual antigo não remove o ajuste mais recente de outra janela", async () => {
+  const memoria = new Map();
+  const principal = armazenamentoIsolado(true, { id: 7 }, memoria);
+  const ilha = armazenamentoIsolado(true, { id: 7 }, memoria);
+  await principal.api.iniciarArmazenamento();
+  await ilha.api.iniciarArmazenamento();
+  principal.api.gravarChave("niko:configuracoes", "antigo");
+  let confirmar;
+  principal.contexto.fetch = () => new Promise((r) => { confirmar = r; });
+  const envio = principal.api.salvarAgora();
+  ilha.api.gravarChave("niko:configuracoes", visualPessoal);
+  confirmar({ ok: true, json: async () => ({ versao: "2" }) });
+  await envio;
+  assert.equal(JSON.parse(memoria.get("niko:sincronia-pendente:7")).itens["niko:configuracoes"], visualPessoal);
+});
+
+function autenticacaoIsolada(sessao = null) {
+  const memoria = new Map();
+  const chamadas = [];
+  const ouvintes = new Map();
+  if (sessao) {
+    memoria.set("kyro_token", "token-anterior");
+    memoria.set("kyro_usuario", JSON.stringify(sessao));
+  }
+  const contexto = vm.createContext({
+    create, AbortSignal,
+    window: { __TAURI_INTERNALS__: {}, location: { reload: () => chamadas.push("recarregar") } },
+    localStorage: { getItem: (k) => memoria.get(k) ?? null, setItem: (k, v) => memoria.set(k, v), removeItem: (k) => memoria.delete(k) },
+    listen: async (nome, fn) => { ouvintes.set(nome, fn); },
+    emit: async () => { chamadas.push("publicar"); },
+    salvarAgora: async () => { assert.equal(memoria.get("kyro_token"), "token-anterior"); chamadas.push("salvar"); },
+    fetch: async () => { chamadas.push("revogar"); return { ok: true }; },
+    mensagemDeErroApi: () => "erro",
+  });
+  const codigo = stripTypeScriptTypes(readFileSync("src/estado/autenticacao.ts", "utf8"))
+    .replace(/^import .*;\r?\n/gm, "").replace(/^export /gm, "")
+    .replaceAll("import.meta.env", "({})")
+    .replace('await import("../ponte/armazenamento")', "({ salvarAgora: globalThis.salvarAgora })");
+  vm.runInContext(`${codigo}\nglobalThis.api = useAuth;`, contexto);
+  if (sessao) contexto.api.setState({ usuario: sessao });
+  return { auth: contexto.api, contexto, memoria, chamadas, ouvintes };
+}
+
+test("login recebido pela ilha recarrega o armazenamento antes de exibir a conta", () => {
+  const a = autenticacaoIsolada();
+  a.ouvintes.get("niko://autenticacao")({ payload: { usuario: { id: 7, perfil: "gerencia" }, token: "novo-token" } });
+  assert.deepEqual(a.chamadas, ["recarregar"]);
+  assert.equal(a.auth.getState().usuario, null);
+  assert.equal(JSON.parse(a.memoria.get("kyro_usuario")).id, 7);
+});
+
+test("logout salva preferências com a sessão válida antes de revogar e recarregar", async () => {
+  const a = autenticacaoIsolada({ id: 7, perfil: "gerencia" });
+  await a.auth.getState().logout();
+  assert.deepEqual(a.chamadas, ["salvar", "revogar", "publicar", "recarregar"]);
+  assert.equal(a.memoria.has("kyro_token"), false);
+});
+
+test("evento da mesma sessão mantém as lojas carregadas", () => {
+  const a = autenticacaoIsolada({ id: 7, perfil: "gerencia" });
+  a.ouvintes.get("niko://autenticacao")({ payload: { usuario: { id: 7, perfil: "gerencia", nome: "Nome atualizado" }, token: "token-anterior" } });
+  assert.equal(a.chamadas.length, 0);
+  assert.equal(a.auth.getState().usuario.nome, "Nome atualizado");
 });
 
 function moduloIsolado(caminho, globais, nomes) {

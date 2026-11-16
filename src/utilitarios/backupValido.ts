@@ -1,7 +1,7 @@
 import { exigir, objeto, validarEvento, validarPaiPagina, validarTransacao } from "./validacoes";
 import { dataValida, horaValida } from "./datas";
 import type { Conta, Categoria, Evento, Pagina, Transacao } from "../tipos";
-import { CONFIG_PADRAO } from "../estado/configuracoes";
+import { CONFIG_PADRAO, VERSAO_CONFIGURACOES } from "../estado/configuracoes";
 import { validarFormatoConfiguracoes } from "./configuracoesValidas";
 import { configuracaoEscritorioValida } from "../modulos/escritorio/configuracaoDoEscritorio";
 import { corteDasAnalisesValido, registrosValidos } from "../modulos/escritorio/dadosDoEscritorio";
@@ -84,7 +84,7 @@ function conferir(valor: unknown, regra: Regra) {
 
 export function validarEstadoSalvo(nome: string, bruto: unknown): asserts bruto is { state: Record<string, unknown>; version?: number } {
   exigir(objeto(bruto) && objeto(bruto.state));
-  exigir(bruto.version === undefined || (Number.isInteger(bruto.version) && Number(bruto.version) >= 0 && Number(bruto.version) <= (nome === "configuracoes" ? 10 : nome === "agentes" ? 1 : 0)));
+  exigir(bruto.version === undefined || (Number.isInteger(bruto.version) && Number(bruto.version) >= 0 && Number(bruto.version) <= (nome === "configuracoes" ? VERSAO_CONFIGURACOES : nome === "agentes" ? 1 : 0)));
   const estado = bruto.state;
   if (nome === "configuracoes") {
     validarFormatoConfiguracoes(estado, CONFIG_PADRAO);

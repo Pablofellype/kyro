@@ -2,17 +2,16 @@ import { TourDoNiko } from "./TourDoNiko";
 import { EstilosDaMidia } from "../ilha/midia/EstilosDaMidia";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useInterface, type Geometria } from "../../estado/interface";
-import { useConfig, GRUPO_DA_ROTA } from "../../estado/configuracoes";
+import { useConfig } from "../../estado/configuracoes";
 import { Janela, areaUtil } from "../Janela";
 import { BarraLateral } from "./BarraLateral";
 import { PAGINA_ROTA } from "./rotas";
-import { numeroDaRota } from "../../componentes/CabecalhoAba";
 import { T } from "../../textos/textos";
 import { AvisosRodape } from "../../componentes/basicos";
 import { tocarSom } from "../../ponte/sons";
 import { NATIVO, ocultarSistemaNativo } from "../../desktop/desktop";
 import { rotaLigada } from "../../utilitarios/funcoes";
-import { primeiraRotaDaArea, rotaDisponivelNaArea, ROTULOS_EMPRESA, ROTULOS_PESSOAIS } from "./areas";
+import { primeiraRotaDaArea, rotaDisponivelNaArea } from "./areas";
 import { LimiteDeErro } from "../../componentes/LimiteDeErro";
 import { NotificacoesSistema } from "../../componentes/NotificacoesSistema";
 import { podeAcessarArea, podeAcessarRota } from "../../servicos/permissoes";
@@ -40,7 +39,6 @@ export function JanelaSistema({ mobile = false }: { mobile?: boolean } = {}) {
   const rotaValida = rotaLigada(rotaPedida, desligadas) && rotaDisponivelNaArea(rotaPedida, areaEfetiva) && podeAcessarRota(usuario, rotaPedida, areaEfetiva);
   const rota = rotaValida ? rotaPedida : primeiraRotaDaArea(areaEfetiva);
   const chavePagina = rota === "appsEmpresa" ? `${rota}:${appEmpresa}` : rota;
-  const nomeApp = rota === "appsEmpresa" ? itensDoMenuAppsEmpresa(usuario).find((app) => app.id === appEmpresa)?.nome : undefined;
   const appAberto = rota === "appsEmpresa" && itensDoMenuAppsEmpresa(usuario).some((app) => app.id === appEmpresa && app.disponivel);
   const geometriaSalva = useInterface((s) => s.geometria);
   const maximizada = useInterface((s) => s.sistemaMaximizado);
@@ -80,17 +78,6 @@ export function JanelaSistema({ mobile = false }: { mobile?: boolean } = {}) {
   const Pagina = PAGINA_ROTA[rota];
   const recolhida = !mobile && (appAberto ? barraAppsRecolhida ?? true : recolhidaManual || largura < 1100);
 
-  const titulo = (
-    <span className="migalha">
-      <span>{T.gruposBarra[GRUPO_DA_ROTA[rota]]}</span>
-      <span className="migalha-barra" aria-hidden="true">/</span>
-      <span className="migalha-atual">
-        {areaEfetiva === "empresa" ? "Empresa" : "Pessoal"} / {numeroDaRota(rota)} {(areaEfetiva === "pessoal" ? ROTULOS_PESSOAIS[rota] : ROTULOS_EMPRESA[rota]) || T.rotas[rota]}
-        {nomeApp && <> / {nomeApp}</>}
-      </span>
-    </span>
-  );
-
   const conteudoSistema = (
     <>
       <div className="sistema">
@@ -117,7 +104,6 @@ export function JanelaSistema({ mobile = false }: { mobile?: boolean } = {}) {
   if (!NATIVO) {
     return (
       <section className="estilo-sistema sistema-web" data-mobile={mobile ? "sim" : "nao"} aria-label={T.app.nome} style={{ zIndex: z }} onPointerDownCapture={focar}>
-        {!mobile && <header className="sistema-web-cabecalho">{titulo}</header>}
         <div className="janela-corpo" id="camada-sistema">{conteudoSistema}</div>
       </section>
     );
@@ -126,7 +112,7 @@ export function JanelaSistema({ mobile = false }: { mobile?: boolean } = {}) {
   return (
     <Janela
       className="estilo-sistema"
-      titulo={titulo}
+      titulo={null}
       rotuloAcessivel={T.app.nome}
       geometria={geometria}
       maximizada={maximizada}

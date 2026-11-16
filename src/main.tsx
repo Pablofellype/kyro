@@ -48,6 +48,8 @@ document.documentElement.dataset.tema = "claro";
 const SELETOR_DAS_SOBREPOSTAS = ".ilha-raiz, .ilha-gatilho, .ilha-barra, .ilha-pop, .dock, .dock-gatilho, .dock-previa";
 
 async function iniciar() {
+  iniciarSinalDeVida();
+  desviarLinksExternos();
   const visitante = typeof window !== "undefined" && (window.location.pathname === "/visitante" || new URLSearchParams(window.location.search).get("visitante") === "1");
   if (visitante) {
     const raizPublica = document.getElementById("raiz");
@@ -56,7 +58,6 @@ async function iniciar() {
     createRoot(raizPublica).render(<StrictMode><VisitantePublico /></StrictMode>);
     return;
   }
-  iniciarSinalDeVida();
   const sobreposta = JANELA === "ilha" || JANELA === "dock" || JANELA === "assistive";
   if (sobreposta) document.documentElement.classList.add("janela-sobreposta");
   document.addEventListener("contextmenu", (e) => {
@@ -65,7 +66,6 @@ async function iniciar() {
     if (sobreposta || alvo?.closest(SELETOR_DAS_SOBREPOSTAS)) e.preventDefault();
   });
   await prepararPonte();
-  desviarLinksExternos();
   let modo = "local";
   // Em algumas máquinas o Windows Defender demora alguns segundos para
   // liberar o node.exe empacotado. Aguarde a ponte antes de mostrar a falha.

@@ -21,8 +21,10 @@ function normalizar(texto: string): string {
 
 export function MateriaisNaBarra({
   topo,
+  esquerda = 8,
 }: {
   topo: number;
+  esquerda?: number;
   aoFechar: () => void;
 }) {
   const { materiais, adicionarMaterial, atualizarMaterial, importarTexto, excluirMaterial } =
@@ -155,7 +157,7 @@ export function MateriaisNaBarra({
   return (
     <motion.div
       className="ilha-pop ilha-personalizar ilha-materiais estilo-sistema"
-      style={{ top: topo, maxHeight: `calc(100vh - ${topo + 12}px)` }}
+      style={{ top: topo, left: esquerda, maxHeight: `calc(100vh - ${topo + 12}px)` }}
       role="dialog"
       aria-label="Catálogo de Materiais"
       initial={{ opacity: 0, y: -8, scale: 0.98 }}

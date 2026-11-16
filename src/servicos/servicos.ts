@@ -27,6 +27,8 @@ import type { Evento, Habito, ServicoId } from "../tipos";
 import { addDays, addMonths, addWeeks } from "date-fns";
 import { conquistaLigada, funcaoLigada } from "../utilitarios/funcoes";
 import { ponteLocalDisponivel } from "../ponte/ambiente";
+import { useAuth } from "../estado/autenticacao";
+import { conexaoVisivelPara } from "../utilitarios/visibilidadeConexoes";
 
 function notificar(titulo: string, corpo: string, categoria?: CategoriaDeAviso) {
   if (useConfig.getState().naoPerturbe || !avisoLigado(categoria)) return;
@@ -244,6 +246,7 @@ const vistas = new Map<ServicoId, Set<string>>();
 
 export async function atualizarConexaoAgora(id: ServicoId, forcar = true) {
   if (!ponteLocalDisponivel()) return;
+  if (!conexaoVisivelPara(useAuth.getState().usuario, id)) return;
   if (conexaoEmTestes(id)) return;
   if (emLeitura.has(id)) return;
   emLeitura.add(id);
@@ -278,6 +281,7 @@ export async function atualizarConexaoAgora(id: ServicoId, forcar = true) {
     }
   } catch (e) {
     const mensagem = (e as Error).message;
+    if (mensagem === "conexao_sessao_alterada") return;
     com.atualizarConexao(id, { status: /sem_chave/.test(mensagem) ? "sem_chave" : /fetch|rede|ENOTFOUND|timeout/i.test(mensagem) ? "sem_internet" : "erro", ultimaAtualizacao: new Date().toISOString() });
   } finally {
     emLeitura.delete(id);

@@ -1155,7 +1155,7 @@
   flex-direction: column;
   border-radius: 18px;
   border: 1px solid var(--borda-controle);
-  background: radial-gradient(500px 260px at 80% 0%, color-mix(in srgb, var(--destaque) 12%, transparent), transparent 70%), var(--superficie-alta);
+  background: var(--superficie-alta);
   box-shadow: var(--sombra-modal);
   overflow: hidden;
 }
@@ -1448,7 +1448,7 @@
 .estilo-sistema .ajuste-perfil {
   padding: 22px;
   border-bottom: 1px solid var(--linha);
-  background: radial-gradient(420px 160px at 0% 0%, color-mix(in srgb, var(--destaque) 7%, transparent), transparent 70%);
+  background: var(--superficie);
 }
 
 .estilo-sistema .ajuste-perfil .editor-foto {

@@ -13,13 +13,19 @@ export function focoDaAreaPeloElemento(alvo: Element | null): boolean | undefine
   return undefined;
 }
 
-export function mostrarLateraisDaIlha({ ativadas, estado, saudando, telaCheia, areaEmFoco, emUso = false }: {
+export function mostrarLateraisDaIlha({ ativadas, estado, saudando, telaCheia, areaEmFoco, sistemaEmFoco = false, emUso = false }: {
   ativadas: boolean;
   estado: EstadoIlha;
   saudando: boolean;
   telaCheia: boolean;
   areaEmFoco: boolean;
+  sistemaEmFoco?: boolean;
   emUso?: boolean;
 }): boolean {
-  return ativadas && !telaCheia && !saudando && (emUso || (estado !== "escondida" && (areaEmFoco || estado === "expandida")));
+  return ativadas && !telaCheia && !saudando && (emUso || (estado !== "escondida" && (areaEmFoco || sistemaEmFoco || estado === "expandida")));
+}
+
+// Espaço dos controles, incluindo a distância até a ilha em cada lado.
+export function reservaDasLaterais(larguraDaTela: number): number {
+  return larguraDaTela <= 1100 ? 240 : 400;
 }

@@ -2,8 +2,8 @@ import { useEffect, useLayoutEffect, useState } from "react";
 import { useConfig } from "../../estado/configuracoes";
 import { comAlfa, contraste, hexValido, textoSobre } from "../../utilitarios/cores";
 
-export const DESTAQUE_PADRAO = { claro: "#7c5ce0", escuro: "#a78bfa" };
-export const DESTAQUE_SISTEMA = "#ff3b47";
+export const DESTAQUE_PADRAO = { claro: "#275f50", escuro: "#8fc5af" };
+export const DESTAQUE_SISTEMA = "#275f50";
 
 function textoSobreBotao(cor: string) {
   return contraste(cor, "#ffffff") >= 2.4 ? "#ffffff" : "#111111";
@@ -38,7 +38,7 @@ export function usarTema() {
     const corDoSistema = escolhida ?? DESTAQUE_SISTEMA;
     raiz.style.setProperty("--destaque", cor);
     raiz.style.setProperty("--destaque-texto", textoSobre(cor));
-    raiz.style.setProperty("--destaque-suave", comAlfa(cor, efetivo === "escuro" ? 0.18 : 0.12));
+    raiz.style.setProperty("--destaque-suave", comAlfa(efetivo === "escuro" ? "#ffffff" : "#000000", 0.06));
     raiz.style.setProperty("--foco", comAlfa(cor, 0.32));
     raiz.style.setProperty("--destaque-sistema", corDoSistema);
     raiz.style.setProperty("--destaque-sistema-sobre", textoSobreBotao(corDoSistema));

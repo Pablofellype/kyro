@@ -403,7 +403,7 @@ export interface Memoria {
 
 export type ServicoId =
   | "stripe" | "github" | "vercel" | "resend" | "notion" | "calcom" | "n8n" | "google" | "supabase" | "cloudflare"
-  | "linear" | "jira" | "trello" | "railway" | "discord" | "reddit" | "strava" | "email" | "calendario" | "cripto" | "outlook";
+  | "linear" | "jira" | "trello" | "railway" | "discord" | "reddit" | "strava" | "email" | "calendario" | "cripto" | "outlook" | "teams" | "planner" | "planilhas";
 
 export type StatusConexao = "conectado" | "sem_chave" | "erro" | "pausado" | "sem_internet";
 

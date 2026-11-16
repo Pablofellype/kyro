@@ -25,74 +25,38 @@
   right: 0;
   z-index: 999;
   pointer-events: none;
-  font-size: calc(12px * var(--escala-barra, 1));
+  font-size: max(10px, calc(12px * var(--escala-barra, 1)));
 }
-
-.ilha-barra-faixa {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: var(--faixa);
-  background: var(--borda-fundo);
-}
-
-/* Os cantos continuam alcançáveis quando as cápsulas estão recolhidas. */
-.ilha-barra-gatilhos {
-  height: 12px;
-  z-index: 1001;
-}
-
-.ilha-barra-gatilho {
-  position: absolute;
-  top: 0;
-  width: clamp(96px, 20%, 220px);
-  height: 12px;
-  pointer-events: auto;
-}
-
-.ilha-barra-gatilho-esquerdo { left: 0; }
-.ilha-barra-gatilho-direito { right: 0; }
-.ilha-barra-gatilhos[data-visivel="sim"] .ilha-barra-gatilho { height: 5px; }
 
 .ilha-barra-aba {
   position: absolute;
-  top: var(--faixa);
+  top: 0;
   bottom: 0;
   display: flex;
   align-items: center;
-  padding: 0 8px var(--faixa);
+  max-width: 184px;
+  padding: 0 8px;
+  border: 1px solid var(--i-linha);
+  border-top: 2px solid var(--marca-primaria);
+  border-radius: 0 0 14px 14px;
   background: var(--borda-fundo);
+  box-shadow: 0 5px 14px rgb(0 0 0 / .08);
   pointer-events: auto;
 }
 
-.ilha-barra-aba::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  width: var(--raio-aba);
-  height: var(--raio-aba);
-  pointer-events: none;
-}
-
 .ilha-barra-aba-esquerda {
-  left: 0;
-  border-bottom-right-radius: var(--raio-aba);
-}
-
-.ilha-barra-aba-esquerda::after {
-  right: calc(var(--raio-aba) * -1);
-  background: radial-gradient(circle at 100% 100%, transparent calc(var(--raio-aba) - 0.5px), var(--borda-fundo) var(--raio-aba));
+  right: calc(50% + var(--meia-ilha) + 8px);
 }
 
 .ilha-barra-aba-direita {
-  right: 0;
-  border-bottom-left-radius: var(--raio-aba);
+  left: calc(50% + var(--meia-ilha) + 8px);
 }
 
-.ilha-barra-aba-direita::after {
-  left: calc(var(--raio-aba) * -1);
-  background: radial-gradient(circle at 0 100%, transparent calc(var(--raio-aba) - 0.5px), var(--borda-fundo) var(--raio-aba));
+@media (max-width: 1100px) {
+  .ilha-barra-aba { max-width: 112px; padding-inline: 4px; }
+  .ilha-barra .ilha-barra-materiais-label,
+  .ilha-barra .ilha-barra-valor { display: none; }
+  .ilha-barra .ilha-barra-lado .ilha-barra-status { gap: 6px; padding-inline: 5px; }
 }
 .ilha-barra .ilha-barra-status {
   gap: 9px;
@@ -176,8 +140,8 @@
 }
 
 .ilha-barra-botao {
-  height: calc(20px * var(--escala-barra, 1));
-  min-width: calc(22px * var(--escala-barra, 1));
+  height: 28px;
+  min-width: 26px;
   padding: 0 6px;
   display: inline-flex;
   align-items: center;

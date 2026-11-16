@@ -5,10 +5,11 @@ import { T } from "../../textos/textos";
 import { FaixaAjuste, LinhaAjuste } from "./LinhaAjuste";
 
 export const FUNDOS_PRONTOS = [
-  { valor: FUNDO_PADRAO_DAS_BORDAS, rotulo: T.configuracoes.fundosProntos.grafite },
+  { valor: FUNDO_PADRAO_DAS_BORDAS, rotulo: T.configuracoes.fundosProntos.branco },
+  { valor: "#b13749", rotulo: T.configuracoes.fundosProntos.vermelho },
+  { valor: "#232428", rotulo: T.configuracoes.fundosProntos.grafite },
   { valor: "#000000", rotulo: T.configuracoes.fundosProntos.preto },
   { valor: "#1d2738", rotulo: T.configuracoes.fundosProntos.noite },
-  { valor: "#f4f5f7", rotulo: T.configuracoes.fundosProntos.branco },
 ];
 
 interface PropsSeletorDeFundo {

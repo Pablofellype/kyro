@@ -68,6 +68,15 @@ function mil(n: number) {
 
 export function montarResumo(servico: ServicoId, dados: DadosServico[ServicoId]): Resumo {
   switch (servico) {
+    case "planilhas": {
+      const d = dados as DadosServico["planilhas"];
+      const disponiveis = d.planilhas.filter((p) => p.previa);
+      return {
+        numeros: [{ rotulo: "Planilhas disponíveis", valor: disponiveis.length }],
+        tituloDaLista: "Suas planilhas de trabalho",
+        linhas: d.planilhas.map((p, i) => ({ chave: `${p.id}:${i}`, principal: p.titulo, secundario: p.previa ? `${p.previa.aba} · ${p.previa.valores.length} linhas na prévia` : "Não foi possível consultar esta planilha" })),
+      };
+    }
     case "stripe": {
       const d = dados as DadosServico["stripe"];
       const falhas = d.cobrancas.filter((c) => c.status === "falhou").length;

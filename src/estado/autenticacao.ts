@@ -15,7 +15,7 @@ interface EstadoAuth {
   carregando: boolean;
   token: string | null;
   erroVerificacao: string | null;
-  definirUsuario: (u: UsuarioAutenticado | null, token?: string | null) => void;
+  definirUsuario: (u: UsuarioAutenticado | null, token?: string | null) => Promise<void>;
   logout: () => Promise<void>;
   verificar: () => Promise<boolean>;
 }
@@ -42,8 +42,8 @@ function estadoDaSessao(usuario: UsuarioAutenticado | null, token: string | null
   return { usuario, token, carregando: false };
 }
 
-function publicarAutenticacao(usuario: UsuarioAutenticado | null, token: string | null) {
-  if (NATIVO) void emit(EVENTO_AUTENTICACAO, { usuario, token } satisfies MensagemAutenticacao).catch(() => undefined);
+async function publicarAutenticacao(usuario: UsuarioAutenticado | null, token: string | null) {
+  if (NATIVO) await emit(EVENTO_AUTENTICACAO, { usuario, token } satisfies MensagemAutenticacao).catch(() => undefined);
 }
 
 export function urlApi(caminho: string): string {
@@ -78,25 +78,35 @@ export const useAuth = create<EstadoAuth>((set, get) => ({
   token: typeof window !== "undefined" ? localStorage.getItem("kyro_token") : null,
   erroVerificacao: null,
 
-  definirUsuario: (usuario, token) => {
+  definirUsuario: async (usuario, token) => {
     const sessao = estadoDaSessao(usuario, token ?? null);
     set({ ...sessao, erroVerificacao: null });
-    publicarAutenticacao(usuario, token ?? null);
+    await publicarAutenticacao(usuario, token ?? null);
   },
 
   logout: async () => {
     const token = get().token;
+    // A sessão precisa continuar válida enquanto enviamos as preferências.
+    // Sem rede, a fila por usuário conserva as alterações para o próximo login.
+    try {
+      const { salvarAgora } = await import("../ponte/armazenamento");
+      await salvarAgora();
+    } catch {
+      // A indisponibilidade da sincronização não impede sair da conta.
+    }
     if (token) {
       try {
         await fetch(urlApi("/api/auth?acao=logout"), {
           method: "POST",
           headers: { ...cabecalhosNiko(), Authorization: `Bearer ${token}` },
+          signal: AbortSignal.timeout(8000),
         });
       } catch {
         // ignora erro de rede no logout
       }
     }
-    get().definirUsuario(null);
+    await get().definirUsuario(null);
+    if (NATIVO) window.location.reload();
   },
 
   verificar: async () => {
@@ -109,23 +119,32 @@ export const useAuth = create<EstadoAuth>((set, get) => ({
       const res = await fetch(urlApi("/api/auth?acao=verificar"), {
         headers: { ...cabecalhosNiko(), Authorization: `Bearer ${token}` },
       });
+      if (get().token !== token) return Boolean(get().usuario);
       if (!res.ok) {
         set({ carregando: false, erroVerificacao: mensagemDeErroApi(undefined, res.status) });
         return Boolean(get().usuario);
       }
       const dados = await res.json();
+      if (get().token !== token) return Boolean(get().usuario);
       if (dados.autenticado && dados.usuario) {
         if (dados.usuario.perfil === "visitante") {
-          get().definirUsuario(null);
+          await get().definirUsuario(null);
           return false;
         }
-        set({ usuario: dados.usuario, carregando: false, erroVerificacao: null });
+        const idArmazenado = cabecalhosNiko()["x-kyro-user-id"];
+        const sessao = estadoDaSessao(dados.usuario, token);
+        if (idArmazenado !== String(dados.usuario.id)) {
+          window.location.reload();
+          return false;
+        }
+        set({ ...sessao, erroVerificacao: null });
         return true;
       }
       set({ usuario: null, carregando: false, erroVerificacao: null });
-      get().definirUsuario(null);
+      await get().definirUsuario(null);
       return false;
     } catch {
+      if (get().token !== token) return Boolean(get().usuario);
       // Uma queda temporária não pode apagar a sessão local nem expulsar o usuário.
       set({ carregando: false, erroVerificacao: mensagemDeErroApi(new TypeError("rede")) });
       return Boolean(get().usuario);
@@ -137,6 +156,17 @@ if (NATIVO) {
   void listen<MensagemAutenticacao>(EVENTO_AUTENTICACAO, (evento) => {
     const mensagem = evento.payload;
     if (!mensagem || typeof mensagem !== "object") return;
-    useAuth.setState(estadoDaSessao(mensagem.usuario ?? null, mensagem.token ?? null));
+    const usuario = mensagem.usuario ?? null;
+    const token = mensagem.token ?? null;
+    const anterior = useAuth.getState();
+    const mudouSessao = anterior.token !== token || anterior.usuario?.id !== usuario?.id;
+    const sessao = estadoDaSessao(usuario, token);
+    if (mudouSessao) {
+      // Cada WebView deve carregar o armazenamento da conta antes de exibir
+      // a ilha ou o dock. Reutilizar a loja anterior pode gravar o visual antigo.
+      window.location.reload();
+      return;
+    }
+    useAuth.setState(sessao);
   }).catch(() => undefined);
 }

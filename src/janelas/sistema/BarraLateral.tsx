@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Sun, Moon, PanelLeftClose, PanelLeftOpen, Check, Settings, ChevronDown, LogOut, UserRound, Building2 } from "lucide-react";
+import { Sun, Moon, PanelLeftClose, PanelLeftOpen, Check, Settings, ChevronDown, LogOut, UserRound, Building2, LayoutDashboard } from "lucide-react";
 import { useConfig, GRUPO_DA_ROTA } from "../../estado/configuracoes";
 import { useInterface } from "../../estado/interface";
 import { useRotina, tarefasDoDia } from "../../estado/rotina";
@@ -19,15 +19,18 @@ import { primeiraRotaDaArea, rotaDisponivelNaArea, rotaVisivelNaArea, ROTULOS_EM
 import { mudarTema } from "../area-de-trabalho/mudarTema";
 import { IndicadorSincronia } from "../../componentes/IndicadorSincronia";
 import { Marca } from "../../marcas/Marca";
-import { ehDono, podeAcessarArea, podeAcessarRota } from "../../servicos/permissoes";
+import { ehDono, podeAcessarArea, podeAcessarRota, rotuloDoPapel } from "../../servicos/permissoes";
 import { AppsEmpresaNoMenu } from "./AppsEmpresaNoMenu";
+import "./barraLateral.css";
+import { conexaoVisivelPara } from "../../utilitarios/visibilidadeConexoes";
 
 function useContadores(): Partial<Record<Rota, { n: number; alerta?: boolean }>> {
+  const usuario = useAuth((s) => s.usuario);
   const hoje = hojeISO();
   const area = useInterface((s) => s.area);
   const tarefas = useRotina((s) => tarefasDoDia(s.tarefas.filter((t) => area === "empresa" ? t.area === "empresa" : t.area !== "empresa"), hoje).filter((t) => t.status !== "concluida" && t.status !== "cancelada").length);
   const revisoes = useEstudos((s) => revisoesParaHoje(s));
-  const falhas = useAgentes((s) => s.alertas.filter((a) => a.servico).length);
+  const falhas = useAgentes((s) => s.alertas.filter((a) => a.servico && conexaoVisivelPara(usuario, a.servico)).length);
   const eventos = useOrganizacao((s) => s.eventos.filter((e) => e.data === hoje && (area === "empresa" ? e.area === "empresa" : e.area !== "empresa")).length);
   return {
     journal: { n: tarefas },
@@ -139,10 +142,13 @@ function usarIndicador(rota: string, recolhida: boolean) {
     if (!nav) return;
     const obs = new ResizeObserver(() => posicionar());
     obs.observe(nav);
+    const mudancas = new MutationObserver(() => posicionar());
+    mudancas.observe(nav, { subtree: true, childList: true, attributes: true, attributeFilter: ["aria-current", "hidden"] });
     void document.fonts?.ready.then(() => posicionar());
     const ativos = relogios;
     return () => {
       obs.disconnect();
+      mudancas.disconnect();
       ativos.current.forEach(clearTimeout);
     };
   }, [posicionar]);
@@ -174,6 +180,7 @@ export function BarraLateral({ recolhida }: { recolhida: boolean }) {
   const hoje = tarefasDoDia(tarefas.filter((t) => area === "empresa" ? t.area === "empresa" : t.area !== "empresa"), hojeISO()).filter((t) => t.status !== "cancelada").slice(0, 5);
   const visiveis = barra.filter((i) => i.visivel && rotaLigada(i.rota, desligadas) && rotaVisivelNaArea(i.rota, area) && podeAcessarRota(usuario, i.rota, area));
   const dono = ehDono(usuario);
+  const podeConfigurar = podeAcessarRota(usuario, "configuracoes", area);
   const mostrarHoje = funcaoLigada("journal", desligadas);
 
   useEffect(() => {
@@ -218,25 +225,26 @@ export function BarraLateral({ recolhida }: { recolhida: boolean }) {
   };
 
   const item = (r: Rota, nomeItem?: string) => {
-    const Icone = ICONE_ROTA[r];
+    const Icone = r === "escritorio" ? LayoutDashboard : ICONE_ROTA[r];
     const ativo = rota === r;
     const rotulo = nomeItem || (area === "pessoal" ? ROTULOS_PESSOAIS[r] : ROTULOS_EMPRESA[r]) || T.rotas[r];
     const posicao = visiveis.findIndex((v) => v.rota === r) + 1;
     const contador = contadores[r];
     const atalho = posicao > 0 && posicao <= 9 ? ` (Ctrl + ${posicao})` : "";
+    const compacto = nomeItem || ({ conexoes: "Conexões", calendario: "Agenda", journal: "Rotina", metas: "Objetivos" } as Partial<Record<Rota, string>>)[r] || T.rotas[r];
     return (
-      <button key={r} type="button" className="barra-item" data-rota={r} aria-current={ativo ? "page" : undefined} title={`${rotulo}${atalho}`} onClick={() => irPara(r)}>
+      <button key={r} type="button" className="barra-item" data-rota={r} aria-label={rotulo} aria-current={ativo ? "page" : undefined} title={`${rotulo}${atalho}`} onClick={() => irPara(r)}>
         <Icone size={16} />
-        {!recolhida && <span className="cortar">{rotulo}</span>}
+        <span className="barra-item-texto cortar">{recolhida ? compacto : rotulo}</span>
         {contador && contador.n > 0 && <span className={`barra-contador ${contador.alerta ? "barra-contador-alerta" : ""}`} aria-label={String(contador.n)}>{recolhida ? "" : contador.n}</span>}
       </button>
     );
   };
 
   const itemDoWhatsapp = () => (
-    <button key="whatsapp" type="button" className="barra-item barra-subitem" data-rota="whatsapp" aria-current={rota === "whatsapp" ? "page" : undefined} title={T.rotas.whatsapp} onClick={() => irPara("whatsapp")}>
+    <button key="whatsapp" type="button" className="barra-item barra-whatsapp" data-rota="whatsapp" aria-label={T.rotas.whatsapp} aria-current={rota === "whatsapp" ? "page" : undefined} title={T.rotas.whatsapp} onClick={() => irPara("whatsapp")}>
       <Marca marca="whatsapp" tamanho={15} monocromatica={rota === "whatsapp"} />
-      {!recolhida && <span className="cortar">{T.rotas.whatsapp}</span>}
+      <span className="barra-item-texto cortar">{T.rotas.whatsapp}</span>
       {naoLidasWhatsapp > 0 && <span className="barra-contador barra-contador-whatsapp" aria-label={String(naoLidasWhatsapp)}>{recolhida ? "" : naoLidasWhatsapp > 99 ? "99+" : naoLidasWhatsapp}</span>}
     </button>
   );
@@ -259,20 +267,23 @@ export function BarraLateral({ recolhida }: { recolhida: boolean }) {
         )}
       </div>
       {recolhida && (
-        <button type="button" className="barra-icone barra-icone-largo" aria-label={T.barraLateral.expandir} title={`${T.barraLateral.expandir} (Ctrl + B)`} onClick={() => recolherBarra(false)}>
+        <button type="button" className="barra-icone barra-icone-largo barra-expandir" aria-label={T.barraLateral.expandir} title={`${T.barraLateral.expandir} (Ctrl + B)`} onClick={() => recolherBarra(false)}>
           <PanelLeftOpen size={16} />
         </button>
       )}
-      <div className="barra-contexto" role="tablist" aria-label="Área do sistema">
+      {!dono && usuario ? <div className="barra-contexto-identidade" title="Empresa · Espaço de trabalho">
+        <Building2 size={16} />
+        <span><strong>Empresa</strong>{!recolhida && <small>Espaço de trabalho</small>}</span>
+      </div> : <div className="barra-contexto" role="tablist" aria-label="Área do sistema">
         {dono && <button type="button" className="barra-contexto-botao" data-ativo={area === "pessoal" ? "sim" : "nao"} role="tab" aria-selected={area === "pessoal"} title="Pessoal" onClick={() => trocarArea("pessoal")}>
           <UserRound size={14} />
-          {!recolhida && <span>Pessoal</span>}
+          <span>Pessoal</span>
         </button>}
         <button type="button" className="barra-contexto-botao" data-ativo={area === "empresa" ? "sim" : "nao"} role="tab" aria-selected={area === "empresa"} title="Empresa" onClick={() => trocarArea("empresa")}>
           <Building2 size={14} />
-          {!recolhida && <span>Empresa</span>}
+          <span>Empresa</span>
         </button>
-      </div>
+      </div>}
       <div ref={rolagem} className="barra-rolagem" data-fade-topo={fade.topo ? "sim" : "nao"} data-fade-base={fade.base ? "sim" : "nao"}>
         <span
           className="barra-indicador"
@@ -290,11 +301,11 @@ export function BarraLateral({ recolhida }: { recolhida: boolean }) {
                   <ChevronDown size={12} className="barra-rotulo-seta" />
                 </button>
               )}
-              {!fechado && itens.flatMap((i) => i.rota === "appsEmpresa" ? [<AppsEmpresaNoMenu key="appsEmpresa" recolhida={recolhida} nome={i.nome} />] : i.rota === "conexoes" ? [item(i.rota, i.nome), itemDoWhatsapp()] : [item(i.rota, i.nome)])}
+              {!fechado && itens.map((i) => i.rota === "appsEmpresa" ? <AppsEmpresaNoMenu key="appsEmpresa" recolhida={recolhida} nome={i.nome} /> : i.rota === "conexoes" ? <div key="conexoes" className="barra-conexoes">{item(i.rota, i.nome)}{itemDoWhatsapp()}</div> : item(i.rota, i.nome))}
             </div>
           );
         })}
-        {!recolhida && mostrarHoje && (
+        {!recolhida && mostrarHoje && (area !== "empresa" || hoje.length > 0) && (
           <div className="barra-grupo" data-grupo="hoje">
             <button type="button" className="barra-rotulo" aria-expanded={!hojeFechado} onClick={() => alternarGrupo("hoje")}>
               <span className="rotulo-secao">{T.gruposBarra.hoje}</span>
@@ -323,37 +334,22 @@ export function BarraLateral({ recolhida }: { recolhida: boolean }) {
       <div className="barra-base">
         <IndicadorSincronia recolhida={recolhida} />
         <div className="barra-base-linha">
-          <button type="button" className="barra-perfil" title={dono ? T.perfil.abrirPerfil : nomeExibido} disabled={!dono} onClick={() => irPara("configuracoes", { secao: "geral" })}>
+          <button type="button" className="barra-perfil" title={podeConfigurar ? T.perfil.abrirPerfil : nomeExibido} disabled={!podeConfigurar} onClick={() => irPara("configuracoes", { secao: "geral" })}>
             <Avatar tamanho={28} />
-            {!recolhida && <span className="cortar">{nomeExibido}</span>}
+            {!recolhida && <span className="barra-perfil-identidade"><strong className="cortar">{nomeExibido}</strong><small>{usuario ? rotuloDoPapel(usuario.perfil) : "Seu perfil"}</small></span>}
           </button>
-          {!recolhida && (
-            <>
+          <div className="barra-acoes">
               <button type="button" className="barra-icone" role="switch" aria-checked={escuroAgora} aria-label={rotuloTema} title={rotuloTema} onClick={(evento) => mudarTema(escuroAgora ? "claro" : "escuro", evento.currentTarget)}>
                 {escuroAgora ? <Moon size={15} /> : <Sun size={15} />}
               </button>
-              {dono && <button type="button" className="barra-icone" data-tour="ajustes" aria-current={emAjustes ? "page" : undefined} aria-label={T.rotas.configuracoes} title={T.rotas.configuracoes} onClick={() => irPara("configuracoes")}>
+              {podeConfigurar && <button type="button" className="barra-icone" data-tour="ajustes" aria-current={emAjustes ? "page" : undefined} aria-label={T.rotas.configuracoes} title={T.rotas.configuracoes} onClick={() => irPara("configuracoes")}>
                 <Settings size={15} />
               </button>}
-              <button type="button" className="barra-icone" aria-label="Sair da conta" title="Sair da conta" onClick={() => void logout()}>
+              <button type="button" className="barra-icone barra-sair" aria-label="Sair da conta" title="Sair da conta" onClick={() => void logout()}>
                 <LogOut size={15} />
               </button>
-            </>
-          )}
+          </div>
         </div>
-        {recolhida && (
-          <>
-            <button type="button" className="barra-icone barra-icone-largo" role="switch" aria-checked={escuroAgora} aria-label={rotuloTema} title={rotuloTema} onClick={(evento) => mudarTema(escuroAgora ? "claro" : "escuro", evento.currentTarget)}>
-              {escuroAgora ? <Moon size={16} /> : <Sun size={16} />}
-            </button>
-            {dono && <button type="button" className="barra-icone barra-icone-largo" data-tour="ajustes" aria-current={emAjustes ? "page" : undefined} aria-label={T.rotas.configuracoes} title={T.rotas.configuracoes} onClick={() => irPara("configuracoes")}>
-              <Settings size={16} />
-            </button>}
-            <button type="button" className="barra-icone barra-icone-largo" aria-label="Sair da conta" title="Sair da conta" onClick={() => void logout()}>
-              <LogOut size={16} />
-            </button>
-          </>
-        )}
       </div>
     </nav>
   );

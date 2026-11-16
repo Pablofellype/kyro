@@ -4,11 +4,11 @@
   --fonte-titulo: "Bricolage Grotesque Variable", "Geist", system-ui, sans-serif;
   --fonte-numero: "Instrument Serif", Georgia, serif;
 
-  --destaque: var(--destaque-sistema, #ff3b47);
+  --destaque: var(--destaque-sistema, #275f50);
   --destaque-sobre: var(--destaque-sistema-sobre, #ffffff);
   --destaque-texto: var(--destaque-sobre);
-  --destaque-suave: color-mix(in srgb, var(--destaque) 14%, transparent);
-  --destaque-borda: color-mix(in srgb, var(--destaque) 26%, var(--superficie));
+  --destaque-suave: var(--marca-suave);
+  --destaque-borda: var(--borda);
   --foco: color-mix(in srgb, var(--destaque) 32%, transparent);
 
   --raio-cartao: 12px;
@@ -32,8 +32,8 @@
 
 [data-tema="escuro"] .estilo-sistema {
   color-scheme: dark;
-  --p-f: #0e0e10;
-  --p-s: #161618;
+  --p-f: #1c1b18;
+  --p-s: #26241f;
   --fundo: var(--p-f);
   --fundo-barra: color-mix(in srgb, var(--p-f), #000 22%);
   --superficie: color-mix(in srgb, var(--p-f) 55%, var(--p-s));
@@ -48,13 +48,14 @@
   --borda-hover: color-mix(in srgb, var(--p-s), #fff 18%);
   --linha: color-mix(in srgb, var(--p-s), #fff 3%);
 
-  --texto: #f2efe9;
-  --texto-corpo: #d9d6d0;
-  --texto-2: #a9a6a0;
-  --texto-3: #6f6d69;
-  --texto-4: #55534f;
-  --texto-5: #3f3e3c;
-  --destaque-claro: color-mix(in srgb, var(--destaque) 85%, #fff);
+  --texto: #f6f2e9;
+  --texto-corpo: #ece5da;
+  --texto-2: #ded6c8;
+  --texto-3: #c1b8a7;
+  --texto-4: #b6ac9a;
+  --texto-5: #a89e8c;
+  --destaque-claro: color-mix(in srgb, var(--destaque) 45%, #fff);
+  --destaque-suave: color-mix(in srgb, var(--destaque) 18%, var(--superficie));
 
   --sucesso: #3dd68c;
   --alerta: #f5b651;
@@ -72,19 +73,19 @@
 }
 
 [data-tema="escuro"][data-paleta="padrao"] .estilo-sistema {
-  --fundo: #0e0e10;
-  --fundo-barra: #0b0b0d;
-  --superficie: #131316;
-  --superficie-2: #1b1b1f;
-  --superficie-3: #141417;
-  --superficie-alta: #111113;
-  --superficie-ativa: #17171a;
-  --borda-suave: #1f1f23;
-  --borda: #232327;
-  --borda-controle: #26262b;
-  --borda-forte: #33333a;
-  --borda-hover: #3a3a40;
-  --linha: #1d1d21;
+  --fundo: #1c1b18;
+  --fundo-barra: #26241f;
+  --superficie: #26241f;
+  --superficie-2: #302d26;
+  --superficie-3: #26241f;
+  --superficie-alta: #2b2822;
+  --superficie-ativa: #373229;
+  --borda-suave: #3e392f;
+  --borda: #484237;
+  --borda-controle: #5e5546;
+  --borda-forte: #7f725e;
+  --borda-hover: #a99b83;
+  --linha: #3e392f;
 }
 
 [data-tema="escuro"][data-paleta="areia"] .estilo-sistema { --p-f: #14110d; --p-s: #1c1814; }
@@ -94,8 +95,8 @@
 
 [data-tema="claro"] .estilo-sistema {
   color-scheme: light;
-  --p-f: #ededeb;
-  --p-s: #f8f8f5;
+  --p-f: #f6f3ed;
+  --p-s: #ffffff;
   --fundo: var(--p-f);
   --fundo-barra: color-mix(in srgb, var(--p-f), #000 2.5%);
   --superficie: var(--p-s);
@@ -110,12 +111,12 @@
   --borda-hover: color-mix(in srgb, var(--p-f), #000 34%);
   --linha: color-mix(in srgb, var(--p-f), #000 12%);
 
-  --texto: #20201e;
-  --texto-corpo: #30302d;
-  --texto-2: #4d4d49;
-  --texto-3: #62625f;
-  --texto-4: #666662;
-  --texto-5: #8b8b84;
+  --texto: #2c2924;
+  --texto-corpo: #454037;
+  --texto-2: #625b50;
+  --texto-3: #6c6458;
+  --texto-4: #6c6458;
+  --texto-5: #857c6f;
   --destaque-claro: color-mix(in srgb, var(--destaque) 86%, #000);
 
   --sucesso: #1f9d63;
@@ -1434,7 +1435,7 @@
 
 .estilo-sistema .barra-item[aria-current="page"] {
   background: transparent;
-  color: var(--destaque-sobre);
+  color: var(--texto);
   font-weight: 500;
 }
 
@@ -1447,15 +1448,15 @@
 }
 
 .estilo-sistema .barra-item[aria-current="page"][data-sem-indicador="sim"] {
-  background: linear-gradient(180deg, color-mix(in srgb, var(--destaque) 92%, #fff), color-mix(in srgb, var(--destaque) 86%, #000));
+  background: var(--superficie-2);
 }
 
 .estilo-sistema .barra-indicador {
   position: absolute;
   z-index: 0;
   border-radius: 8px;
-  background: linear-gradient(180deg, color-mix(in srgb, var(--destaque) 92%, #fff), color-mix(in srgb, var(--destaque) 86%, #000));
-  box-shadow: 0 3px 12px color-mix(in srgb, var(--destaque) 30%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  background: var(--superficie-2);
+  box-shadow: none;
   pointer-events: none;
 }
 

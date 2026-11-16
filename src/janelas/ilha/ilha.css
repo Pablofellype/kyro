@@ -68,6 +68,26 @@
   border-radius: inherit;
 }
 
+.ilha-comandos-laterais {
+  position: absolute;
+  top: 0;
+  left: 6px;
+  right: 6px;
+  z-index: 12;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) 28px;
+  align-items: center;
+  height: 40px;
+  pointer-events: none;
+}
+
+.ilha-comandos-laterais > span { text-align: center; font-size: 10px; font-weight: 600; letter-spacing: .1em; color: var(--i-dim); }
+.ilha-seta-lateral { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 9px; background: transparent; color: var(--i-tinta); pointer-events: auto; transition: background .15s, color .15s; }
+.ilha-seta-lateral:hover, .ilha-seta-lateral[aria-expanded="true"] { background: var(--i-aba-ativa); color: var(--destaque); }
+.ilha-seta-lateral:focus-visible { outline: 2px solid var(--destaque); outline-offset: 1px; }
+.ilha-raiz .ilha[data-com-laterais="sim"] .ilha-compacta { padding-inline: 40px; }
+.ilha-raiz .ilha[data-com-laterais="sim"] .ilha-expandida { padding-top: 42px; }
+
 .ilha-compacta {
   position: absolute;
   inset: 0;
@@ -256,7 +276,7 @@
   color: var(--i-tinta);
 }
 
-.ilha-aba:has(.ilha-aba-nome) {
+.ilha-aba[aria-selected="true"] {
   width: auto;
   display: flex;
   gap: 6px;
@@ -267,6 +287,10 @@
   font-size: 11.5px;
   font-weight: 600;
   white-space: nowrap;
+}
+
+.ilha-aba:not([aria-selected="true"]) .ilha-aba-nome {
+  display: none;
 }
 
 .ilha-aba-selo {
@@ -2971,7 +2995,7 @@ html[data-mobile="sim"] .ilha-gatilho {
     border-radius: 10px;
   }
 
-  .ilha-aba:has(.ilha-aba-nome) {
+  .ilha-aba[aria-selected="true"] {
     height: 36px;
     padding-right: 9px;
     padding-left: 8px;

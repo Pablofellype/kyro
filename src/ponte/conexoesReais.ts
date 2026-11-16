@@ -4,8 +4,12 @@ import type { ServicoId } from "../tipos";
 import type { CalendarioContribuicoesGithub } from "../utilitarios/contribuicoesGithub";
 import type { CommitGithub } from "../utilitarios/commitsGithub";
 import { hojeISO, paraISO } from "../utilitarios/datas";
-import { cabecalhosNiko } from "../estado/autenticacao";
+import { cabecalhosNiko, useAuth } from "../estado/autenticacao";
 import { ponteLocalDisponivel } from "./ambiente";
+import type { DadosTeams, DadosPlanner } from "../tiposMicrosoft";
+import { tarefaPlannerAtrasada } from "../utilitarios/conexoesMicrosoft";
+import { conexaoVisivelPara } from "../utilitarios/visibilidadeConexoes";
+import type { DadosPlanilhasGoogle, PlanilhaGoogle } from "../tiposPlanilhas";
 
 export interface DadosStripe {
   disponivel: number;
@@ -260,6 +264,9 @@ export type DadosServico = {
   cripto: DadosCripto;
   google: DadosGoogle;
   outlook: DadosOutlook;
+  teams: DadosTeams;
+  planner: DadosPlanner;
+  planilhas: DadosPlanilhasGoogle;
   supabase: DadosSupabase;
   cloudflare: DadosCloudflare;
   stripe: DadosStripe;
@@ -276,8 +283,13 @@ async function pedir<R>(caminho: string, opcoes: RequestInit = {}): Promise<R> {
   const conexaoGoogle = /^\/conexoes\/google(?:\?|$|\/)/.test(caminho) && opcoes.method !== "DELETE";
   if (recursoGoogle || conexaoGoogle) exigirConexaoDisponivel("google");
   if (!ponteLocalDisponivel()) throw new Error("Esta conexão precisa do aplicativo Kyro instalado.");
+  const sessao = useAuth.getState();
+  const servico = /^\/conexoes\/([a-z]+)(?:[/?]|$)/.exec(caminho)?.[1] as ServicoId | undefined;
+  if (servico && !conexaoVisivelPara(sessao.usuario, servico)) throw new Error("conexao_oculta_perfil");
   const r = await fetch(`/ponte${caminho}`, { ...opcoes, headers: { ...cabecalhosNiko(), "content-type": "application/json", ...(opcoes.headers ?? {}) } });
   const json = (await r.json().catch(() => ({}))) as R & { erro?: string };
+  const atual = useAuth.getState();
+  if (atual.token !== sessao.token || atual.usuario?.id !== sessao.usuario?.id) throw new Error("conexao_sessao_alterada");
   if (!r.ok) throw new Error(json.erro ?? `http_${r.status}`);
   return json;
 }
@@ -286,6 +298,7 @@ export const conexoesPonte = {
   loginDireto: () => pedir<{ disponivel: boolean }>("/google/login-direto", { signal: AbortSignal.timeout(4000) }),
   estado: () => pedir<Record<ServicoId, { temChave: boolean; url: string | null }>>("/conexoes"),
   ler: <S extends ServicoId>(servico: S, forcar = false) => pedir<DadosServico[S]>(`/conexoes/${servico}${forcar ? "?forcar=1" : ""}`),
+  lerAbaPlanilha: (id: string, gid: number) => pedir<PlanilhaGoogle>(`/conexoes/planilhas/aba?${new URLSearchParams({ id, gid: String(gid) })}`),
   salvarChave: (servico: ServicoId, chave: string, extra: Record<string, unknown> = {}) => pedir<{ ok: boolean }>(`/conexoes/${servico}/chave`, { method: "POST", body: JSON.stringify({ chave, ...extra }) }),
   buscarEmails: (q: string) => pedir<EmailResumo[]>(`/gmail/buscar?q=${encodeURIComponent(q)}`),
   lerAgendaGoogle: (de: string, ate: string) => pedir<EventoGoogle[]>(`/agenda/eventos?de=${encodeURIComponent(de)}&ate=${encodeURIComponent(ate)}`),
@@ -318,6 +331,18 @@ export function resumoDe<S extends ServicoId>(servico: S, dados: DadosServico[S]
     case "outlook": {
       const o = d as DadosOutlook;
       return R.outlook(o.naoLidos, o.agenda.hoje);
+    }
+    case "teams": {
+      const t = d as DadosTeams;
+      return R.teams(t.conversas.length, t.mensagens.filter((m) => m.mencionaMe && !m.minha).length, t.parcial);
+    }
+    case "planner": {
+      const p = d as DadosPlanner;
+      return R.planner(p.tarefas.filter((t) => t.progresso < 100).length, p.tarefas.filter((t) => tarefaPlannerAtrasada(t)).length, p.parcial);
+    }
+    case "planilhas": {
+      const p = d as DadosPlanilhasGoogle;
+      return R.planilhas(p.planilhas.filter((p) => p.previa !== null).length, p.planilhas.filter((p) => p.erro !== null).length);
     }
     case "supabase":
       return R.supabase((d as DadosSupabase).projetos.length, (d as DadosSupabase).projetos.reduce((a, p) => a + p.usuarios, 0));
@@ -404,6 +429,12 @@ export function ocorrenciasDe<S extends ServicoId>(servico: S, dados: DadosServi
       return ((d as DadosGoogle).gmail?.importantes ?? []).map((e) => ({ chave: e.id, texto: O.emailImportante(e.de, e.assunto), tipo: "sucesso" as const, data: e.data, aviso: "importante" as const }));
     case "outlook":
       return (d as DadosOutlook).importantes.map((e) => ({ chave: e.id, texto: O.emailImportante(e.de, e.assunto), tipo: "sucesso" as const, data: e.data, aviso: "importante" as const }));
+    case "teams":
+      return (d as DadosTeams).mensagens.filter((m) => !m.minha && m.mencionaMe).map((m) => ({ chave: `teams-${m.conversaId}-${m.id}`, texto: O.teamsMencao(m.autor, m.conversa), tipo: "sucesso" as const, data: m.data, aviso: "importante" as const }));
+    case "planner": {
+      const hoje = hojeISO();
+      return (d as DadosPlanner).tarefas.filter((t) => t.progresso < 100 && t.prazo && paraISO(new Date(t.prazo)) === hoje).map((t) => ({ chave: `planner-prazo-${t.id}-${hoje}`, texto: O.prazoHoje(nome, t.titulo), tipo: "sucesso" as const, data: t.prazo!, aviso: "importante" as const }));
+    }
     case "supabase":
       return (d as DadosSupabase).projetos.flatMap((p) => p.servicos.filter((x) => !x.saudavel).map((x) => ({ chave: `${p.ref}-${x.nome}-${new Date().toISOString().slice(0, 13)}`, texto: O.supabaseServico(p.nome, x.nome), tipo: "falha" as const, data: new Date().toISOString() })));
     case "cloudflare":
@@ -456,8 +487,8 @@ export function ocorrenciasDe<S extends ServicoId>(servico: S, dados: DadosServi
       return [];
   }
 }
-export const SERVICOS_DO_GOOGLE: ServicoId[] = ["google"];
-export const SERVICOS_DO_MICROSOFT: ServicoId[] = ["outlook"];
+export const SERVICOS_DO_GOOGLE: ServicoId[] = ["google", "planilhas"];
+export const SERVICOS_DO_MICROSOFT: ServicoId[] = ["outlook", "teams", "planner"];
 
 export const LINKS_DO_GUIA: Record<ServicoId, (string | null)[]> = {
   stripe: ["https://dashboard.stripe.com/apikeys", null, null, null],
@@ -476,6 +507,9 @@ export const LINKS_DO_GUIA: Record<ServicoId, (string | null)[]> = {
     null,
   ],
   outlook: ["https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade", "https://learn.microsoft.com/entra/identity-platform/scenario-desktop-app-registration", null, null],
+  teams: ["https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade", "https://learn.microsoft.com/entra/identity-platform/scenario-desktop-app-registration", "https://learn.microsoft.com/graph/api/chat-list-messages?view=graph-rest-1.0", null],
+  planner: ["https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade", "https://learn.microsoft.com/entra/identity-platform/scenario-desktop-app-registration", "https://learn.microsoft.com/graph/api/planneruser-list-tasks?view=graph-rest-1.0", null],
+  planilhas: ["https://console.cloud.google.com/projectcreate", "https://console.cloud.google.com/apis/library/sheets.googleapis.com", "https://console.cloud.google.com/auth/clients", null],
   supabase: ["https://supabase.com/dashboard/account/tokens", null, null],
   cloudflare: ["https://dash.cloudflare.com/profile/api-tokens", null, null, null],
   linear: ["https://linear.app/settings/account/security", null, null],
@@ -500,6 +534,9 @@ export const PAINEL_OFICIAL: Record<ServicoId, string> = {
   n8n: "https://n8n.io",
   google: "https://myaccount.google.com/",
   outlook: "https://outlook.office.com/mail/",
+  teams: "https://teams.microsoft.com/",
+  planner: "https://planner.cloud.microsoft/",
+  planilhas: "https://sheets.google.com/",
   supabase: "https://supabase.com/dashboard/projects",
   cloudflare: "https://dash.cloudflare.com",
   linear: "https://linear.app",

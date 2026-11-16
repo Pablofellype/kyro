@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs";
 
 globalThis.BroadcastChannel = undefined;
 globalThis.localStorage = { getItem: () => null, setItem: () => undefined };
-globalThis.window = { setTimeout, clearTimeout };
+globalThis.window = Object.assign(new EventTarget(), { setTimeout, clearTimeout, innerWidth: 1366 });
 const servidor = await createServer({ configFile: false, server: { middlewareMode: true, hmr: false, watch: null }, appType: "custom", optimizeDeps: { noDiscovery: true } });
 after(() => servidor.close());
 const { abaVizinha, alternarAbaDaBarra, criarAlternadorDoIniciar } = await servidor.ssrLoadModule("/src/janelas/ilha/barra/acoesDaBarra.ts");
@@ -13,6 +13,49 @@ const { useIlha } = await servidor.ssrLoadModule("/src/estado/ilha.ts");
 const { atrasoDeFechamento, editandoNaIlha } = await servidor.ssrLoadModule("/src/janelas/ilha/fechamento.ts");
 const { controle, sistema } = await servidor.ssrLoadModule("/src/ponte/ponteLocal.ts");
 const { areaDeTrabalhoNaFrente, focoDaAreaPeloElemento, mostrarLateraisDaIlha } = await servidor.ssrLoadModule("/src/janelas/ilha/barra/visibilidadeDaBarra.ts");
+
+test("gerência e dono mantêm todas as abas pessoais configuradas, incluindo avisos sem notificações", async () => {
+  const { abasVisiveisDaIlha } = await servidor.ssrLoadModule("/src/janelas/ilha/abasDaIlha.ts");
+  const { CONFIG_PADRAO } = await servidor.ssrLoadModule("/src/estado/configuracoes.ts");
+  const esperado = ["hoje", "time", "conexoes", "whatsapp", "midia", "foco", "avisos"];
+  for (const perfil of ["dono", "gerencia"]) assert.deepEqual(abasVisiveisDaIlha({ perfil }, CONFIG_PADRAO.ilha, []), esperado);
+  assert.deepEqual(abasVisiveisDaIlha({ perfil: "visitante" }, CONFIG_PADRAO.ilha, []), []);
+  assert.deepEqual(abasVisiveisDaIlha(null, CONFIG_PADRAO.ilha, []), []);
+});
+
+test("restaurar as abas da gerência respeita ordem e opções desligadas pelo usuário", async () => {
+  const { abasVisiveisDaIlha } = await servidor.ssrLoadModule("/src/janelas/ilha/abasDaIlha.ts");
+  const { CONFIG_PADRAO } = await servidor.ssrLoadModule("/src/estado/configuracoes.ts");
+  const cfg = { ...CONFIG_PADRAO.ilha, ordemAbas: ["midia", "hoje", "foco", "whatsapp", "avisos", "chat", "claude"], blocos: { ...CONFIG_PADRAO.ilha.blocos, foco: false, chat: true, claude: true } };
+  const antes = structuredClone(cfg);
+  assert.deepEqual(abasVisiveisDaIlha({ perfil: "gerencia" }, cfg, []), ["midia", "hoje", "whatsapp", "avisos"]);
+  assert.deepEqual(abasVisiveisDaIlha({ perfil: "gerencia" }, cfg, ["journal", "calendario"]), ["midia", "whatsapp", "avisos"]);
+  assert.deepEqual(cfg, antes);
+});
+
+test("Time da gerência mantém tarefas e foco sem anunciar acesso ao chat restrito", async () => {
+  const { createElement } = await import("react");
+  const { renderToStaticMarkup } = await import("react-dom/server");
+  const { VisaoTime } = await servidor.ssrLoadModule("/src/janelas/ilha/VisaoTime.tsx");
+  const { useAuth } = await servidor.ssrLoadModule("/src/estado/autenticacao.ts");
+  const { useInterface } = await servidor.ssrLoadModule("/src/estado/interface.ts");
+  const { T } = await servidor.ssrLoadModule("/src/textos/textos.ts");
+  const auth = useAuth.getInitialState(), ui = useInterface.getInitialState();
+  const usuario = auth.usuario, area = ui.area;
+  try {
+    ui.area = "empresa";
+    auth.usuario = { id: 7, perfil: "gerencia" };
+    const gerente = renderToStaticMarkup(createElement(VisaoTime));
+    assert.ok(gerente.includes(T.inicio.novaTarefa));
+    assert.ok(gerente.includes(T.pomodoro.iniciar));
+    assert.ok(!gerente.includes(T.ilha.conversar));
+    auth.usuario = { id: 1, perfil: "dono" };
+    assert.ok(renderToStaticMarkup(createElement(VisaoTime)).includes(T.ilha.conversar));
+  } finally {
+    auth.usuario = usuario;
+    ui.area = area;
+  }
+});
 
 test("fechamento permite sair imediatamente ou esperar menos de cinco segundos, preservando Nunca", () => {
   assert.equal(atrasoDeFechamento(0, "hoje"), null);
@@ -36,17 +79,22 @@ test("edição protege inputs, texto, seletores e conteúdo editável, mas não 
   assert.equal(editandoNaIlha(raiz, { dentro: true, closest: () => null }), false);
 });
 
-test("grade de conexões mantém 350 px e somente os detalhes do GitHub conectado usam 500 px", async () => {
-  const { alturaDasConexoes } = await servidor.ssrLoadModule("/src/janelas/ilha/alturaDasConexoes.ts");
-  assert.equal(alturaDasConexoes(null, true), 350);
-  assert.equal(alturaDasConexoes(null, false), 350);
-  assert.equal(alturaDasConexoes("github", true), 500);
-  assert.equal(alturaDasConexoes("github", false), 350);
-  for (const servico of ["stripe", "vercel", "resend", "notion", "calcom", "n8n", "google", "supabase", "cloudflare"])
-    assert.equal(alturaDasConexoes(servico, true), 350);
+test("ilha aberta mantém uma moldura comum e cabe em celulares nas duas orientações", async () => {
+  const { DIMENSOES_ILHA_EXPANDIDA, limitarIlhaATela } = await servidor.ssrLoadModule("/src/janelas/ilha/dimensoesDaIlha.ts");
+  for (const tela of [{ largura: 390, altura: 844 }, { largura: 844, altura: 390 }, { largura: 240, altura: 180 }, { largura: 1920, altura: 1080 }]) {
+    const ajustada = limitarIlhaATela(DIMENSOES_ILHA_EXPANDIDA, tela);
+    assert.ok(ajustada.w > 0 && ajustada.h > 0);
+    assert.ok(ajustada.w <= tela.largura - 16);
+    assert.ok(ajustada.h <= tela.altura - 24);
+    assert.ok(ajustada.w <= DIMENSOES_ILHA_EXPANDIDA.w);
+    assert.ok(ajustada.h <= DIMENSOES_ILHA_EXPANDIDA.h);
+    assert.equal(ajustada.r, DIMENSOES_ILHA_EXPANDIDA.r);
+  }
+  assert.deepEqual(limitarIlhaATela(DIMENSOES_ILHA_EXPANDIDA, { largura: 1920, altura: 1080 }), DIMENSOES_ILHA_EXPANDIDA);
+  assert.ok(Object.isFrozen(DIMENSOES_ILHA_EXPANDIDA));
 });
 
-test("voltar, fechar ou trocar de aba restaura a grade compacta sem perder a rolagem dos commits", () => {
+test("voltar, fechar ou trocar de aba limpa a seleção sem perder a rolagem dos commits", () => {
   const ilha = readFileSync(new URL("../src/janelas/ilha/Ilha.tsx", import.meta.url), "utf8");
   const visoes = readFileSync(new URL("../src/janelas/ilha/Visoes.tsx", import.meta.url), "utf8");
   const detalhes = readFileSync(new URL("../src/janelas/ilha/ConexaoNaIlha.tsx", import.meta.url), "utf8");
@@ -68,15 +116,41 @@ test("laterais seguem o foco, não o tamanho da janela, e preservam foco ao usar
   assert.equal(areaDeTrabalhoNaFrente({ ...area, telaCheia: true, frente: "sobreposta" }, true), false);
 });
 
-test("abrir a ilha mostra os dois lados mesmo sobre uma janela, recolher respeita o foco", () => {
+test("controles ficam disponíveis na ilha aberta ou no próprio painel, respeitando bloqueios", () => {
   const base = { ativadas: true, estado: "compacta", saudando: false, telaCheia: false, areaEmFoco: false };
   assert.equal(mostrarLateraisDaIlha(base), false);
   assert.equal(mostrarLateraisDaIlha({ ...base, areaEmFoco: true }), true);
+  assert.equal(mostrarLateraisDaIlha({ ...base, sistemaEmFoco: true }), true);
   assert.equal(mostrarLateraisDaIlha({ ...base, estado: "expandida" }), true);
   assert.equal(mostrarLateraisDaIlha({ ...base, estado: "escondida", areaEmFoco: true }), false);
   for (const bloqueio of [{ ativadas: false }, { saudando: true }, { telaCheia: true }]) {
     assert.equal(mostrarLateraisDaIlha({ ...base, estado: "expandida", areaEmFoco: true, ...bloqueio }), false);
   }
+});
+
+test("laterais começam recolhidas e cada seta revela somente o lado escolhido", async () => {
+  const { createElement } = await import("react");
+  const { renderToStaticMarkup } = await import("react-dom/server");
+  const { SetasLaterais } = await servidor.ssrLoadModule("/src/janelas/ilha/SetasLaterais.tsx");
+  const { BarraDoTopo } = await servidor.ssrLoadModule("/src/janelas/ilha/barra/BarraDoTopo.tsx");
+  const { aparenciaDeBorda } = await servidor.ssrLoadModule("/src/utilitarios/cores.ts");
+  const props = { visivel: true, escala: 1, larguraDaIlha: 300, aparencia: aparenciaDeBorda("#fff9fa", 1, "#e40016"), aoUsar() {}, aoFechar() {} };
+  const renderizar = (ladoAberto) => renderToStaticMarkup(createElement(BarraDoTopo, { ...props, ladoAberto }));
+  assert.doesNotMatch(renderizar(null), /ilha-barra-aba|ilha-pop ilha/);
+  for (const lado of ["esquerda", "direita"]) {
+    const html = renderizar(lado);
+    assert.ok(html.includes(`id="ilha-lateral-${lado}"`));
+    assert.ok(!html.includes(`id="ilha-lateral-${lado === "esquerda" ? "direita" : "esquerda"}"`));
+  }
+  const clicados = [];
+  const setas = SetasLaterais({ aberta: null, expandida: false, aoAlternar: (lado) => clicados.push(lado) });
+  for (const botao of [setas.props.children[0], setas.props.children[2]]) {
+    assert.equal(botao.props["aria-expanded"], false);
+    botao.props.onClick();
+  }
+  assert.deepEqual(clicados, ["esquerda", "direita"]);
+  const html = renderToStaticMarkup(createElement(SetasLaterais, { aberta: "direita", expandida: true, aoAlternar() {} }));
+  assert.match(html, /aria-label="Recolher controles à direita"[^>]*aria-expanded="true"/);
 });
 
 test("foco no localhost distingue área de trabalho, janelas e controles da ilha", () => {
@@ -87,7 +161,7 @@ test("foco no localhost distingue área de trabalho, janelas e controles da ilha
   assert.equal(focoDaAreaPeloElemento(null), undefined);
 });
 
-test("passar o mouse nas laterais revela a barra sem abrir a ilha central e mantém os painéis em uso", () => {
+test("controles solicitados permanecem em uso sem abrir a ilha e respeitam os bloqueios", () => {
   const base = { ativadas: true, estado: "escondida", saudando: false, telaCheia: false, areaEmFoco: false };
   assert.equal(mostrarLateraisDaIlha(base), false);
   assert.equal(mostrarLateraisDaIlha({ ...base, emUso: true }), true);

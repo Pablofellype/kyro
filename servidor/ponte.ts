@@ -9,7 +9,7 @@ import { lerUltimaVersao } from "./atualizacoes.ts";
 import { lerTudo, gravar, backupManual, zerarBanco, reservarConfirmacao } from "./banco.ts";
 import { pedirMidia } from "./midia.ts";
 import { pedirJanelas } from "./janelas.ts";
-import { configPublica, estadoConexoes, lerConexao, salvarChaveConexao, removerChaveConexao, servicoValido, chaveDe, SERVICOS as SERVICOS_CONEXAO } from "./conexoes.ts";
+import { configPublica, estadoConexoes, lerConexao, salvarChaveConexao, removerChaveConexao, servicoValido, chaveDe, lerAbaDasPlanilhas, SERVICOS as SERVICOS_CONEXAO } from "./conexoes.ts";
 import { buscarGmail, criarRascunhoGmail, enviarGmail } from "./gmail.ts";
 import { lerAgendaGoogle } from "./agendaGoogle.ts";
 import { lerCotacoes } from "./cotacoes.ts";
@@ -648,6 +648,11 @@ export const rotas: Connect.NextHandleFunction = async (req, res, proximo) => {
     }
     if (caminho === "/cotacoes" && req.method === "GET") return responder(res, 200, await lerCotacoes());
     if (caminho === "/google/login-direto" && req.method === "GET") return responder(res, 200, { disponivel: false, emTestes: true });
+    if (caminho === "/conexoes/planilhas/aba" && req.method === "GET") {
+      const gid = url.searchParams.get("gid");
+      if (!gid || !/^\d+$/.test(gid)) return responder(res, 400, { erro: "planilhas_aba_invalida" });
+      return responder(res, 200, await lerAbaDasPlanilhas(url.searchParams.get("id") ?? "", Number(gid)));
+    }
     if (caminho === "/gmail/buscar" && req.method === "GET") return responder(res, 200, await buscarGmail(await chaveDe("google"), url.searchParams.get("q") ?? ""));
     if (caminho === "/agenda/eventos" && req.method === "GET") return responder(res, 200, await lerAgendaGoogle(await chaveDe("google"), url.searchParams.get("de") ?? "", url.searchParams.get("ate") ?? ""));
     if (caminho === "/gmail/rascunho" && req.method === "POST") return responder(res, 200, await criarRascunhoGmail(await chaveDe("google"), await lerCorpo(req)));

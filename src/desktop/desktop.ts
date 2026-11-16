@@ -410,6 +410,7 @@ export interface EstadoDaFrente {
   maximizada: boolean;
   naBase?: boolean;
   frente: TipoDaFrente;
+  sistemaEmFoco?: boolean;
 }
 
 const EVENTO_FRENTE_MUDOU = "niko://frente-mudou";
@@ -495,7 +496,8 @@ export function usarEstadoDaFrente(ativo: boolean, regras: RegrasDeSumir, geraca
       const maximizada = Boolean(r?.maximizada);
       const naBase = Boolean(r?.naBase);
       const frente: TipoDaFrente = r?.frente === "app" || r?.frente === "sobreposta" ? r.frente : "area_de_trabalho";
-      setEstado((anterior) => (anterior.cobre === cobre && anterior.telaCheia === telaCheia && anterior.maximizada === maximizada && Boolean(anterior.naBase) === naBase && anterior.frente === frente ? anterior : { cobre, telaCheia, maximizada, naBase, frente }));
+      const sistemaEmFoco = r.sistemaEmFoco === true;
+      setEstado((anterior) => (anterior.cobre === cobre && anterior.telaCheia === telaCheia && anterior.maximizada === maximizada && Boolean(anterior.naBase) === naBase && anterior.frente === frente && Boolean(anterior.sistemaEmFoco) === sistemaEmFoco ? anterior : { cobre, telaCheia, maximizada, naBase, frente, sistemaEmFoco }));
     };
     // O Windows avisa quando a janela da frente muda; a consulta periódica fica como rede de segurança.
     let desligarAviso: () => void = () => undefined;

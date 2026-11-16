@@ -1136,7 +1136,7 @@
   padding: 28px;
   border-radius: 16px;
   border: 1px solid var(--borda-forte);
-  background: radial-gradient(400px 200px at 50% 0%, color-mix(in srgb, var(--destaque) 8%, transparent), transparent 70%), var(--superficie-3);
+  background: var(--superficie-3);
   text-align: center;
 }
 

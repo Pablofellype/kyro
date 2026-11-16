@@ -1,4 +1,14 @@
 :root {
+  --marca-primaria: #275f50;
+  --marca-primaria-hover: #1b493d;
+  --marca-primaria-profunda: #12382e;
+  --marca-suave: #e7efe8;
+  --marca-borda: #ded7cb;
+  --marca-texto: #2c2924;
+  --destaque: var(--marca-primaria);
+  --destaque-sistema: var(--marca-primaria);
+  --destaque-sistema-sobre: #ffffff;
+  --destaque-texto: #ffffff;
   --fonte-mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
   --fonte-texto: "Inter", system-ui, "Segoe UI Variable Text", "Segoe UI", sans-serif;
 
@@ -42,47 +52,47 @@
 [data-fundo-claro] {
   color-scheme: light;
   --cor-organizador: #1c1c1e;
-  --fundo: #ededeb;
-  --superficie: #f8f8f5;
-  --superficie-2: #e5e5e1;
-  --borda: #c9cac5;
-  --borda-forte: #abada7;
-  --texto: #20201e;
-  --texto-2: #4d4d49;
-  --texto-3: #62625f;
-  --primario: #20201e;
+  --fundo: #f6f3ed;
+  --superficie: #ffffff;
+  --superficie-2: #efe9df;
+  --borda: #ded7cb;
+  --borda-forte: #b9ab98;
+  --texto: #2c2924;
+  --texto-2: #625b50;
+  --texto-3: #6c6458;
+  --primario: var(--marca-primaria);
   --primario-texto: #ffffff;
   --botao-primario: var(--primario);
-  --botao-primario-hover: #2a2a2a;
+  --botao-primario-hover: var(--marca-primaria-hover);
   --botao-primario-texto: var(--primario-texto);
   --botao-primario-borda: transparent;
   --sucesso: #2f9e6b;
   --alerta: #d9922b;
   --erro: #d84b4b;
-  --foco: rgba(124, 92, 224, 0.35);
+  --foco: rgba(39, 95, 80, 0.3);
 }
 
 [data-tema="escuro"],
 [data-fundo-escuro] {
   color-scheme: dark;
-  --fundo: #0e0e10;
-  --superficie: #161618;
-  --superficie-2: #1d1d20;
-  --borda: #2a2a2e;
-  --borda-forte: #3a3a40;
-  --texto: #f2f2f2;
-  --texto-2: #9a9aa0;
-  --texto-3: #6b6b72;
-  --primario: #f2f2f2;
-  --primario-texto: #111111;
-  --botao-primario: color-mix(in srgb, #ffffff 13%, var(--superficie));
-  --botao-primario-hover: color-mix(in srgb, #ffffff 19%, var(--superficie));
-  --botao-primario-texto: var(--texto);
+  --fundo: #1c1b18;
+  --superficie: #26241f;
+  --superficie-2: #302d26;
+  --borda: #484237;
+  --borda-forte: #5e5546;
+  --texto: #f6f2e9;
+  --texto-2: #ded6c8;
+  --texto-3: #c1b8a7;
+  --primario: var(--marca-primaria);
+  --primario-texto: #ffffff;
+  --botao-primario: var(--primario);
+  --botao-primario-hover: var(--marca-primaria-hover);
+  --botao-primario-texto: var(--primario-texto);
   --botao-primario-borda: rgba(255, 255, 255, 0.09);
   --sucesso: #3dd68c;
   --alerta: #f5b651;
   --erro: #ff6b6b;
-  --foco: rgba(167, 139, 250, 0.4);
+  --foco: rgba(143, 197, 175, 0.4);
   --cor-organizador: #e9e9ec;
 }
 

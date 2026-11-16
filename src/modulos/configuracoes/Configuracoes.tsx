@@ -13,6 +13,7 @@ import { AGENTES } from "../../estado/agentes";
 import { useComunicacao } from "../../estado/comunicacao";
 import { useInterface } from "../../estado/interface";
 import { useAuth } from "../../estado/autenticacao";
+import { podeAcessarConfiguracao, podeAcessarRota } from "../../servicos/permissoes";
 import { usePomodoro } from "../../estado/pomodoro";
 import { T } from "../../textos/textos";
 import { contraste, hexValido, FUNDO_DESTAQUE } from "../../utilitarios/cores";
@@ -63,7 +64,7 @@ const ICONES: Record<Secao, React.ReactNode> = {
 };
 
 const AMOSTRAS_PALETA: Record<Paleta, { escuro: [string, string]; claro: [string, string] }> = {
-  padrao: { escuro: ["#0e0e10", "#161618"], claro: ["#f6f5f2", "#ffffff"] },
+  padrao: { escuro: ["#1c1b18", "#26241f"], claro: ["#f6f3ed", "#ffffff"] },
   areia: { escuro: ["#14110d", "#1c1814"], claro: ["#f5f1ea", "#fffdf9"] },
   grafite: { escuro: ["#0b0c0e", "#131418"], claro: ["#eeeff1", "#fbfbfc"] },
   floresta: { escuro: ["#0c110d", "#131a14"], claro: ["#f1f4f0", "#fcfdfb"] },
@@ -327,14 +328,15 @@ export default function Configuracoes() {
   const [busca, setBusca] = useState("");
   const secoesVisiveis = useMemo(() => {
     const termo = normalizarTexto(busca.trim());
-    const todas = (Object.keys(T.configuracoes.secoes) as Secao[]).filter((s) => s !== "admin" || usuario?.perfil === "dono");
+    const todas = (Object.keys(T.configuracoes.secoes) as Secao[]).filter((s) => podeAcessarConfiguracao(usuario, s));
     if (!termo) return todas;
     return todas.filter((s) => normalizarTexto(`${T.configuracoes.secoes[s]} ${T.configuracoes.palavrasChave[s]}`).includes(termo));
   }, [busca, usuario?.perfil]);
   useEffect(() => {
     if (secoesVisiveis.length > 0 && !secoesVisiveis.includes(secao)) setSecao(secoesVisiveis[0]);
   }, [secoesVisiveis, secao]);
-  const secaoAtual = secao === "admin" && usuario?.perfil !== "dono" ? "geral" : secao;
+  const secaoAtual = podeAcessarConfiguracao(usuario, secao) ? secao : "geral";
+  const barraEditavel = cfg.barraLateral.filter((b) => rotaLigada(b.rota, cfg.funcoesDesligadas) && podeAcessarRota(usuario, b.rota, "empresa"));
   const [previaVisual, setPreviaVisual] = useState<ReturnType<typeof validarVisual>>(null);
   const [erroVisual, setErroVisual] = useState("");
   const [novoFato, setNovoFato] = useState("");
@@ -375,7 +377,7 @@ export default function Configuracoes() {
         <div className="ajuste-perfil">
           <EditorFoto tamanho={96}>
             <label className="ajuste-perfil-rotulo" htmlFor="cf-nome">{T.configuracoes.nomePerfil}</label>
-            <input id="cf-nome" className="campo ajuste-perfil-nome" value={cfg.nome} maxLength={40} placeholder={T.barraLateral.perfil} onChange={(e) => cfg.definir({ nome: e.target.value })} />
+            <input id="cf-nome" className="campo ajuste-perfil-nome" value={cfg.nome} maxLength={40} placeholder={usuario?.nome || T.barraLateral.perfil} onChange={(e) => cfg.definir({ nome: e.target.value })} />
           </EditorFoto>
         </div>
         <div className="linha-entre linha-config">
@@ -483,9 +485,9 @@ export default function Configuracoes() {
         />
         <div className="ajuste-bloco">
           <DndContext collisionDetection={closestCenter} onDragEnd={aoArrastarBarra}>
-            <SortableContext items={cfg.barraLateral.map((b) => b.rota)} strategy={verticalListSortingStrategy}>
+            <SortableContext items={barraEditavel.map((b) => b.rota)} strategy={verticalListSortingStrategy}>
               <div className="ajuste-ordenaveis">
-                {cfg.barraLateral.filter((b) => rotaLigada(b.rota, cfg.funcoesDesligadas)).map((b) => (
+                {barraEditavel.map((b) => (
                   <ItemBarraOrdenavel
                     key={b.rota}
                     rota={b.rota}
@@ -744,12 +746,12 @@ export default function Configuracoes() {
         </LinhaAjuste>
         <LinhaAjuste rotulo={T.configuracoes.licencaRotulo} dica={T.configuracoes.licenca} />
         <DiagnosticoSistema />
-        <LinhaAjuste rotulo={T.tour.verTour} dica={T.tour.verTourDica}>
+        {usuario?.perfil === "dono" && <LinhaAjuste rotulo={T.tour.verTour} dica={T.tour.verTourDica}>
           <Botao onClick={() => useTour.getState().abrir()}>{T.tour.verTour}</Botao>
-        </LinhaAjuste>
-        <LinhaAjuste rotulo={T.configuracoes.primeiraExecucao}>
+        </LinhaAjuste>}
+        {usuario?.perfil === "dono" && <LinhaAjuste rotulo={T.configuracoes.primeiraExecucao}>
           <Botao variante="primario" onClick={() => cfg.definir({ primeiraExecucaoFeita: false })}>{T.configuracoes.refazerPrimeira}</Botao>
-        </LinhaAjuste>
+        </LinhaAjuste>}
       </>
     ),
     desenvolvedor: (

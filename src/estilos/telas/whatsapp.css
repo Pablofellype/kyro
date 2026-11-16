@@ -1488,9 +1488,7 @@
   padding: 18px 12px 16px;
   border-radius: var(--raio-cartao);
   border: 1px solid var(--borda-suave);
-  background:
-    radial-gradient(120% 70% at 50% 0%, color-mix(in srgb, var(--destaque) 12%, transparent), transparent 70%),
-    var(--superficie);
+  background: var(--superficie);
   text-align: center;
 }
 

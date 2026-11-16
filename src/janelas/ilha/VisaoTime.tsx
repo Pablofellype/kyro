@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
 import { CalendarClock, Check, ListTodo, MessageCircle, Pause, Play, Plus, Timer, type LucideIcon } from "lucide-react";
 import { useInterface } from "../../estado/interface";
+import { useAuth } from "../../estado/autenticacao";
+import { useIlha } from "../../estado/ilha";
+import { podeAcessarRota } from "../../servicos/permissoes";
 import { formatarRelogio, restanteAtual, usePomodoro } from "../../estado/pomodoro";
 import { habitoCumprido, tarefaPendente, tarefasDoDia, useRotina } from "../../estado/rotina";
 import { hojeISO } from "../../utilitarios/datas";
@@ -34,6 +37,8 @@ export function VisaoTime() {
   const registros = useRotina((estado) => estado.registros);
   const irPara = useInterface((estado) => estado.irPara);
   const abrirCaptura = useInterface((estado) => estado.abrirCaptura);
+  const area = useInterface((estado) => estado.area);
+  const usuario = useAuth((estado) => estado.usuario);
   const pomodoro = usePomodoro();
   const [agora, setAgora] = useState(() => Date.now());
   const hoje = hojeISO();
@@ -101,11 +106,17 @@ export function VisaoTime() {
         </div>
 
         <div className="time-kyro-acoes" aria-label="Ações rápidas">
-          <button type="button" className="time-kyro-acao" onClick={() => irPara("chat")}>
+          {podeAcessarRota(usuario, "chat", area) && <button type="button" className="time-kyro-acao" onClick={() => irPara("chat")}>
             <MessageCircle size={14} />
             <span>{T.ilha.conversar}</span>
-          </button>
-          <button type="button" className="time-kyro-acao" onClick={() => abrirCaptura(true)}>
+          </button>}
+          <button type="button" className="time-kyro-acao" onClick={() => {
+            if (usuario?.perfil === "dono") abrirCaptura(true);
+            else {
+              useIlha.getState().definirSecaoHoje("tarefas");
+              useIlha.getState().abrir("hoje");
+            }
+          }}>
             <Plus size={14} />
             <span>{T.inicio.novaTarefa}</span>
           </button>

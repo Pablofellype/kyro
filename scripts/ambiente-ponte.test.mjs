@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { stripTypeScriptTypes } from "node:module";
 import vm from "node:vm";
 import { create } from "zustand";
+import { conexaoVisivelPara } from "../src/utilitarios/visibilidadeConexoes.ts";
 
 function modulo(caminho, nomes, dependencias = {}) {
   const codigo = stripTypeScriptTypes(readFileSync(caminho, "utf8"))
@@ -34,6 +35,8 @@ function pontes(locais) {
   const dependencias = {
     create, ponteLocalDisponivel: () => locais,
     cabecalhosNiko: () => ({}), exigirConexaoDisponivel() {}, T: {},
+    useAuth: { getState: () => ({ token: null, usuario: null }) },
+    conexaoVisivelPara,
     fetch: async (url) => { chamadas.push(url); return Response.json({ sessao: false }); },
   };
   return {

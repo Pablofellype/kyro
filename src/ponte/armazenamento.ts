@@ -15,6 +15,7 @@ const bancoDeTeste = (() => {
 })();
 const CABECALHOS: Record<string, string> = { "x-niko": "1", "content-type": "application/json", ...(bancoDeTeste ? { "x-niko-banco": bancoDeTeste } : {}) };
 const CHAVE_CLIENTE = "kyro_cliente_id";
+const CHAVE_CONFIGURACOES = `${PREFIXO}configuracoes`;
 
 function idDoUsuarioLocal(): string | null {
   try {
@@ -32,6 +33,27 @@ function tokenDaSessao(): string | null {
   } catch {
     return null;
   }
+}
+
+let tokenDoArmazenamento = tokenDaSessao();
+let usuarioDoArmazenamento = idDoUsuarioLocal();
+
+function mesmaSessaoDoArmazenamento(): boolean {
+  return tokenDaSessao() === tokenDoArmazenamento && idDoUsuarioLocal() === usuarioDoArmazenamento;
+}
+
+function prefixoLocalDaConta(): string {
+  const id = idDoUsuarioLocal();
+  return id ? `kyro:usuario:${id}:` : "";
+}
+
+function chaveLocal(nome: string): string {
+  return `${prefixoLocalDaConta()}${nome}`;
+}
+
+function guardarConfiguracoesLocais(nome: string, valor: string | null) {
+  if (nome !== CHAVE_CONFIGURACOES || !usuarioDoArmazenamento || !mesmaSessaoDoArmazenamento()) return;
+  localSeguro(() => valor === null ? localStorage.removeItem(chaveLocal(nome)) : localStorage.setItem(chaveLocal(nome), valor), undefined);
 }
 
 function endpointDosDados(): string {
@@ -108,6 +130,7 @@ let atrasoReconexaoWebsocket = 15_000;
 let sincroniaTempoRealAtiva = false;
 const snapshotRemoto = new Map<string, string>();
 const CHAVE_FILA_SINCRONIA = "niko:sincronia-pendente:";
+const filaPersistidaNestaJanela = new Map<string, string | null>();
 export type EstadoSincronia = "local" | "conectado" | "sincronizando" | "pendente" | "offline" | "conflito";
 export interface SituacaoSincronia {
   estado: EstadoSincronia;
@@ -138,15 +161,28 @@ function chaveDaFilaSincronia(): string | null {
 }
 
 function persistirFilaSincronia() {
+  if (!mesmaSessaoDoArmazenamento()) return;
   const chave = chaveDaFilaSincronia();
   if (!chave) return;
   try {
-    const itens = Object.fromEntries([...emEnvio, ...pendentes]);
+    // As WebViews compartilham o localStorage. Confirmar um envio nesta
+    // janela não pode apagar as alterações ainda pendentes de outra.
+    const salva = lerFilaSincronia();
+    const itens = { ...salva?.itens };
+    const atuais = new Map([...emEnvio, ...pendentes]);
+    for (const [nome, valor] of filaPersistidaNestaJanela) {
+      if (!atuais.has(nome) && itens[nome] === valor) delete itens[nome];
+    }
+    for (const [nome, valor] of atuais) {
+      if (!Object.hasOwn(itens, nome) || !filaPersistidaNestaJanela.has(nome) || filaPersistidaNestaJanela.get(nome) !== valor) itens[nome] = valor;
+    }
+    filaPersistidaNestaJanela.clear();
+    for (const [nome, valor] of atuais) filaPersistidaNestaJanela.set(nome, valor);
     if (Object.keys(itens).length === 0) {
       localStorage.removeItem(chave);
       return;
     }
-    localStorage.setItem(chave, JSON.stringify({ versao: versaoBaseLocal ?? versaoRemota, itens }));
+    localStorage.setItem(chave, JSON.stringify({ versao: versaoBaseLocal ?? salva?.versao ?? versaoRemota, itens }));
   } catch {
     return;
   }
@@ -195,6 +231,7 @@ let temporizadorAviso = 0;
 
 interface MudancaDeDados {
   banco: string;
+  usuarioId: string | null;
   origem: string;
   chave: string;
   valor: string | null;
@@ -205,7 +242,7 @@ function tauriDisponivel(): boolean {
 }
 
 function avisarOutrasJanelas(chave: string, valor: string | null) {
-  canal?.postMessage({ origem: ORIGEM, banco: bancoDeTeste, chave, valor } satisfies MudancaDeDados);
+  canal?.postMessage({ origem: ORIGEM, banco: bancoDeTeste, usuarioId: usuarioDoArmazenamento, chave, valor } satisfies MudancaDeDados);
   if (!tauriDisponivel()) return;
   avisosPendentes.set(chave, valor);
   if (temporizadorAviso) return;
@@ -213,9 +250,10 @@ function avisarOutrasJanelas(chave: string, valor: string | null) {
     temporizadorAviso = 0;
     const itens = [...avisosPendentes];
     avisosPendentes.clear();
+    if (!mesmaSessaoDoArmazenamento()) return;
     try {
       const { emit } = await import("@tauri-apps/api/event");
-      for (const [c, v] of itens) await emit(EVENTO_DADOS, { origem: ORIGEM, banco: bancoDeTeste, chave: c, valor: v } satisfies MudancaDeDados);
+      for (const [c, v] of itens) await emit(EVENTO_DADOS, { origem: ORIGEM, banco: bancoDeTeste, usuarioId: usuarioDoArmazenamento, chave: c, valor: v } satisfies MudancaDeDados);
     } catch {
       return;
     }
@@ -231,6 +269,7 @@ const recebidosDeOutraJanela = new Map<string, number>();
 
 function receberDeFora(m: unknown) {
   if (!objeto(m) || m.banco !== bancoDeTeste || typeof m.origem !== "string" || typeof m.chave !== "string" || !/^niko:[a-z0-9_-]{1,60}$/.test(m.chave) || (m.valor !== null && (typeof m.valor !== "string" || m.valor.length > 20_000_000))) return;
+  if (!mesmaSessaoDoArmazenamento() || (m.usuarioId ?? null) !== usuarioDoArmazenamento) return;
   if (m.origem === ORIGEM || pendentes.has(m.chave) || emEnvio.has(m.chave)) return;
   if (m.origem === ORIGEM_DA_PONTE && Date.now() - (recebidosDeOutraJanela.get(m.chave) ?? 0) < TEMPO_PARA_A_PONTE_ALCANCAR_MS) return;
   if (m.origem !== ORIGEM_DA_PONTE) recebidosDeOutraJanela.set(m.chave, Date.now());
@@ -238,6 +277,7 @@ function receberDeFora(m: unknown) {
   if (atual === m.valor) return;
   if (m.valor === null) cache.delete(m.chave);
   else cache.set(m.chave, m.valor as string);
+  guardarConfiguracoesLocais(m.chave, m.valor as string | null);
   const chaveRecebida = m.chave;
   ouvintesDeFora.forEach((f) => f(chaveRecebida));
 }
@@ -252,7 +292,7 @@ function atualizarSnapshotRemoto(dados: Record<string, string>) {
 
 function aplicarDadosRecebidos(dados: Record<string, string>, origem: string) {
   const chaves = new Set([...cache.keys(), ...Object.keys(dados)]);
-  for (const k of chaves) receberDeFora({ origem, banco: bancoDeTeste, chave: k, valor: Object.hasOwn(dados, k) ? dados[k] : null });
+  for (const k of chaves) receberDeFora({ origem, banco: bancoDeTeste, usuarioId: usuarioDoArmazenamento, chave: k, valor: Object.hasOwn(dados, k) ? dados[k] : null });
   if (origem === "remoto") atualizarSnapshotRemoto(dados);
 }
 
@@ -283,6 +323,7 @@ function reconciliarConflito(itens: Record<string, string | null>, resposta: unk
     if (anterior === valor) continue;
     if (valor === null) cache.delete(chave);
     else cache.set(chave, valor);
+    guardarConfiguracoesLocais(chave, valor);
     ouvintesDeFora.forEach((f) => f(chave));
   }
   for (const [chave, valor] of Object.entries(itens)) {
@@ -299,17 +340,19 @@ function reconciliarConflito(itens: Record<string, string | null>, resposta: unk
 }
 
 async function recarregarDaPonte() {
-  if (modo !== "banco") return;
+  if (modo !== "banco" || !mesmaSessaoDoArmazenamento()) return;
   const token = tokenDaSessao();
   try {
     const endpoint = endpointDosDados();
     const desde = token && versaoRemota ? `?desde=${encodeURIComponent(versaoRemota)}` : "";
     const r = await fetch(`${endpoint}${desde}`, { headers: cabecalhosDosDados(), signal: AbortSignal.timeout(8000) });
+    if (!mesmaSessaoDoArmazenamento()) return;
     if (!r.ok) {
       definirSituacaoSincronia(token ? "offline" : "local", pendentes.size);
       return;
     }
     const resposta: unknown = await r.json();
+    if (!mesmaSessaoDoArmazenamento()) return;
     if (!objeto(resposta)) return;
     if (typeof resposta.versao === "string") versaoRemota = resposta.versao;
     if (resposta.alterado === false) {
@@ -320,6 +363,7 @@ async function recarregarDaPonte() {
     aplicarDadosRecebidos(dados, token ? "remoto" : ORIGEM_DA_PONTE);
     definirSituacaoSincronia(token ? (pendentes.size ? "pendente" : "conectado") : "local", pendentes.size, Date.now());
   } catch {
+    if (!mesmaSessaoDoArmazenamento()) return;
     definirSituacaoSincronia(token ? "offline" : "local", pendentes.size);
     return;
   }
@@ -428,9 +472,10 @@ function localSeguro<T>(fn: () => T, reserva: T): T {
 function enviarPendentes(manterViva = false): Promise<void> {
   window.clearTimeout(temporizador);
   temporizador = 0;
+  if (!mesmaSessaoDoArmazenamento()) return Promise.resolve();
   if (envioEmAndamento) return envioEmAndamento;
   envioEmAndamento = (async () => {
-    while (pendentes.size > 0) {
+    while (pendentes.size > 0 && mesmaSessaoDoArmazenamento()) {
       const itens = Object.fromEntries(pendentes);
       definirSituacaoSincronia(tokenDaSessao() ? "sincronizando" : "local", Object.keys(itens).length);
       pendentes.clear();
@@ -441,8 +486,10 @@ function enviarPendentes(manterViva = false): Promise<void> {
       try {
         const corpo = JSON.stringify({ itens, versao: versaoBaseLocal ?? versaoRemota });
         const r = await fetch(endpointDosDados(), { method: "POST", headers: cabecalhosDosDados(), body: corpo, signal: controle.signal, keepalive: manterViva && new TextEncoder().encode(corpo).length < 60000 });
+        if (!mesmaSessaoDoArmazenamento()) return;
         if (r.status === 409) {
           const resposta: unknown = await jsonDaResposta(r);
+          if (!mesmaSessaoDoArmazenamento()) return;
           if (objeto(resposta) && resposta.erro === "conflito_sincronizacao" && typeof resposta.versao === "string" && objeto(resposta.dados)) {
             reconciliarConflito(itens, resposta);
             definirSituacaoSincronia("conflito", pendentes.size);
@@ -452,6 +499,7 @@ function enviarPendentes(manterViva = false): Promise<void> {
         }
         if (!r.ok) throw new Error(`http_${r.status}`);
         const resposta: unknown = await jsonDaResposta(r);
+        if (!mesmaSessaoDoArmazenamento()) return;
         if (objeto(resposta) && typeof resposta.versao === "string") {
           versaoRemota = resposta.versao;
           versaoBaseLocal = pendentes.size > 0 ? resposta.versao : null;
@@ -462,6 +510,7 @@ function enviarPendentes(manterViva = false): Promise<void> {
           else snapshotRemoto.set(chave, valor);
         }
       } catch (erro) {
+        if (!mesmaSessaoDoArmazenamento()) return;
         for (const [k, v] of Object.entries(itens)) if (!pendentes.has(k) && (cache.get(k) ?? null) === v) pendentes.set(k, v);
         persistirFilaSincronia();
         definirSituacaoSincronia(tokenDaSessao() ? "offline" : "local", pendentes.size);
@@ -491,9 +540,10 @@ function agendar(ms = 350) {
 }
 
 const armazenamentoSeguro: StateStorage = {
-  getItem: (nome) => (modo === "banco" ? cache.get(nome) ?? null : localSeguro(() => localStorage.getItem(nome), cache.get(nome) ?? null)),
+  getItem: (nome) => !mesmaSessaoDoArmazenamento() ? null : (modo === "banco" ? cache.get(nome) ?? null : localSeguro(() => localStorage.getItem(chaveLocal(nome)), cache.get(nome) ?? null)),
   setItem: (nome, valor) => {
-    if (travado) return;
+    if (travado || !mesmaSessaoDoArmazenamento()) return;
+    guardarConfiguracoesLocais(nome, valor);
     if (modo === "banco") {
       if (cache.get(nome) === valor) return;
       if (versaoBaseLocal === null) versaoBaseLocal = versaoRemota;
@@ -506,14 +556,21 @@ const armazenamentoSeguro: StateStorage = {
       return;
     }
     try {
-      localStorage.setItem(nome, valor);
+      localStorage.setItem(chaveLocal(nome), valor);
     } catch {
       cache.set(nome, valor);
       window.dispatchEvent(new CustomEvent("niko:armazenamento-cheio"));
     }
+    if (tokenDoArmazenamento) {
+      cache.set(nome, valor);
+      pendentes.set(nome, valor);
+      persistirFilaSincronia();
+      agendar();
+    }
   },
   removeItem: (nome) => {
-    if (travado) return;
+    if (travado || !mesmaSessaoDoArmazenamento()) return;
+    guardarConfiguracoesLocais(nome, null);
     if (modo === "banco") {
       if (versaoBaseLocal === null) versaoBaseLocal = versaoRemota;
       cache.delete(nome);
@@ -524,8 +581,13 @@ const armazenamentoSeguro: StateStorage = {
       avisarOutrasJanelas(nome, null);
       return;
     }
-    localSeguro(() => localStorage.removeItem(nome), undefined);
+    localSeguro(() => localStorage.removeItem(chaveLocal(nome)), undefined);
     cache.delete(nome);
+    if (tokenDoArmazenamento) {
+      pendentes.set(nome, null);
+      persistirFilaSincronia();
+      agendar();
+    }
   },
 };
 
@@ -598,12 +660,16 @@ export async function restaurarBackupSincronia(id: number): Promise<void> {
   versaoRemota = "";
   cache.clear();
   snapshotRemoto.clear();
-  persistirFilaSincronia();
+  filaPersistidaNestaJanela.clear();
+  const fila = chaveDaFilaSincronia();
+  if (fila) localSeguro(() => localStorage.removeItem(fila), undefined);
   await recarregarDaPonte();
 }
 
-function chavesLocais(): string[] {
-  return localSeguro(() => Object.keys(localStorage).filter((k) => k.startsWith(PREFIXO)), []);
+function chavesLocais(legadas = false): string[] {
+  const prefixo = legadas ? "" : prefixoLocalDaConta();
+  return localSeguro(() => Object.keys(localStorage).filter((k) => k.startsWith(`${prefixo}${PREFIXO}`))
+    .map((k) => k.slice(prefixo.length)).filter((k) => /^niko:[a-z0-9_-]{1,60}$/.test(k)), []);
 }
 
 function validarDadosRecebidos(resposta: unknown): Record<string, string> {
@@ -628,6 +694,8 @@ async function lerDadosLegadosDaPonte(): Promise<Record<string, string>> {
 
 export async function iniciarArmazenamento(): Promise<ModoArmazenamento> {
   let limite = 0;
+  tokenDoArmazenamento = tokenDaSessao();
+  usuarioDoArmazenamento = idDoUsuarioLocal();
   try {
     const remoto = Boolean(tokenDaSessao());
     const usuarioId = idDoUsuarioLocal();
@@ -643,6 +711,7 @@ export async function iniciarArmazenamento(): Promise<ModoArmazenamento> {
     window.clearTimeout(limite);
     if (!r.ok) throw new Error(`http_${r.status}`);
     const resposta = await r.json();
+    if (!mesmaSessaoDoArmazenamento()) return modo;
     if (remoto && objeto(resposta) && typeof resposta.versao === "string") versaoRemota = resposta.versao;
     const dados = validarDadosRecebidos(resposta);
     for (const [k, v] of Object.entries(dados)) cache.set(k, v);
@@ -654,6 +723,7 @@ export async function iniciarArmazenamento(): Promise<ModoArmazenamento> {
       for (const [k, v] of Object.entries(filaSalva.itens)) {
         if (v === null) cache.delete(k);
         else cache.set(k, v);
+        guardarConfiguracoesLocais(k, v);
         pendentes.set(k, v);
       }
       persistirFilaSincronia();
@@ -666,7 +736,8 @@ export async function iniciarArmazenamento(): Promise<ModoArmazenamento> {
         }
       }
     }
-    const locais = chavesLocais().filter((k) => k !== `${PREFIXO}migrado`);
+    for (const [k, v] of cache) guardarConfiguracoesLocais(k, v);
+    const locais = chavesLocais(true).filter((k) => k !== `${PREFIXO}migrado`);
     if (remoto && Object.keys(dados).length === 0 && (Object.keys(dadosLegados).length > 0 || (podeMigrarChavesLocais && locais.length > 0))) {
       const migrados = { ...dadosLegados };
       if (podeMigrarChavesLocais) {
@@ -677,6 +748,7 @@ export async function iniciarArmazenamento(): Promise<ModoArmazenamento> {
       }
       for (const [k, v] of Object.entries(migrados)) {
         cache.set(k, v);
+        guardarConfiguracoesLocais(k, v);
         pendentes.set(k, v);
       }
       await enviarPendentes();
@@ -772,7 +844,10 @@ export async function zerarTudo(apagarChaves: boolean): Promise<void> {
       definirSituacaoSincronia(tokenDaSessao() ? "conectado" : "local", 0, tokenDaSessao() ? Date.now() : null);
     }
     pendentes.clear();
-    for (const k of chavesLocais()) if (k !== `${PREFIXO}migrado`) localSeguro(() => localStorage.removeItem(k), undefined);
+    filaPersistidaNestaJanela.clear();
+    const fila = chaveDaFilaSincronia();
+    if (fila) localSeguro(() => localStorage.removeItem(fila), undefined);
+    for (const k of chavesLocais()) if (k !== `${PREFIXO}migrado`) localSeguro(() => localStorage.removeItem(chaveLocal(k)), undefined);
     localSeguro(() => localStorage.setItem(`${PREFIXO}migrado`, new Date().toISOString()), undefined);
   } catch (erro) {
     travado = false;
@@ -782,6 +857,20 @@ export async function zerarTudo(apagarChaves: boolean): Promise<void> {
 }
 
 export function salvarAgora(): Promise<void> {
+  if (mesmaSessaoDoArmazenamento()) {
+    const fila = lerFilaSincronia();
+    if (fila) {
+      if (versaoBaseLocal === null) versaoBaseLocal = fila.versao || versaoRemota;
+      for (const [nome, valor] of Object.entries(fila.itens)) {
+        if (pendentes.has(nome) || (emEnvio.has(nome) && emEnvio.get(nome) === valor)) continue;
+        if (valor === null) cache.delete(nome);
+        else cache.set(nome, valor);
+        guardarConfiguracoesLocais(nome, valor);
+        pendentes.set(nome, valor);
+        ouvintesDeFora.forEach((ouvinte) => ouvinte(nome));
+      }
+    }
+  }
   return enviarPendentes();
 }
 

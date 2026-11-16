@@ -3,7 +3,9 @@ import { join } from "node:path";
 import { lerSegredo, gravarSegredo, apagarSegredo } from "./segredos.ts";
 import { pastaDados, validarUrlBase } from "./ia.ts";
 import { autorizarWorkspace, lerGoogle } from "./google.ts";
-import { autorizarOutlook, lerOutlook } from "./outlook.ts";
+import { autorizarMicrosoft, lerOutlook } from "./outlook.ts";
+import { lerTeams, lerPlanner } from "./microsoftCorporativo.ts";
+import { credencialDasPlanilhas, configuracaoPublicaPlanilhas, lerPlanilhasGoogle, lerAbaPlanilhaGoogle } from "./planilhasGoogle.ts";
 import { lerContribuicoesGithub, lerCommitsGithub } from "./github.ts";
 import { exigirConexaoDisponivel } from "../src/utilitarios/disponibilidadeConexoes.ts";
 import { autorizarStrava, lerJson, lerCalendarios, lerDiscord, lerEmail, lerJira, lerLinear, lerRailway, lerReddit, lerStrava, lerTrello, urlPublicaSegura } from "./conexoesExtras.ts";
@@ -12,7 +14,7 @@ import { pastaDoUsuario, segredoDoUsuario, usuarioLocalAtual } from "./escopoUsu
 
 export const SERVICOS = [
   "stripe", "github", "vercel", "resend", "notion", "calcom", "n8n", "google", "supabase", "cloudflare",
-  "linear", "jira", "trello", "railway", "discord", "reddit", "strava", "email", "calendario", "cripto", "outlook",
+  "linear", "jira", "trello", "railway", "discord", "reddit", "strava", "email", "calendario", "cripto", "outlook", "teams", "planner", "planilhas",
 ] as const;
 const SERVICOS_ANTIGOS_DO_GOOGLE = ["gmail", "agenda"];
 export type Servico = (typeof SERVICOS)[number];
@@ -342,6 +344,9 @@ const LEITORES: Record<Servico, Leitor> = {
   calendario: (chave) => lerCalendarios(chave),
   cripto: (chave) => lerCripto(chave),
   outlook: (chave) => lerOutlook(chave),
+  teams: (chave) => lerTeams(chave),
+  planner: (chave) => lerPlanner(chave),
+  planilhas: (chave) => lerPlanilhasGoogle(chave),
 };
 
 const PRESETS_DE_EMAIL: Record<string, { servidor: string; porta: number }> = {
@@ -368,6 +373,7 @@ export async function credencialDoServico(servico: Servico, dados: Record<string
   const anterior = anteriorDe(guardada);
   const segredoOuAnterior = (novo: string, chaveAntiga: string) => novo || (typeof anterior[chaveAntiga] === "string" ? (anterior[chaveAntiga] as string) : "");
   switch (servico) {
+    case "planilhas": return credencialDasPlanilhas(dados, guardada);
     case "jira": {
       const site = urlPublicaSegura(campo(dados.site, 300)).origin;
       const token = segredoOuAnterior(campo(dados.chave, 4000), "token");
@@ -477,8 +483,8 @@ export async function salvarChaveConexao(servico: Servico, dados: Record<string,
     leiturasEmAndamento.delete(chaveDoCache(servico));
     return { ok: true };
   }
-  if (servico === "outlook") {
-    const credencial = await autorizarOutlook(String(dados.clienteId ?? "").trim());
+  if (servico === "outlook" || servico === "teams" || servico === "planner") {
+    const credencial = await autorizarMicrosoft(String(dados.clienteId ?? "").trim(), servico);
     const texto = JSON.stringify(credencial);
     await LEITORES[servico](texto);
     await gravarSegredo(segredoDoUsuario(`conexao-${servico}`), texto);
@@ -509,6 +515,7 @@ export async function configPublica(servico: Servico): Promise<Record<string, un
   exigirConexaoDisponivel(servico);
   const texto = lerConfig()[servico]?.temChave ? await lerSegredo(segredoDoUsuario(`conexao-${servico}`)) : null;
   if (!texto) return {};
+  if (servico === "planilhas") return configuracaoPublicaPlanilhas(texto);
   const c = lerJson<Record<string, unknown>>(texto);
   switch (servico) {
     case "jira":
@@ -522,6 +529,8 @@ export async function configPublica(servico: Servico): Promise<Record<string, un
     case "strava":
       return { clienteId: c.clienteId, temToken: Boolean(c.segredo) };
     case "outlook":
+    case "teams":
+    case "planner":
       return { clienteId: c.clienteId, email: c.email, temToken: Boolean(c.refresh) };
     case "email":
       return { servidor: c.servidor, porta: c.porta, usuario: c.usuario, temToken: Boolean(c.senha) };
@@ -534,6 +543,10 @@ export async function configPublica(servico: Servico): Promise<Record<string, un
     default:
       return { temToken: true };
   }
+}
+
+export async function lerAbaDasPlanilhas(id: string, gid: number) {
+  return lerAbaPlanilhaGoogle(await chaveDe("planilhas"), id, gid);
 }
 
 export async function removerChaveConexao(servico: Servico) {

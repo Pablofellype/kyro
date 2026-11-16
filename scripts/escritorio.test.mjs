@@ -22,6 +22,119 @@ const { hash32 } = await vite.ssrLoadModule("/src/modulos/escritorio/motor/share
 const { Camera } = await vite.ssrLoadModule("/src/modulos/escritorio/motor/client/src/world/camera.ts");
 const base = { id: "a", sessao: "segredo-sessao", cwd: "C:/Users/pessoa/MeuProjeto", ferramenta: "claude", recebidoEm: "2026-10-09T13:00:00Z", evento: "PreToolUse", dados: { prompt: "privado", tool_input: { command: "privado" } } };
 
+test("painel da empresa isola dados pessoais, ordena atrasos e usa ocorrências futuras reais", async () => {
+  const { resumirPainelEmpresa } = await vite.ssrLoadModule("/src/modulos/escritorio/dadosDoPainelEmpresa.ts");
+  const agora = new Date(2026, 10, 15, 10, 0);
+  const evento = { tipo: "evento", repeticao: "nenhuma", data: "2026-11-15", hora: "11:00", area: "empresa" };
+  const eventos = [
+    { ...evento, id: "proximo", titulo: "Reunião da empresa" },
+    { ...evento, id: "pessoal", titulo: "Evento pessoal privado", area: "pessoal" },
+    { ...evento, id: "passado", titulo: "Horário anterior", hora: "08:00" },
+    { ...evento, id: "feito", titulo: "Compromisso já concluído", feitos: ["2026-11-15"] },
+    { ...evento, id: "repetido", titulo: "Rotina recorrente", data: "2026-01-01", hora: "09:00", repeticao: "diaria", excecoes: ["2026-11-16"] },
+  ];
+  const tarefa = { status: "a_fazer", prioridade: "media", area: "empresa", ordem: 0, descricao: "", checklist: [], criadaEm: "2026-11-14T12:00:00Z" };
+  const tarefas = [
+    { ...tarefa, id: "amanha", titulo: "Atividade de amanhã", data: "2026-11-16" },
+    { ...tarefa, id: "atrasada", titulo: "Atividade atrasada", data: "2026-11-14" },
+    { ...tarefa, id: "hoje", titulo: "Atividade de hoje", data: "2026-11-15", hora: "14:00" },
+    { ...tarefa, id: "hora-vencida", titulo: "Prazo de hoje vencido", data: "2026-11-15", hora: "09:00" },
+    { ...tarefa, id: "privada", titulo: "Atividade pessoal privada", data: "2026-11-13", area: "pessoal" },
+    { ...tarefa, id: "finalizada", titulo: "Atividade concluída", status: "concluida", concluidaEm: "2026-11-15T11:00:00Z" },
+    { ...tarefa, id: "cancelada", titulo: "Atividade cancelada", status: "cancelada", data: "2026-11-14" },
+  ];
+  const pedidos = [{ id: "1", material: "Papel", solicitante: "Ana", quantidade: 2, status: "pendente", criadoEm: "2026-11-14T13:00:00Z" }, { id: "2", material: "Caneta", solicitante: "Bruno", quantidade: 1, status: "atendido", criadoEm: "2026-11-14T14:00:00Z" }];
+  const antes = structuredClone({ eventos, tarefas, pedidos });
+  const resumo = resumirPainelEmpresa(eventos, tarefas, pedidos, agora);
+  assert.deepEqual(resumo.atrasadas.map((item) => item.id), ["atrasada", "hora-vencida"]);
+  assert.equal(resumo.abertas.length, 4);
+  assert.deepEqual(resumo.pedidosPendentes.map((item) => item.id), ["1"]);
+  assert.equal(resumo.prioridades[0].tarefa.id, "atrasada");
+  assert.equal(resumo.prioridades[2].pedido.id, "1");
+  assert.equal(resumo.agenda[0].titulo, "Reunião da empresa");
+  assert.ok(resumo.agenda.some((item) => item.id === "repetido:2026-11-17"));
+  assert.ok(!resumo.agenda.some((item) => item.id === "repetido:2026-11-16"));
+  assert.doesNotMatch(JSON.stringify(resumo), /pessoal privado|pessoal privada|Horário anterior|Compromisso já concluído|Atividade cancelada/);
+  assert.ok(resumo.historico.some((item) => item.titulo === "Atividade concluída: Atividade concluída"));
+  assert.deepEqual({ eventos, tarefas, pedidos }, antes);
+});
+
+test("consulta do escritório respeita o perfil e preserva erro em vez de fabricar zero solicitações", async () => {
+  const { carregarDadosDoPainel, validarPedidosDoPainel } = await vite.ssrLoadModule("/src/modulos/escritorio/dadosDoPainelEmpresa.ts");
+  const chamadas = [];
+  const sinal = new AbortController().signal;
+  const consultar = async (url, opcoes) => {
+    chamadas.push({ url, opcoes });
+    return { ok: true, json: async () => String(url).includes("solicitacoes") ? { solicitacoes: [] } : { usuarios: [{ id: 1, nome: "Ana", ativo: true, perfil: "dono", setor: "Operação" }] } };
+  };
+  const gerencia = await carregarDadosDoPainel("gerencia", "token-teste", sinal, consultar);
+  assert.equal(chamadas.length, 1);
+  assert.ok(String(chamadas[0].url).endsWith("/api/solicitacoes"));
+  assert.equal(chamadas[0].opcoes.headers.Authorization, "Bearer token-teste");
+  assert.equal(chamadas[0].opcoes.signal, sinal);
+  assert.deepEqual(gerencia.pedidos, []);
+  assert.equal(gerencia.membros, null);
+  chamadas.length = 0;
+  const dono = await carregarDadosDoPainel("dono", "token-teste", sinal, consultar);
+  assert.equal(chamadas.length, 2);
+  assert.equal(dono.membros[0].setor, "Operação");
+  chamadas.length = 0;
+  await carregarDadosDoPainel("visitante", "token-teste", sinal, consultar);
+  await carregarDadosDoPainel("dono", "", sinal, consultar);
+  assert.equal(chamadas.length, 0);
+  const parcial = await carregarDadosDoPainel("dono", "token-teste", sinal, async (url, opcoes) => {
+    if (String(url).includes("solicitacoes")) return { ok: false, status: 503 };
+    return consultar(url, opcoes);
+  });
+  assert.equal(parcial.pedidos, null);
+  assert.equal(parcial.erroPedidos, true);
+  assert.equal(parcial.membros[0].nome, "Ana");
+  const invalido = await carregarDadosDoPainel("gerencia", "token-teste", sinal, async () => ({ ok: true, json: async () => ({ solicitacoes: "inválido" }) }));
+  assert.equal(invalido.pedidos, null);
+  assert.equal(invalido.erroPedidos, true);
+  assert.throws(() => validarPedidosDoPainel([{ id: 1, material_nome: "Papel", status: "pendente", quantidade: 1, criado_em: "inválido" }]));
+});
+
+test("concluir pelo escritório afeta apenas a atividade da empresa e permite desfazer sem sobrescrever mudanças posteriores", async () => {
+  const { concluirAtividadeDoPainel } = await vite.ssrLoadModule("/src/modulos/escritorio/PainelCoordenacao.tsx");
+  const { useAuth } = await vite.ssrLoadModule("/src/estado/autenticacao.ts");
+  const { useRotina } = await vite.ssrLoadModule("/src/estado/rotina.ts");
+  const { useInterface } = await vite.ssrLoadModule("/src/estado/interface.ts");
+  const anteriores = [useAuth.getState(), useRotina.getState(), useInterface.getState()];
+  let desfazer;
+  try {
+    useAuth.setState({ usuario: { id: 7, perfil: "gerencia", nome: "Ana" } });
+    useInterface.setState({ area: "empresa", avisar: (_, acao) => { desfazer = acao; } });
+    useRotina.setState({ tarefas: [{ id: "empresa", titulo: "Atividade da empresa", area: "empresa", status: "em_andamento" }, { id: "pessoal", titulo: "Atividade pessoal", area: "pessoal", status: "a_fazer" }] });
+    concluirAtividadeDoPainel("pessoal", 7);
+    assert.equal(useRotina.getState().tarefas[1].status, "a_fazer");
+    concluirAtividadeDoPainel("empresa", 8);
+    assert.equal(useRotina.getState().tarefas[0].status, "em_andamento");
+    useInterface.setState({ area: "pessoal" });
+    concluirAtividadeDoPainel("empresa", 7);
+    assert.equal(useRotina.getState().tarefas[0].status, "em_andamento");
+    useInterface.setState({ area: "empresa" });
+    concluirAtividadeDoPainel("empresa", 7);
+    assert.equal(useRotina.getState().tarefas[0].status, "concluida");
+    assert.equal(typeof desfazer, "function");
+    desfazer();
+    assert.equal(useRotina.getState().tarefas[0].status, "em_andamento");
+    concluirAtividadeDoPainel("empresa", 7);
+    useRotina.setState({ tarefas: useRotina.getState().tarefas.map((item) => item.id === "empresa" ? { ...item, concluidaEm: "2099-01-01T00:00:00.000Z" } : item) });
+    desfazer();
+    assert.equal(useRotina.getState().tarefas[0].status, "concluida");
+    assert.equal(useRotina.getState().tarefas[0].concluidaEm, "2099-01-01T00:00:00.000Z");
+    useRotina.getState().mudarStatus("empresa", "a_fazer");
+    useAuth.setState({ usuario: { id: 7, perfil: "visitante", nome: "Ana" } });
+    concluirAtividadeDoPainel("empresa", 7);
+    assert.equal(useRotina.getState().tarefas[0].status, "a_fazer");
+  } finally {
+    useAuth.setState(anteriores[0]);
+    useRotina.setState(anteriores[1]);
+    useInterface.setState(anteriores[2]);
+  }
+});
+
 test("reconexão atualiza o estado sem duplicar passos e ignora snapshots antigos ou inválidos", () => {
   const anterior = useClaudeCode.getState();
   const aplicar = anterior.aplicar;
