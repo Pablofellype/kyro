@@ -40,7 +40,8 @@ test("painel da empresa isola dados pessoais, ordena atrasos e usa ocorrências 
     { ...tarefa, id: "hoje", titulo: "Atividade de hoje", data: "2026-11-15", hora: "14:00" },
     { ...tarefa, id: "hora-vencida", titulo: "Prazo de hoje vencido", data: "2026-11-15", hora: "09:00" },
     { ...tarefa, id: "privada", titulo: "Atividade pessoal privada", data: "2026-11-13", area: "pessoal" },
-    { ...tarefa, id: "finalizada", titulo: "Atividade concluída", status: "concluida", concluidaEm: "2026-11-15T11:00:00Z" },
+    { ...tarefa, id: "finalizada", titulo: "Atividade concluída", status: "concluida", concluidaEm: new Date(2026, 10, 15, 8, 0).toISOString() },
+    { ...tarefa, id: "conclusao-futura", titulo: "Conclusão no futuro", status: "concluida", concluidaEm: new Date(2026, 10, 15, 11, 0).toISOString() },
     { ...tarefa, id: "cancelada", titulo: "Atividade cancelada", status: "cancelada", data: "2026-11-14" },
   ];
   const pedidos = [{ id: "1", material: "Papel", solicitante: "Ana", quantidade: 2, status: "pendente", criadoEm: "2026-11-14T13:00:00Z" }, { id: "2", material: "Caneta", solicitante: "Bruno", quantidade: 1, status: "atendido", criadoEm: "2026-11-14T14:00:00Z" }];
@@ -56,6 +57,7 @@ test("painel da empresa isola dados pessoais, ordena atrasos e usa ocorrências 
   assert.ok(!resumo.agenda.some((item) => item.id === "repetido:2026-11-16"));
   assert.doesNotMatch(JSON.stringify(resumo), /pessoal privado|pessoal privada|Horário anterior|Compromisso já concluído|Atividade cancelada/);
   assert.ok(resumo.historico.some((item) => item.titulo === "Atividade concluída: Atividade concluída"));
+  assert.ok(!resumo.historico.some((item) => item.id === "tarefa-conclusao-futura"));
   assert.deepEqual({ eventos, tarefas, pedidos }, antes);
 });
 
