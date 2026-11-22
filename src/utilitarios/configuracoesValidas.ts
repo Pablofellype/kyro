@@ -69,6 +69,9 @@ export function configuracoesValidas(valor: unknown, padrao: Configuracoes): Con
     const codigo = c.ilha.ordemAbas.indexOf("claude");
     c.ilha.ordemAbas.splice(codigo < 0 ? 1 : codigo, 0, "time");
   }
+  if (padrao.ilha.ordemAbas.includes("materiais") && !c.ilha.ordemAbas.includes("materiais")) {
+    c.ilha.ordemAbas.push("materiais");
+  }
   c.dock.buscador = escolher(c.dock.buscador, ["google", "duckduckgo", "bing"], padrao.dock.buscador);
   const rotas = [...padrao.barraLateral.map((r) => r.rota), "configuracoes"];
   const barra = objeto(valor) && Array.isArray(valor.barraLateral) ? valor.barraLateral : padrao.barraLateral;

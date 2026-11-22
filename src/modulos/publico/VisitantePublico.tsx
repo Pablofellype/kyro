@@ -1,7 +1,9 @@
 import { ArrowLeft, ArrowUpRight, CalendarDays, ClipboardCheck, ClipboardList, Globe2, LockKeyhole, PackageOpen, Smile, type LucideIcon } from "lucide-react";
+import { useEffect, useState } from "react";
 import { LogoNiko } from "../../componentes/LogoNiko";
 import { NATIVO } from "../../desktop/desktop";
 import { APLICATIVOS_EMPRESA, type AplicativoEmpresa } from "../escritorio/aplicativosEmpresaConfig";
+import { consultarAppsEmpresa } from "../escritorio/catalogoAppsEmpresa";
 import "./visitantePublico.css";
 
 const ICONES: Record<string, LucideIcon> = {
@@ -43,8 +45,17 @@ function CartaoDoSistema({ app }: { app: AplicativoEmpresa }) {
 }
 
 export default function VisitantePublico() {
-  const aplicativos = APLICATIVOS_EMPRESA.filter((app) => app.publico);
-  const disponiveis = aplicativos.filter((app) => app.status === "disponivel" && app.url).length;
+  const [catalogo, setCatalogo] = useState<AplicativoEmpresa[] | null>(() => typeof window === "undefined" ? APLICATIVOS_EMPRESA : null);
+  const [erro, setErro] = useState(false);
+  useEffect(() => {
+    const controle = new AbortController();
+    void consultarAppsEmpresa<{ aplicativos: AplicativoEmpresa[] }>("catalogo", null, undefined, controle.signal)
+      .then(({ aplicativos }) => { if (!controle.signal.aborted) setCatalogo(aplicativos); })
+      .catch(() => { if (!controle.signal.aborted) setErro(true); });
+    return () => controle.abort();
+  }, []);
+  const aplicativos = catalogo?.filter((app) => app.publico);
+  const disponiveis = aplicativos?.filter((app) => app.status === "disponivel" && app.url).length;
 
   return (
     <main className="visitante-publico">
@@ -68,10 +79,11 @@ export default function VisitantePublico() {
         <section className="visitante-sistemas" aria-labelledby="visitante-sistemas-titulo">
           <div className="visitante-sistemas-cabecalho">
             <h2 id="visitante-sistemas-titulo">Sistemas da empresa</h2>
-            <span>{disponiveis} {disponiveis === 1 ? "disponível" : "disponíveis"}</span>
+            {disponiveis !== undefined && <span>{disponiveis} {disponiveis === 1 ? "disponível" : "disponíveis"}</span>}
           </div>
+          {!aplicativos && <p role="status">{erro ? "Não foi possível carregar os aplicativos. Recarregue a página para tentar novamente." : "Carregando aplicativos…"}</p>}
           <div className="visitante-apps">
-            {aplicativos.map((app) => <CartaoDoSistema app={app} key={app.id} />)}
+            {aplicativos?.map((app) => <CartaoDoSistema app={app} key={app.id} />)}
           </div>
           <p className="visitante-dica"><ArrowUpRight size={15} aria-hidden="true" />{NATIVO ? "Os sistemas abrem no navegador. Você pode voltar a este portal quando precisar." : "Os sistemas abrem em outra aba. Este portal continua disponível para você voltar."}</p>
         </section>

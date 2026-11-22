@@ -18,6 +18,7 @@ import { podeAcessarArea, podeAcessarRota } from "../../servicos/permissoes";
 import { useAuth } from "../../estado/autenticacao";
 import "./sistemaWeb.css";
 import { itensDoMenuAppsEmpresa } from "../../modulos/escritorio/aplicativosEmpresaConfig";
+import { useCatalogoAppsEmpresa, useSincronizarCatalogoAppsEmpresa } from "../../modulos/escritorio/catalogoAppsEmpresa";
 
 const MINIMO = { w: 960, h: 600 };
 
@@ -39,7 +40,9 @@ export function JanelaSistema({ mobile = false }: { mobile?: boolean } = {}) {
   const rotaValida = rotaLigada(rotaPedida, desligadas) && rotaDisponivelNaArea(rotaPedida, areaEfetiva) && podeAcessarRota(usuario, rotaPedida, areaEfetiva);
   const rota = rotaValida ? rotaPedida : primeiraRotaDaArea(areaEfetiva);
   const chavePagina = rota === "appsEmpresa" ? `${rota}:${appEmpresa}` : rota;
-  const appAberto = rota === "appsEmpresa" && itensDoMenuAppsEmpresa(usuario).some((app) => app.id === appEmpresa && app.disponivel);
+  useSincronizarCatalogoAppsEmpresa();
+  const { aplicativos } = useCatalogoAppsEmpresa();
+  const appAberto = rota === "appsEmpresa" && itensDoMenuAppsEmpresa(usuario, aplicativos).some((app) => app.id === appEmpresa && app.disponivel);
   const geometriaSalva = useInterface((s) => s.geometria);
   const maximizada = useInterface((s) => s.sistemaMaximizado);
   const definirSistema = useInterface((s) => s.definirSistema);

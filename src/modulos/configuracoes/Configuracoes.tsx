@@ -28,6 +28,7 @@ import { TODOS_OS_SONS, tocarSom, type CategoriaSom } from "../../ponte/sons";
 import { DESTAQUE_SISTEMA } from "../../janelas/area-de-trabalho/usarTema";
 import { mudarTema } from "../../janelas/area-de-trabalho/mudarTema";
 import { EditorFoto } from "../../componentes/FotoPerfil";
+import { PreferenciasNotificacoesApps } from "./PreferenciasNotificacoesApps";
 import { SeletorDeFundo } from "./SeletorDeFundo";
 import { SecaoAssistive } from "./SecaoAssistive";
 import { EditorDeAtalhos } from "./EditorDeAtalhos";
@@ -394,6 +395,7 @@ export default function Configuracoes() {
         <AlternadorAjuste rotulo={T.configuracoes.manterSegundoPlano} dica={`${T.configuracoes.manterDica} ${T.configuracoes.somenteDesktop}.`} ligado={false} desativado aoMudar={() => undefined} />
         <AlternadorAjuste rotulo={T.configuracoes.conquistasAtivas} ligado={cfg.conquistasAtivas} aoMudar={(v) => cfg.definir({ conquistasAtivas: v })} />
         <AlternadorAjuste rotulo={T.calendario.integracaoMostrar} ligado={cfg.sugestaoAgendaGoogle} aoMudar={(v) => cfg.definir({ sugestaoAgendaGoogle: v })} />
+        {(usuario?.perfil === "dono" || usuario?.perfil === "gerencia") && <PreferenciasNotificacoesApps key={usuario.id} />}
       </>
     ),
     aparencia: (

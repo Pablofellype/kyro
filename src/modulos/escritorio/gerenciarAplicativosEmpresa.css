@@ -1,0 +1,77 @@
+.gerenciar-apps {
+  display: grid;
+  gap: 16px;
+  max-width: 920px;
+}
+
+.gerenciar-apps-acoes {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.gerenciar-apps-form,
+.gerenciar-apps-lista {
+  margin: 0;
+  border: 1px solid var(--linha);
+  border-radius: 12px;
+  background: var(--superficie);
+}
+
+.gerenciar-apps-form {
+  display: grid;
+  gap: 16px;
+  padding: 16px;
+}
+
+.gerenciar-apps-form h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.gerenciar-apps-form fieldset {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
+  gap: 12px;
+  min-width: 0;
+  padding: 0;
+  margin: 0;
+  border: 0;
+}
+
+.gerenciar-apps-publico {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.gerenciar-apps-lista {
+  list-style: none;
+  padding: 0 14px;
+}
+
+.gerenciar-apps-lista li {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  padding: 12px 0;
+}
+
+.gerenciar-apps-lista li + li {
+  border-top: 1px solid var(--linha);
+}
+
+.gerenciar-apps-lista li > div {
+  display: grid;
+  flex: 1 1 220px;
+  min-width: 0;
+  gap: 3px;
+}
+
+.gerenciar-apps-lista li span,
+.gerenciar-apps-lista li small {
+  color: var(--texto-3);
+  overflow-wrap: anywhere;
+}

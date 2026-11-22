@@ -1,5 +1,6 @@
 import type { ConfiguracaoAderencias, PlanilhaAderencia, ResultadoAderencia } from "../modulos/escritorio/aderenciasTipos";
 import { cabecalhosNiko, urlApi, useAuth, type UsuarioAutenticado } from "../estado/autenticacao";
+import type { AgendadaWhatsapp } from "./whatsapp";
 
 export interface PreviaAderencia {
   imagem: string;
@@ -11,6 +12,22 @@ export interface PreviaAderencia {
 export interface ResultadoEnvioAderencia {
   previa: PreviaAderencia;
   resultado: ResultadoAderencia;
+}
+
+export type FrequenciaMensagemAderencia = "once" | "daily" | "weekly";
+export interface AgendamentoMensagemAderencia {
+  jid: string;
+  texto: string;
+  quando: string;
+  fuso: string;
+  frequencia: FrequenciaMensagemAderencia;
+  dias: number[];
+  todos: boolean;
+  numeros: string[];
+}
+export interface MensagensAutomaticasAderencia {
+  grupos: Array<{ jid: string; nome: string }>;
+  agendadas: Array<AgendadaWhatsapp & { frequencia: string; dias: number[]; fuso: string }>;
 }
 
 const CABECALHOS = { "x-niko": "1", "content-type": "application/json" };
@@ -34,15 +51,19 @@ function cabecalhosDaExecucao(usuario = useAuth.getState().usuario): Record<stri
   };
 }
 
-async function pedir<T>(caminho: string, corpo?: unknown): Promise<T> {
-  const usuario = useAuth.getState().usuario;
+async function pedir<T>(caminho: string, corpo?: unknown, signal?: AbortSignal): Promise<T> {
+  const { usuario, token } = useAuth.getState();
   const remoto = aderenciasRemotas(usuario);
   const prefixo = remoto ? (import.meta.env.DEV ? "/ponte/aderencias-remota" : urlApi("/api/aderencias")) : "/ponte/aderencias";
   const destino = remoto && !import.meta.env.DEV ? `${prefixo}?acao=${encodeURIComponent(caminho)}` : `${prefixo}/${caminho}`;
   const resposta = await fetch(destino, {
     method: corpo === undefined ? "GET" : "POST",
-    headers: cabecalhosDaExecucao(usuario),
+    headers: {
+      ...cabecalhosDaExecucao(usuario),
+      ...(caminho === "mensagens-automaticas" && token ? { Authorization: `Bearer ${token}` } : {}),
+    },
     body: corpo === undefined ? undefined : JSON.stringify(corpo),
+    signal,
   });
   const json = await resposta.json().catch(() => ({})) as T & { erro?: string };
   if (!resposta.ok) throw new Error(json.erro ?? `http_${resposta.status}`);
@@ -56,4 +77,8 @@ export const aderenciasPonte = {
   testar: (planilha: PlanilhaAderencia) => pedir<PreviaAderencia>("testar", { planilha }),
   enviar: (configuracao: ConfiguracaoAderencias, planilha: PlanilhaAderencia) => pedir<ResultadoEnvioAderencia>("enviar", { configuracao, planilha }),
   executar: (configuracao: ConfiguracaoAderencias, grupoId?: string) => pedir<{ resultado: ResultadoAderencia; previas: PreviaAderencia[] }>("executar", { configuracao, grupoId }),
+  mensagensAutomaticas: (signal?: AbortSignal) => pedir<MensagensAutomaticasAderencia>("mensagens-automaticas", undefined, signal),
+  participantes: (jid: string, signal?: AbortSignal) => pedir<{ participantes: Array<{ numero: string; nome: string }> }>("mensagens-automaticas", { operacao: "participantes", jid }, signal),
+  agendarMensagem: (agenda: AgendamentoMensagemAderencia) => pedir<{ id: string }>("mensagens-automaticas", { operacao: "agendar", ...agenda }),
+  cancelarMensagem: (id: string) => pedir<{ ok: true }>("mensagens-automaticas", { operacao: "cancelar", id }),
 };

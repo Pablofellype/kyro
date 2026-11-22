@@ -1,9 +1,10 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { AppWindow, CalendarDays, ChartNoAxesCombined, ChevronDown, ClipboardCheck, ClipboardList, FileSpreadsheet, LayoutGrid, LockKeyhole, PackageOpen, X, type LucideIcon } from "lucide-react";
+import { AppWindow, CalendarDays, ChartNoAxesCombined, ChevronDown, ClipboardCheck, ClipboardList, FileSpreadsheet, LayoutGrid, LockKeyhole, PackageOpen, Settings2, X, type LucideIcon } from "lucide-react";
 import { useAuth } from "../../estado/autenticacao";
 import { useInterface } from "../../estado/interface";
-import { itensDoMenuAppsEmpresa } from "../../modulos/escritorio/aplicativosEmpresaConfig";
+import { GERENCIAR_APLICATIVOS, itensDoMenuAppsEmpresa } from "../../modulos/escritorio/aplicativosEmpresaConfig";
+import { useCatalogoAppsEmpresa } from "../../modulos/escritorio/catalogoAppsEmpresa";
 import "./appsEmpresaNoMenu.css";
 
 const ICONES: Record<string, LucideIcon> = {
@@ -15,6 +16,7 @@ const ICONES: Record<string, LucideIcon> = {
   nps: ChartNoAxesCombined,
   armarios: LockKeyhole,
   solicitacoes: ClipboardList,
+  [GERENCIAR_APLICATIVOS]: Settings2,
 };
 
 export function AppsEmpresaNoMenu({ recolhida, nome = "Aplicativos" }: { recolhida: boolean; nome?: string }) {
@@ -26,11 +28,15 @@ export function AppsEmpresaNoMenu({ recolhida, nome = "Aplicativos" }: { recolhi
   const [painelAberto, setPainelAberto] = useState(false);
   const botao = useRef<HTMLButtonElement>(null);
   const painel = useRef<HTMLDivElement>(null);
-  const itens = itensDoMenuAppsEmpresa(usuario);
+  const { aplicativos } = useCatalogoAppsEmpresa();
+  const itens = itensDoMenuAppsEmpresa(usuario, aplicativos);
+  const opcoes = usuario?.perfil === "dono"
+    ? [...itens, { id: GERENCIAR_APLICATIVOS, nome: "Gerenciar aplicativos", disponivel: true }]
+    : itens;
   const nestaArea = rota === "appsEmpresa";
-  const selecionado = itens.some((app) => app.id === appId && app.disponivel);
+  const selecionado = opcoes.some((app) => app.id === appId && app.disponivel);
   const quantidade = itens.filter((app) => app.disponivel).length;
-  const appAtual = itens.find((app) => app.id === appId && app.disponivel);
+  const appAtual = opcoes.find((app) => app.id === appId && app.disponivel);
 
   useEffect(() => {
     if (rota === "appsEmpresa") setAberto(true);
@@ -56,7 +62,7 @@ export function AppsEmpresaNoMenu({ recolhida, nome = "Aplicativos" }: { recolhi
       window.removeEventListener("resize", posicionar);
       window.removeEventListener("scroll", posicionar, true);
     };
-  }, [painelAberto, quantidade]);
+  }, [painelAberto, quantidade, opcoes.length]);
 
   useEffect(() => {
     if (!painelAberto) return;
@@ -92,7 +98,7 @@ export function AppsEmpresaNoMenu({ recolhida, nome = "Aplicativos" }: { recolhi
     };
   }, [painelAberto]);
 
-  const lista = (flutuante: boolean) => itens.map((app) => {
+  const lista = (flutuante: boolean) => opcoes.map((app) => {
     const Icone = ICONES[app.id] ?? AppWindow;
     const ativo = nestaArea && appId === app.id && app.disponivel;
     const rotulo = app.disponivel ? app.nome : `${app.nome}: em manutenção`;

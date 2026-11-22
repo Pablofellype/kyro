@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { AppWindow, Check, Copy, LoaderCircle, RefreshCw } from "lucide-react";
+import { AppWindow, Check, Copy, ExternalLink, LoaderCircle, RefreshCw } from "lucide-react";
 import { AvisoFaixa, Botao } from "../../componentes/basicos";
-import type { AplicativoEmpresa } from "./aplicativosEmpresaConfig";
+import { ORIGENS_DE_APPS_INCORPORADOS, type AplicativoEmpresa } from "./aplicativosEmpresaConfig";
 import "./sistemaEmpresaAberto.css";
 
 export function SistemaEmpresaAberto({ app }: { app: AplicativoEmpresa }) {
@@ -11,6 +11,8 @@ export function SistemaEmpresaAberto({ app }: { app: AplicativoEmpresa }) {
   const [falhaAoCopiar, setFalhaAoCopiar] = useState(false);
 
   if (!app.url || app.status !== "disponivel") return null;
+  const url = app.url;
+  const incorporado = ORIGENS_DE_APPS_INCORPORADOS.has(new URL(url).origin);
 
   return (
     <section className="apps-empresa-visualizador" aria-label={`${app.nome} dentro do Kyro`}>
@@ -20,10 +22,11 @@ export function SistemaEmpresaAberto({ app }: { app: AplicativoEmpresa }) {
           <h1>{app.nome}</h1>
         </div>
         <div className="apps-empresa-ferramentas-acoes">
-          <Botao icone={<RefreshCw size={15} />} onClick={() => {
+          <a className="botao botao-secundario" href={url} target="_blank" rel="noopener noreferrer"><ExternalLink size={15} />Abrir no navegador</a>
+          {incorporado && <Botao icone={<RefreshCw size={15} />} onClick={() => {
             setCarregando(true);
             setTentativa((valor) => valor + 1);
-          }}>Recarregar</Botao>
+          }}>Recarregar</Botao>}
           <Botao aria-label="Copiar link do sistema" title={app.url} icone={linkCopiado ? <Check size={15} /> : <Copy size={15} />} onClick={async () => {
             try {
               await navigator.clipboard.writeText(app.url!);
@@ -37,7 +40,7 @@ export function SistemaEmpresaAberto({ app }: { app: AplicativoEmpresa }) {
         </div>
       </header>
       {falhaAoCopiar && <div className="apps-empresa-copia-manual"><AvisoFaixa tipo="alerta">A cópia automática não ficou disponível. Selecione o link para copiar.</AvisoFaixa><input className="campo" aria-label="Link do sistema para copiar" readOnly value={app.url} onFocus={(evento) => evento.currentTarget.select()} /></div>}
-      <div className="apps-empresa-quadro" aria-busy={carregando}>
+      {incorporado ? <div className="apps-empresa-quadro" aria-busy={carregando}>
         {carregando && <div className="apps-empresa-quadro-carregando" role="status"><LoaderCircle size={16} className="girando" /> Carregando página…</div>}
         <iframe
           key={tentativa}
@@ -47,7 +50,7 @@ export function SistemaEmpresaAberto({ app }: { app: AplicativoEmpresa }) {
           sandbox="allow-scripts allow-forms allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-downloads allow-modals"
           onLoad={() => setCarregando(false)}
         />
-      </div>
+      </div> : app.descricao && <div className="apps-empresa-copia-manual"><p>{app.descricao}</p></div>}
     </section>
   );
 }

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import {
   Plus, Eye, EyeOff, Music, Timer, CalendarDays, MessageCircle, Plug, Bell, Volume2, VolumeX, AppWindow, ChevronUp, Pin, PinOff, Check, CircleAlert, Download, CodeXml, ShieldAlert, LoaderCircle, MessagesSquare,
-  Users, Palette, type LucideIcon,
+  Users, Palette, PackageOpen, type LucideIcon,
 } from "lucide-react";
 import { useConfig, GRUPO_DA_ROTA, type AbaIlha, type VisaoIlha } from "../../estado/configuracoes";
 import { useAuth } from "../../estado/autenticacao";
@@ -55,6 +55,8 @@ import { atrasoDeFechamento, editandoNaIlha } from "./fechamento";
 import { VisaoTime } from "./VisaoTime";
 import { VisaoWhatsapp, usarAvisosDoWhatsapp } from "./VisaoWhatsapp";
 import { useWhatsapp } from "../../estado/whatsapp";
+import { VisaoSolicitacoesMaterial } from "./VisaoSolicitacoesMaterial";
+import { usarResumoDoInventario } from "../../modulos/escritorio/notificacoesAppsEmpresa";
 import "./ilha.css";
 
 const ICONE_ABA: Record<AbaIlha, LucideIcon> = {
@@ -67,6 +69,7 @@ const ICONE_ABA: Record<AbaIlha, LucideIcon> = {
   claude: CodeXml,
   time: Users,
   whatsapp: MessagesSquare,
+  materiais: PackageOpen,
 };
 
 const VISAO_ABA: Record<Exclude<VisaoIlha, "conexoes">, () => React.JSX.Element | null> = {
@@ -79,6 +82,7 @@ const VISAO_ABA: Record<Exclude<VisaoIlha, "conexoes">, () => React.JSX.Element 
   claude: VisaoClaude,
   time: VisaoTime,
   whatsapp: VisaoWhatsapp,
+  materiais: VisaoSolicitacoesMaterial,
 };
 
 const ESCALA = { pequena: 0.85, media: 1, grande: 1.15 };
@@ -111,6 +115,18 @@ function useAgora(intervalo: number, ativo: boolean) {
     return () => window.clearInterval(t);
   }, [intervalo, ativo]);
   return agora;
+}
+
+function IconeAvisoMaterial({ reduzir }: { reduzir: boolean }) {
+  return <motion.span
+    className="ilha-materiais-icone-aviso"
+    aria-hidden="true"
+    initial={reduzir ? false : { scale: 0.7, rotate: -14 }}
+    animate={reduzir ? { scale: 1 } : { scale: [0.7, 1.24, 0.95, 1], rotate: [-14, 7, -3, 0] }}
+    transition={{ duration: reduzir ? 0 : 0.48, ease: "easeOut" }}
+  >
+    <PackageOpen size={16} />
+  </motion.span>;
 }
 
 export function Ilha() {
@@ -207,12 +223,15 @@ export function Ilha() {
   const desligadas = useConfig((s) => s.funcoesDesligadas);
   usarAvisosDoWhatsapp();
   const naoLidasDoWhatsapp = useWhatsapp((s) => s.estado?.vinculo === "conectado" ? s.estado.naoLidas : 0);
+  const { novas: novasSolicitacoes } = usarResumoDoInventario();
   const abas = abasVisiveisDaIlha(usuario, cfg, desligadas);
+  const materiaisPendentes = abas.includes("materiais") && novasSolicitacoes > 0;
+  const rotuloMateriaisPendentes = `${novasSolicitacoes} ${novasSolicitacoes === 1 ? "nova solicitação" : "novas solicitações"} de material`;
   const capturaDisponivel = usuario?.perfil === "dono" && tiposDeCapturaLigados(desligadas).length > 0;
   const fallback = usuario?.perfil === "gerencia" ? "conexoes" : "hoje";
   const abaAtual: VisaoIlha = aba === "captura" && capturaDisponivel ? "captura" : abas.includes(aba as AbaIlha) ? aba : abas[0] ?? fallback;
   const areaAtual = useInterface((s) => s.area);
-  const rotaDaAba = { hoje: secaoHoje === "agenda" ? "calendario" : "journal", captura: "inicio", midia: "inicio", foco: "estudos", chat: "chat", conexoes: "conexoes", avisos: "inicio", claude: "configuracoes", time: "agentes", whatsapp: "whatsapp" } as const;
+  const rotaDaAba = { hoje: secaoHoje === "agenda" ? "calendario" : "journal", captura: "inicio", midia: "inicio", foco: "estudos", chat: "chat", conexoes: "conexoes", avisos: "inicio", claude: "configuracoes", time: "agentes", whatsapp: "whatsapp", materiais: "appsEmpresa" } as const;
   const podeAbrirNoSistema = podeAcessarRota(usuario, rotaDaAba[abaAtual], areaAtual);
   const abaAntesDaCaptura = useRef<AbaIlha>("hoje");
   const rolagemDasAbas = useRef({ acumulado: 0, ultimaTroca: 0 });
@@ -419,13 +438,13 @@ export function Ilha() {
     ? rotaLongaMobile
       ? Math.max(96, Math.min(128, espacoDisponivel))
       : Math.max(88, Math.min(230, espacoDisponivel))
-    : compacta.largura + (cfg.laterais ? 64 : 0);
+    : compacta.largura + (cfg.laterais ? 64 : 0) + (materiaisPendentes && compacta.tipo !== "revelacao" ? 26 : 0);
   const alvoBase = saudando
     ? { w: LARGURA_DA_SAUDACAO, h: ALTURA_DA_SAUDACAO, r: 40 }
     : estadoEfetivo === "escondida"
       ? { w: 120, h: 6, r: 6 }
       : estadoEfetivo === "compacta"
-        ? { w: larguraCompacta, h: compacta.tipo === "revelacao" ? 56 : compacta.tipo === "midia" ? ALTURA_COMPACTA_MIDIA : ALTURA_COMPACTA, r: compacta.tipo === "midia" || compacta.tipo === "revelacao" ? 14 : 12 }
+        ? { w: larguraCompacta, h: compacta.tipo === "revelacao" ? (revelacao?.detalhe ? 72 : 56) : compacta.tipo === "midia" ? ALTURA_COMPACTA_MIDIA : ALTURA_COMPACTA, r: compacta.tipo === "midia" || compacta.tipo === "revelacao" ? 14 : 12 }
         : DIMENSOES_ILHA_EXPANDIDA;
   const margemTela = ehMobile ? 8 : MARGEM_DA_TELA;
   const alvo = ehMobile && estadoEfetivo !== "escondida"
@@ -447,7 +466,7 @@ export function Ilha() {
   const comSetas = cfg.laterais && !ehMobile && !oculta && !saudando;
 
   const abaDaCompacta = (): VisaoIlha | undefined =>
-    compacta.tipo === "revelacao" ? revelacao?.aba : compacta.tipo === "pomodoro" ? "foco" : compacta.tipo === "midia" ? "midia" : compacta.tipo === "trabalho" ? "chat" : compacta.tipo === "claude" || compacta.tipo === "claudePedido" ? "claude" : undefined;
+    compacta.tipo === "revelacao" ? revelacao?.aba : compacta.tipo === "pomodoro" ? "foco" : compacta.tipo === "midia" ? "midia" : compacta.tipo === "trabalho" ? "chat" : compacta.tipo === "claude" || compacta.tipo === "claudePedido" ? "claude" : materiaisPendentes ? "materiais" : undefined;
 
   const acionarCompacta = () => {
     window.clearTimeout(relogioHover.current);
@@ -480,9 +499,11 @@ export function Ilha() {
         return (
           <>
             <div className="ilha-compacta-lado">
-              {revelacao?.marca ? <Marca marca={revelacao.marca} tamanho={16} /> : revelacao?.agente ? <EspacoDoPersonagem agente={revelacao.agente} tamanho={20} posicao="compacta" /> : null}
+              {revelacao?.aba === "materiais" ? <IconeAvisoMaterial key={revelacao.texto} reduzir={Boolean(reduzirAnimacoes)} /> : revelacao?.marca ? <Marca marca={revelacao.marca} tamanho={16} /> : revelacao?.agente ? <EspacoDoPersonagem agente={revelacao.agente} tamanho={20} posicao="compacta" /> : null}
             </div>
-            <span className="ilha-compacta-texto privado" role="status">{revelacao?.texto}</span>
+            {revelacao?.detalhe ? <span className="ilha-materiais-aviso-detalhado privado" role="status" title={revelacao.detalhe}>
+              <strong>{revelacao.texto}</strong><span>{revelacao.detalhe}</span>
+            </span> : <span className="ilha-compacta-texto privado" role="status">{revelacao?.texto}</span>}
             <div className="ilha-compacta-lado">
               {revelacao?.tipo === "alerta" ? <CircleAlert size={15} color="#f5a524" /> : <Check size={15} color="#34d399" />}
             </div>
@@ -645,7 +666,10 @@ export function Ilha() {
           </AnimatePresence>
           <AnimatePresence>
             {revelacao && estadoEfetivo === "expandida" && !saudando && <motion.button key={revelacao.texto} type="button" className="ilha-aviso-aberta" initial={{ opacity: 0, y: reduzirAnimacoes ? 0 : -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} onClick={() => { abrir(revelacao.aba); useIlha.getState().dispensarRevelacao(); }}>
-              <Bell size={16} /><span className="privado" role="status">{revelacao.texto}</span>
+              {revelacao.aba === "materiais" ? <IconeAvisoMaterial reduzir={Boolean(reduzirAnimacoes)} /> : <Bell size={16} />}
+              {revelacao.detalhe ? <span className="ilha-materiais-aviso-detalhado privado" role="status" title={revelacao.detalhe}>
+                <strong>{revelacao.texto}</strong><span>{revelacao.detalhe}</span>
+              </span> : <span className="privado" role="status">{revelacao.texto}</span>}
             </motion.button>}
           </AnimatePresence>
           <div className="ilha-recorte">
@@ -658,7 +682,7 @@ export function Ilha() {
                   data-tipo={compacta.tipo}
                   role="button"
                   tabIndex={0}
-                  aria-label={T.ilha.expandir}
+                  aria-label={materiaisPendentes ? `${T.ilha.expandir} · ${rotuloMateriaisPendentes}` : T.ilha.expandir}
                   initial={{ opacity: 0, filter: "blur(8px)", scale: 0.97 }}
                   animate={{ opacity: 1, filter: "blur(0px)", scale: 1, transition: { delay: 0.16, duration: 0.3 } }}
                   exit={{ opacity: 0, filter: "blur(8px)", scale: 0.97, transition: { duration: 0.16 } }}
@@ -683,6 +707,11 @@ export function Ilha() {
                   {conteudoCompacta()}
                   {compacta.tipo !== "revelacao" && naoVistos > 0 && (
                     <span className="ilha-contador" aria-label={T.ilha.fila(naoVistos)} title={T.ilha.fila(naoVistos)}>{naoVistos}</span>
+                  )}
+                  {compacta.tipo !== "revelacao" && materiaisPendentes && (
+                    <span className="ilha-contador ilha-contador-materiais" title={rotuloMateriaisPendentes}>
+                      <PackageOpen size={12} aria-hidden="true" />{novasSolicitacoes > 99 ? "99+" : novasSolicitacoes}
+                    </span>
                   )}
                 </motion.div>
               )}
@@ -722,7 +751,7 @@ export function Ilha() {
                             role="tab"
                             className="ilha-aba"
                             aria-selected={a === abaAtual}
-                            aria-label={T.ilha.abas[a]}
+                            aria-label={a === "materiais" && materiaisPendentes ? rotuloMateriaisPendentes : T.ilha.abas[a]}
                             title={T.ilha.abas[a]}
                             initial={{ opacity: 0, y: -4 }}
                             animate={{ opacity: 1, y: 0, transition: { delay: 0.3 + i * 0.035 } }}
@@ -735,6 +764,7 @@ export function Ilha() {
                             <span className="ilha-aba-nome">{T.ilha.abas[a]}</span>
                             {a === "claude" && pedidosClaude.length > 0 && <span className="ilha-aba-selo">{pedidosClaude.length}</span>}
                             {a === "avisos" && naoVistos > 0 && <span className="ilha-aba-selo">{naoVistos}</span>}
+                            {a === "materiais" && novasSolicitacoes > 0 && <span className="ilha-aba-selo">{novasSolicitacoes > 99 ? "99+" : novasSolicitacoes}</span>}
                             {a === "whatsapp" && naoLidasDoWhatsapp > 0 && <span key={naoLidasDoWhatsapp} className="ilha-aba-selo" data-whatsapp title={T.whatsapp.naoLidasNaIlha(naoLidasDoWhatsapp)}>{naoLidasDoWhatsapp > 99 ? "99+" : naoLidasDoWhatsapp}</span>}
                           </motion.button>
                         );
@@ -820,7 +850,7 @@ export function Ilha() {
                         aria-label={T.ilha.abrirSistema}
                         data-dica={T.ilha.abrirSistema}
                         onClick={() => {
-                          irPara(rotaDaAba[abaAtual]);
+                          irPara(rotaDaAba[abaAtual], abaAtual === "materiais" ? { app: "materiais" } : undefined);
                           recolher();
                           void tocarSom("open");
                         }}

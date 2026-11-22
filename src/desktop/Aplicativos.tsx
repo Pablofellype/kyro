@@ -20,6 +20,7 @@ import { usarSincronia } from "./sincronia";
 import { usarAtalhosDaIlha, usarAtalhosGlobais } from "./usarAtalhosGlobais";
 import { useAuth } from "../estado/autenticacao";
 import { TelaLogin } from "../componentes/login/TelaLogin";
+import { usarNotificacoesAppsEmpresa } from "../modulos/escritorio/notificacoesAppsEmpresa";
 
 export function AppSistema() {
   usarTema();
@@ -106,6 +107,7 @@ export function AppIlha() {
   usarTema();
   usarSincronia();
   usarAtalhosDaIlha();
+  usarNotificacoesAppsEmpresa("ilha");
   useServicos();
 
   useEffect(() => {

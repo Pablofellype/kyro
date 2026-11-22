@@ -11,6 +11,7 @@ export function estadoComAviso(estado: EstadoIlha, temAviso: boolean): EstadoIlh
 
 export interface Revelacao {
   texto: string;
+  detalhe?: string;
   tipo: "sucesso" | "info" | "alerta";
   marca?: MarcaId;
   agente?: AgenteId;

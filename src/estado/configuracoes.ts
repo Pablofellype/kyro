@@ -18,13 +18,13 @@ const NOMES_LEGADOS_DO_PERSONAGEM = new Set(["Rubi", "Nanquim", "Sol", "Java", "
 export type Tema = "claro" | "escuro" | "sistema";
 export type Paleta = "padrao" | "areia" | "grafite" | "floresta" | "oceano";
 export type ModoBorda = "fixo" | "esconder" | "inteligente";
-export type AbaIlha = "hoje" | "midia" | "foco" | "chat" | "conexoes" | "avisos" | "claude" | "time" | "whatsapp";
+export type AbaIlha = "hoje" | "midia" | "foco" | "chat" | "conexoes" | "avisos" | "claude" | "time" | "whatsapp" | "materiais";
 export type VisaoIlha = AbaIlha | "captura";
 export type SecaoHoje = "agenda" | "tarefas" | "habitos";
 
 // Código continua disponível nas ferramentas do sistema, mas não é uma aba da ilha.
 // Manter o id no tipo preserva configurações antigas sem deixar a opção reaparecer.
-export const ABAS_ILHA: AbaIlha[] = ["hoje", "time", "conexoes", "whatsapp", "midia", "foco", "avisos"];
+export const ABAS_ILHA: AbaIlha[] = ["hoje", "time", "conexoes", "whatsapp", "materiais", "midia", "foco", "avisos"];
 const ABAS_JUNTADAS_NO_HOJE = ["hoje", "calendario", "habitos"];
 
 export function juntarAbasNoHoje(ordem: string[], blocos: Record<string, boolean>) {
@@ -205,7 +205,7 @@ export const CONFIG_PADRAO: Configuracoes = {
   ilha: {
     ativa: true,
     modo: "inteligente",
-    blocos: { hoje: true, midia: true, foco: true, chat: false, conexoes: true, avisos: true, claude: false, time: true, whatsapp: true },
+    blocos: { hoje: true, midia: true, foco: true, chat: false, conexoes: true, avisos: true, claude: false, time: true, whatsapp: true, materiais: true },
     ordemAbas: ABAS_ILHA,
     repouso: "agente",
     tamanho: "media",

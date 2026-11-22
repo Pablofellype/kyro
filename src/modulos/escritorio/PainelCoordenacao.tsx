@@ -8,7 +8,8 @@ import { tarefaPendente, useRotina } from "../../estado/rotina";
 import { useWhatsapp } from "../../estado/whatsapp";
 import { dataValida, formatar, formatarData, saudacao } from "../../utilitarios/datas";
 import type { Rota } from "../../tipos";
-import { APLICATIVOS_EMPRESA, itensDoMenuAppsEmpresa } from "./aplicativosEmpresaConfig";
+import { itensDoMenuAppsEmpresa } from "./aplicativosEmpresaConfig";
+import { useCatalogoAppsEmpresa } from "./catalogoAppsEmpresa";
 import { resumirPainelEmpresa, type DadosRemotosDoPainel, type PrioridadeDoPainel, type ResumoDoPainelEmpresa } from "./dadosDoPainelEmpresa";
 import { usarDadosDoPainelEmpresa } from "./usarDadosDoPainelEmpresa";
 import "./painelEmpresa.css";
@@ -52,8 +53,9 @@ export function VisaoDoEscritorio({ nome, usuario, agora, resumo, remoto, mensag
   const primeiroNome = nome.trim().split(/\s+/)[0] || usuario.nome.trim().split(/\s+/)[0];
   const prioridades = resumo.prioridades;
   const exibidas = mostrarTodas ? prioridades : prioridades.slice(0, 5);
-  const sistemas = SISTEMAS_PRINCIPAIS.flatMap((id) => APLICATIVOS_EMPRESA.find((app) => app.id === id) ?? []);
-  const outrosAcessos = itensDoMenuAppsEmpresa(usuario).filter((item) => !SISTEMAS_PRINCIPAIS.includes(item.id));
+  const { aplicativos } = useCatalogoAppsEmpresa();
+  const sistemas = SISTEMAS_PRINCIPAIS.flatMap((id) => aplicativos.find((app) => app.id === id) ?? []);
+  const outrosAcessos = itensDoMenuAppsEmpresa(usuario, aplicativos).filter((item) => !SISTEMAS_PRINCIPAIS.includes(item.id));
   const membrosAtivos = remoto.membros?.filter((membro) => membro.ativo && membro.perfil !== "visitante") ?? null;
 
   return <div className="escritorio-empresa">

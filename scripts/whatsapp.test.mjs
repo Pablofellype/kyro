@@ -50,7 +50,7 @@ function conexaoIsolada(t, responder, configuracoes = {}) {
   });
   const codigo = stripTypeScriptTypes(fs.readFileSync("servidor/whatsapp/whatsapp.ts", "utf8"))
     .replace(/^import[\s\S]*?from ["'][^"']+["'];\r?\n/gm, "").replace(/^export /gm, "");
-  vm.runInContext(`${codigo}\nglobalThis.api = { comWhatsappUsuario, ligarWhatsapp, iniciarWhatsapp, estadoDoWhatsapp, passo, enviarMensagem, enviarImagemNoWhatsapp, definirFiltrosDoWhatsapp, ignorarConversa, nomesDeGruposDoGateway };`, contexto);
+  vm.runInContext(`${codigo}\nglobalThis.api = { comWhatsappUsuario, ligarWhatsapp, iniciarWhatsapp, estadoDoWhatsapp, passo, enviarMensagem, enviarImagemNoWhatsapp, definirFiltrosDoWhatsapp, ignorarConversa, nomesDeGruposDoGateway, criarMensagemAutomatica, listarMensagensAutomaticas, cancelarMensagemAutomatica };`, contexto);
   const api = contexto.api;
   return {
     chamadas,
@@ -236,6 +236,54 @@ function gatewayDeConversas({ conversas, mensagens, grupos, enviar } = {}) {
     assert.fail(`Pedido não previsto: ${url.pathname}`);
   };
 }
+
+test("agenda mensagens no grupo do dispositivo certo, com dias selecionados, pessoas ou @todos", async (t) => {
+  const grupo = "120363024512399999@g.us";
+  const numero = "5511999991234";
+  let agendadorDisponivel = true;
+  const situacao = { id: "envio-1", phone: grupo, status: "active", message_type: "text", recurrence: "weekly", weekdays: [1, 3, 5] };
+  const base = gatewayDeConversas({ grupos: (usuario) => usuario === "7" ? [{ JID: grupo, Name: "Equipe" }] : [] });
+  const conexao = conexaoIsolada(t, (url, opcoes) => {
+    if (url.pathname === "/group/participants") {
+      assert.equal(url.searchParams.get("group_id"), grupo);
+      return respostaJson({ results: { participants: [{ phone_number: numero, display_name: "Pessoa de teste" }] } });
+    }
+    if (url.pathname === "/send/message") return respostaJson({ results: { schedule_id: "envio-1" } });
+    if (url.pathname === "/send/schedules") return agendadorDisponivel
+      ? respostaJson({ results: { data: [situacao, { ...situacao, id: "privado", phone: JID_TESTE }] } })
+      : respostaJson({ code: "NOT_FOUND" }, 404);
+    if (url.pathname === "/send/schedules/privado") return respostaJson({ results: { ...situacao, phone: JID_TESTE } });
+    if (url.pathname === "/send/schedules/envio-1") return respostaJson({ results: situacao });
+    if (url.pathname === "/send/schedules/envio-1/cancel") return respostaJson({ results: {} });
+    return base(url, opcoes);
+  }, { "7": configPreservada(), "8": configPreservada() });
+  await conexao.ligar("7");
+  await conexao.ligar("8");
+  const { api, chamadas } = conexao;
+  const definir = (dados, id = "7") => api.comWhatsappUsuario(id, () => api.criarMensagemAutomatica(dados));
+  const pedido = { jid: grupo, texto: " Aviso de teste ", quando: "2027-01-18T12:00:00.000Z", fuso: "America/Sao_Paulo", frequencia: "weekly", dias: [1, 3, 5] };
+  assert.equal((await definir({ ...pedido, todos: true })).id, "envio-1");
+  assert.equal((await definir({ ...pedido, numeros: [numero, numero] })).id, "envio-1");
+  await assert.rejects(definir({ ...pedido, numeros: ["5511999994321"] }), /agenda_mencoes_invalidas/);
+  await assert.rejects(definir({ ...pedido, dias: [2] }), /agenda_primeiro_dia_invalido/);
+  await assert.rejects(definir({ ...pedido, jid: JID_TESTE }), /grupo_invalido/);
+  await assert.rejects(definir(pedido, "8"), /grupo_invalido/);
+  agendadorDisponivel = false;
+  await assert.rejects(definir(pedido), /NOT_FOUND/);
+  agendadorDisponivel = true;
+  const salvos = chamadas.filter((c) => c.caminho === "/send/message");
+  assert.equal(salvos.length, 2);
+  assert.ok(salvos.every((c) => c.dispositivo === "niko-user-7"));
+  assert.deepEqual(JSON.parse(salvos[0].corpo), {
+    phone: grupo, message: "Aviso de teste", scheduled_at: pedido.quando, timezone: pedido.fuso, recurrence: "weekly", weekdays: [1, 3, 5], mentions: ["@everyone"],
+  });
+  assert.deepEqual(JSON.parse(salvos[1].corpo).mentions, [numero]);
+  const listagem = await api.comWhatsappUsuario("7", () => api.listarMensagensAutomaticas());
+  assert.deepEqual(Array.from(listagem.agendadas, (item) => item.id), ["envio-1"]);
+  await assert.rejects(api.comWhatsappUsuario("7", () => api.cancelarMensagemAutomatica("privado")), /pedido_invalido/);
+  await api.comWhatsappUsuario("7", () => api.cancelarMensagemAutomatica("envio-1"));
+  assert.equal(chamadas.filter((c) => c.caminho.endsWith("/cancel")).length, 1);
+});
 
 test("melhorias preservam filtros, grupos ignorados e configurações independentes por usuário", async (t) => {
   const configs = { "7": configPreservada(), "8": configPreservada({ silenciarGrupos: true, esconderArquivadas: true }) };

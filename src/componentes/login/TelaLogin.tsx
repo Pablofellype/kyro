@@ -175,7 +175,7 @@ export function TelaLogin({ aoSucesso }: Props) {
         <header className="kyro-entrada-topo">
           <a href="/" className="kyro-entrada-marca" aria-label="Kyro, início"><LogoNiko tamanho={36} brilho={false} /><span>kyro<span className="kyro-entrada-marca-ponto">.</span></span></a>
           <span className="kyro-entrada-assinatura">Seu mundo, bem organizado.</span>
-          <button type="button" className="kyro-entrada-download" onClick={() => setModalInstalacaoAberto(true)}><Download size={15} /><span>Kyro para desktop</span><ArrowUpRight size={14} /></button>
+          <button type="button" className="kyro-entrada-download" onClick={() => setModalInstalacaoAberto(true)}><Download size={15} /><span>Baixar Kyro</span><ArrowUpRight size={14} /></button>
         </header>
 
         <main className="kyro-entrada-principal">

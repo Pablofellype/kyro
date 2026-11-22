@@ -1,9 +1,11 @@
 import { useEffect } from "react";
 import { useInterface } from "../estado/interface";
+import { usarNotificacoesAppsEmpresa } from "../modulos/escritorio/notificacoesAppsEmpresa";
 
 const INTERVALO_FALHA = 30_000;
 
 export function NotificacoesSistema() {
+  usarNotificacoesAppsEmpresa();
   useEffect(() => {
     let ultimaFalha = 0;
     const conflito = () => {

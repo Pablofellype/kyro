@@ -314,6 +314,122 @@
   color: #062b14;
 }
 
+.ilha-materiais {
+  display: grid;
+  align-content: start;
+  gap: 16px;
+  padding: 16px 8px;
+  height: 100%;
+  box-sizing: border-box;
+  overflow: auto;
+}
+
+.ilha-materiais header,
+.ilha-materiais-acoes {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ilha-materiais-acoes {
+  flex-wrap: wrap;
+}
+
+.ilha-materiais h2,
+.ilha-materiais p {
+  margin: 0;
+}
+
+.ilha-materiais h2 {
+  font-size: 16px;
+}
+
+.ilha-materiais p,
+.ilha-materiais-resumo span {
+  color: var(--i-dim-2);
+  font-size: 12px;
+}
+
+.ilha-materiais-resumo {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(var(--i-rgb), 0.06);
+}
+
+.ilha-materiais-lista {
+  display: grid;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.ilha-materiais-lista li {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 11px 12px;
+  border: 1px solid var(--i-linha);
+  border-radius: 12px;
+  background: var(--i-cartao);
+  overflow-wrap: anywhere;
+}
+
+.ilha-materiais-lista li[data-nova] {
+  border-inline-start: 2px solid #34d399;
+}
+
+.ilha-materiais-item-topo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.ilha-materiais-meta {
+  color: var(--i-dim-2);
+  font-size: 11px;
+}
+
+.ilha-materiais-nova {
+  color: var(--i-tinta);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.ilha-materiais-icone-aviso {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 24px;
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
+  background: rgb(52 211 153 / 20%);
+  color: var(--i-tinta);
+}
+
+.ilha-materiais-aviso-detalhado,
+.ilha-aviso-aberta > .ilha-materiais-aviso-detalhado {
+  display: grid;
+  flex: 1 1 auto;
+  min-width: 0;
+  gap: 3px;
+  font-size: 12px;
+  text-align: left;
+}
+
+.ilha-materiais-aviso-detalhado > span {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  overflow: hidden;
+  color: var(--i-dim-2);
+}
+
 .ilha-acoes {
   margin-left: auto;
   display: flex;
@@ -1112,6 +1228,12 @@
   font-weight: 700;
   display: grid;
   place-items: center;
+}
+
+.ilha-contador-materiais {
+  display: flex;
+  align-items: center;
+  gap: 3px;
 }
 
 .ilha-progresso {

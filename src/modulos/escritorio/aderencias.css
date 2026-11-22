@@ -460,3 +460,11 @@
     overflow-wrap: anywhere;
   }
 }
+.aderencias-campos-agendamento {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}

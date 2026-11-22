@@ -1,21 +1,42 @@
 import { useState, useEffect } from "react";
-import { X, Download, Monitor, Terminal, ShieldCheck, Check, HardDrive, Package, ExternalLink } from "lucide-react";
+import { X, Download, Monitor, Terminal, ShieldCheck, Check, HardDrive, Package, ExternalLink, Smartphone, TabletSmartphone } from "lucide-react";
 import manifesto from "../../../package.json";
+
+type Plataforma = "windows" | "linux" | "android" | "ios";
 
 interface OpcaoDownload {
   id: string;
-  os: "windows" | "linux";
+  os: Plataforma;
   nome: string;
-  arquivo: string;
+  arquivo?: string;
   extensao: string;
-  tamanho: string;
+  tamanho?: string;
   descricao: string;
   destaque?: string;
-  url: string;
+  url?: string;
 }
 
 const REPOSITORIO_KYRO = "https://github.com/Pablofellype/kyro";
 const VERSAO = manifesto.version;
+const PLATAFORMAS = {
+  windows: { nome: "Windows", icone: Monitor },
+  linux: { nome: "Linux", icone: Terminal },
+  android: { nome: "Android", icone: TabletSmartphone },
+  ios: { nome: "iPhone (iOS)", icone: Smartphone },
+} as const;
+
+function linkMovel(valor: string | undefined, plataforma: "android" | "ios"): string | undefined {
+  if (!valor?.trim()) return;
+  try {
+    const url = new URL(valor);
+    if (url.protocol !== "https:" || url.username || url.password) return;
+    if (plataforma === "android" && !url.pathname.toLowerCase().endsWith(".apk")) return;
+    if (plataforma === "ios" && (url.hostname !== "testflight.apple.com" || !/^\/join\/[a-z0-9]+\/?$/i.test(url.pathname))) return;
+    return url.href;
+  } catch {
+    return;
+  }
+}
 
 const OPCOES_INSTALACAO: OpcaoDownload[] = [
   {
@@ -70,6 +91,23 @@ const OPCOES_INSTALACAO: OpcaoDownload[] = [
     descricao: "Pacote RPM do Kyro para Fedora, RHEL, CentOS Stream, Rocky Linux e openSUSE.",
     url: `${REPOSITORIO_KYRO}/releases/latest/download/Kyro-${VERSAO}-1.x86_64.rpm`,
   },
+  {
+    id: "android-apk",
+    os: "android",
+    nome: "Kyro para Android",
+    arquivo: "Kyro.apk",
+    extensao: ".apk",
+    descricao: "Instalador do Kyro para celulares e tablets Android.",
+    url: linkMovel(import.meta.env.VITE_KYRO_ANDROID_APK_URL, "android"),
+  },
+  {
+    id: "ios-testflight",
+    os: "ios",
+    nome: "Kyro para iPhone",
+    extensao: "TestFlight",
+    descricao: "Versão de teste do Kyro para iPhone pelo TestFlight da Apple.",
+    url: linkMovel(import.meta.env.VITE_KYRO_IOS_TESTFLIGHT_URL, "ios"),
+  },
 ];
 
 interface Props {
@@ -78,7 +116,7 @@ interface Props {
 }
 
 export function ModalInstalacao({ aberto, aoFechar }: Props) {
-  const [abaAtiva, setAbaAtiva] = useState<"todos" | "windows" | "linux">("todos");
+  const [abaAtiva, setAbaAtiva] = useState<"todos" | Plataforma>("todos");
   const [baixadoId, setBaixadoId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -97,6 +135,7 @@ export function ModalInstalacao({ aberto, aoFechar }: Props) {
   );
 
   const iniciarDownload = (opcao: OpcaoDownload) => {
+    if (!opcao.url || !opcao.arquivo) return;
     setBaixadoId(opcao.id);
     const link = document.createElement("a");
     link.href = opcao.url;
@@ -113,7 +152,7 @@ export function ModalInstalacao({ aberto, aoFechar }: Props) {
   };
 
   return (
-    <div className="kyro-instalador-backdrop" onClick={aoFechar} role="dialog" aria-modal="true">
+    <div className="kyro-instalador-backdrop" onClick={aoFechar} role="dialog" aria-modal="true" aria-labelledby="kyro-instalador-titulo">
       <div className="kyro-instalador-janela" onClick={(e) => e.stopPropagation()}>
         {/* Barra superior estilo janela macOS */}
         <header className="kyro-login-barra">
@@ -146,39 +185,31 @@ export function ModalInstalacao({ aberto, aoFechar }: Props) {
               <Package size={22} />
             </div>
             <div>
-              <h2 className="kyro-instalador-titulo">Instalar Kyro Desktop</h2>
+              <h2 className="kyro-instalador-titulo" id="kyro-instalador-titulo">Instalar Kyro</h2>
               <p className="kyro-instalador-subtitulo">
-                Binários oficiais do Kyro (v{VERSAO} · 64-bit) para Windows e Linux.
+                Escolha a plataforma para baixar ou testar o Kyro.
               </p>
             </div>
           </div>
 
           {/* Abas de filtro OS */}
-          <div className="kyro-instalador-abas">
+          <div className="kyro-instalador-abas" role="group" aria-label="Filtrar por plataforma">
             <button
               type="button"
               className={`kyro-instalador-aba ${abaAtiva === "todos" ? "ativa" : ""}`}
+              aria-pressed={abaAtiva === "todos"}
               onClick={() => setAbaAtiva("todos")}
             >
               <HardDrive size={13} />
-              <span>Todos os Pacotes ({OPCOES_INSTALACAO.length})</span>
+              <span>Todos ({OPCOES_INSTALACAO.length})</span>
             </button>
-            <button
-              type="button"
-              className={`kyro-instalador-aba ${abaAtiva === "windows" ? "ativa" : ""}`}
-              onClick={() => setAbaAtiva("windows")}
-            >
-              <Monitor size={13} />
-              <span>Windows (2)</span>
-            </button>
-            <button
-              type="button"
-              className={`kyro-instalador-aba ${abaAtiva === "linux" ? "ativa" : ""}`}
-              onClick={() => setAbaAtiva("linux")}
-            >
-              <Terminal size={13} />
-              <span>Linux (3)</span>
-            </button>
+            {(Object.keys(PLATAFORMAS) as Plataforma[]).map((os) => {
+              const { nome, icone: Icone } = PLATAFORMAS[os];
+              const quantidade = OPCOES_INSTALACAO.filter((item) => item.os === os).length;
+              return <button key={os} type="button" className={`kyro-instalador-aba ${abaAtiva === os ? "ativa" : ""}`} aria-pressed={abaAtiva === os} onClick={() => setAbaAtiva(os)}>
+                <Icone size={13} /><span>{nome} ({quantidade})</span>
+              </button>;
+            })}
           </div>
         </div>
 
@@ -186,12 +217,12 @@ export function ModalInstalacao({ aberto, aoFechar }: Props) {
         <div className="kyro-instalador-lista">
           {itensFiltrados.map((item) => {
             const baixandoEste = baixadoId === item.id;
-            const ehWindows = item.os === "windows";
+            const Icone = PLATAFORMAS[item.os].icone;
 
             return (
               <div key={item.id} className="kyro-instalador-card">
                 <div className="kyro-instalador-card-icone" data-os={item.os}>
-                  {ehWindows ? <Monitor size={20} /> : <Terminal size={20} />}
+                  <Icone size={20} />
                 </div>
 
                 <div className="kyro-instalador-card-info">
@@ -205,15 +236,18 @@ export function ModalInstalacao({ aberto, aoFechar }: Props) {
 
                   <p className="kyro-instalador-card-desc">{item.descricao}</p>
 
-                  <div className="kyro-instalador-card-meta">
+                  {item.arquivo && item.tamanho && <div className="kyro-instalador-card-meta">
                     <span className="kyro-instalador-card-arquivo">{item.arquivo}</span>
                     <span className="kyro-instalador-card-ponto" aria-hidden="true" />
                     <span className="kyro-instalador-card-tamanho">{item.tamanho}</span>
-                  </div>
+                  </div>}
                 </div>
 
                 <div className="kyro-instalador-card-acao">
-                  <button
+                  {!item.url ? <button type="button" className="kyro-instalador-btn-baixar" disabled>Em breve</button>
+                    : item.os === "ios" ? <a href={item.url} target="_blank" rel="noopener noreferrer" className="kyro-instalador-btn-baixar">
+                      <ExternalLink size={14} />Abrir TestFlight
+                    </a> : <button
                     type="button"
                     className={`kyro-instalador-btn-baixar ${baixandoEste ? "baixado" : ""}`}
                     onClick={() => iniciarDownload(item)}
@@ -230,7 +264,7 @@ export function ModalInstalacao({ aberto, aoFechar }: Props) {
                         <span>Baixar</span>
                       </>
                     )}
-                  </button>
+                  </button>}
                 </div>
               </div>
             );

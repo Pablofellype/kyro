@@ -585,6 +585,7 @@ export const T = {
       claude: "Código",
       time: "Time",
       whatsapp: "WhatsApp",
+      materiais: "Solicitações de material",
     },
     claude: {
       nomes: { claude: "Claude Code", codex: "Codex", copilot: "Copilot CLI", opencode: "OpenCode", antigravity: "Antigravity", kimi: "Kimi Code", gemini: "Gemini CLI", amp: "Amp" } as Record<string, string>,

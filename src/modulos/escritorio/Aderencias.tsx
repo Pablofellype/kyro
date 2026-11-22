@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, ArrowLeft, ArrowRight, CheckCircle2, Clock3, Copy, Eye, FileImage, FileSpreadsheet, Image, LoaderCircle, Pencil, Play, Plus, RefreshCw, Save, Send, Settings2, Trash2, X } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ArrowRight, CheckCircle2, Clock3, Copy, Eye, FileImage, FileSpreadsheet, Image, LoaderCircle, MessageSquare, Pencil, Play, Plus, RefreshCw, Save, Send, Settings2, Trash2, X } from "lucide-react";
 import { AvisoFaixa, Botao, Cartao, Campo, LinhaAlternador, Modal } from "../../componentes/basicos";
 import { CabecalhoAba } from "../../componentes/CabecalhoAba";
 import { useWhatsapp } from "../../estado/whatsapp";
@@ -8,6 +8,7 @@ import { aderenciasPonte, aderenciasRemotas, type PreviaAderencia } from "../../
 import { novaPlanilhaAderencia, useAderencias } from "../../estado/aderencias";
 import { configuracaoAderenciasValida, type GrupoAderencia, type PlanilhaAderencia, type ResultadoAderencia } from "./aderenciasTipos";
 import { aplicarRascunhoAderencias, copiarPlanilhasAderencias, criarRascunhoAderencias, type RascunhoAderencias } from "./edicaoAderencias";
+import { AbaMensagensAutomaticasAderencia } from "./MensagensAutomaticasAderencia";
 import "./aderencias.css";
 
 const DIAS = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
@@ -62,6 +63,7 @@ function FormularioPlanilha({ aberto, planilha, aoFechar, aoSalvar }: { aberto: 
 
 export function Aderencias() {
   const usuario = useAuth((s) => s.usuario);
+  const [aba, setAba] = useState<"rotinas" | "mensagens">("rotinas");
   const EXECUCAO_REMOTA = aderenciasRemotas(usuario);
   const config = useAderencias((s) => s);
   const whatsapp = useWhatsapp((s) => s.estado);
@@ -222,7 +224,14 @@ export function Aderencias() {
 
   return (
     <section className="aderencias" aria-label="Robô de Aderências">
-      <CabecalhoAba titulo="Robô de Aderências" subtitulo="Organize planilhas em rotinas de manhã, tarde ou noite e envie cada grupo no seu horário." />
+      <CabecalhoAba titulo="Robô de Aderências" subtitulo={aba === "rotinas"
+        ? "Organize planilhas em rotinas de manhã, tarde ou noite e envie cada grupo no seu horário."
+        : "Agende mensagens de texto para os grupos do WhatsApp conectado."} />
+      <div className="aderencias-acoes" role="group" aria-label="Seções do Robô de Aderências">
+        <Botao pequeno aria-pressed={aba === "rotinas"} variante={aba === "rotinas" ? "primario" : "secundario"} icone={<FileSpreadsheet size={14} />} onClick={() => setAba("rotinas")}>Rotinas de print</Botao>
+        <Botao pequeno aria-pressed={aba === "mensagens"} variante={aba === "mensagens" ? "primario" : "secundario"} icone={<MessageSquare size={14} />} onClick={() => setAba("mensagens")}>Mensagens automáticas</Botao>
+      </div>
+      {aba === "mensagens" ? <AbaMensagensAutomaticasAderencia key={usuario?.id} conectado={conectado} /> : <>
       {!conectado
         ? <AvisoFaixa tipo="alerta"><span>{EXECUCAO_REMOTA ? "O servidor ainda não confirmou o WhatsApp conectado. Atualize o estado para conferir." : <>Conecte o WhatsApp em <strong>Conexões</strong> para testar e enviar os resultados.</>}</span><Botao pequeno soIcone aria-label="Atualizar estado do WhatsApp" onClick={() => void carregarWhatsapp()} icone={<RefreshCw size={13} />} /></AvisoFaixa>
         : <AvisoFaixa><span><strong>WhatsApp conectado.</strong> As rotinas salvas continuam sendo executadas {EXECUCAO_REMOTA ? "no servidor" : "pelo Kyro neste computador"} mesmo com esta tela fechada.</span></AvisoFaixa>}
@@ -287,6 +296,7 @@ export function Aderencias() {
         </div>
       </Modal>
       <Modal aberto={navegacaoPendente !== null} titulo="Descartar alterações?" aoFechar={() => setNavegacaoPendente(null)}><p>Você tem alterações que ainda não foram salvas. Ao sair, esse rascunho será descartado.</p><div className="formulario-acoes"><Botao onClick={() => setNavegacaoPendente(null)}>Continuar editando</Botao><Botao variante="perigo" onClick={() => { navegacaoPendente?.(); setNavegacaoPendente(null); }}>Descartar alterações</Botao></div></Modal>
+      </>}
     </section>
   );
 }

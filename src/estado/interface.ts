@@ -59,7 +59,7 @@ interface EstadoInterface {
   abrirBusca: (aberta: boolean) => void;
   abrirCaptura: (aberta: boolean) => void;
   abrirEstilosDaMidia: (abertos: boolean) => void;
-  avisar: (texto: string, desfazer?: () => void, tipo?: TipoAviso) => void;
+  avisar: (texto: string, desfazer?: () => void, tipo?: TipoAviso, duracao?: number) => void;
   dispensarAviso: (id: string) => void;
   definirSistema: (parcial: Partial<Pick<EstadoInterface, "sistemaAberto" | "sistemaMinimizado" | "sistemaMaximizado" | "geometria">>) => void;
 }
@@ -85,6 +85,10 @@ function areaSalva(): AreaSistema {
   } catch {
     return "pessoal";
   }
+}
+
+function salvarArea(area: AreaSistema) {
+  try { localStorage.setItem(CHAVE_AREA_SISTEMA, area); } catch { /* A área continua selecionada em memória. */ }
 }
 
 function salvarSistemaAberto(aberto: boolean) {
@@ -171,11 +175,7 @@ export const useInterface = create<EstadoInterface>()((set, get) => ({
   area: areaSalva(),
   definirArea: (area) => {
     set({ area });
-    try {
-      localStorage.setItem(CHAVE_AREA_SISTEMA, area);
-    } catch {
-      return;
-    }
+    salvarArea(area);
   },
   irPara: (rota, parametros = {}) => {
     if (foraDoSistema()) {
@@ -189,10 +189,12 @@ export const useInterface = create<EstadoInterface>()((set, get) => ({
     const rota = rotaLigada(rotaPedida) ? rotaPedida : "inicio";
     const parametros = rota === rotaPedida ? parametrosPedidos : {};
     const atual = get();
+    const area = rota === "appsEmpresa" ? "empresa" : atual.area;
     const mesmoDestino = atual.rota === rota && JSON.stringify(parametros) === JSON.stringify(atual.parametros);
     salvarSistemaAberto(true);
     set({
       rota,
+      area,
       parametros: { ...parametros },
       historico: mesmoDestino ? atual.historico : [...atual.historico.slice(-30), atual.rota],
       sistemaAberto: true,
@@ -200,6 +202,7 @@ export const useInterface = create<EstadoInterface>()((set, get) => ({
       zSistema: atual.proximoZ,
       proximoZ: atual.proximoZ + 1,
     });
+    if (area !== atual.area) salvarArea(area);
   },
   voltar: () => {
     const { historico } = get();
@@ -229,10 +232,10 @@ export const useInterface = create<EstadoInterface>()((set, get) => ({
     if (abertos && NATIVO) void mostrarSistema();
     set(abertos ? { estilosDaMidiaAbertos: true, sistemaAberto: true, sistemaMinimizado: false } : { estilosDaMidiaAbertos: false });
   },
-  avisar: (texto, desfazer, tipo = "info") => {
+  avisar: (texto, desfazer, tipo = "info", duracao) => {
     const id = gerarId();
     set((s) => ({ avisos: [...s.avisos.slice(-2), { id, texto, desfazer, tipo }] }));
-    temporizadores.set(id, window.setTimeout(() => get().dispensarAviso(id), desfazer ? 6000 : 3200));
+    temporizadores.set(id, window.setTimeout(() => get().dispensarAviso(id), duracao ?? (desfazer ? 6000 : 3200)));
   },
   dispensarAviso: (id) => {
     window.clearTimeout(temporizadores.get(id));

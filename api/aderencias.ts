@@ -2,7 +2,7 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { validarSessao } from "../src/servicos/autenticacao.js";
 import { configurarCors } from "./cors.js";
 
-const ACOES = new Set(["estado", "testar", "enviar", "executar", "configuracao"]);
+const ACOES = new Set(["estado", "testar", "enviar", "executar", "configuracao", "mensagens-automaticas"]);
 
 function tokenDaRequisicao(req: VercelRequest): string {
   const valor = req.headers.authorization;
@@ -37,8 +37,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const acao = acaoDaRequisicao(req);
   if (!ACOES.has(acao)) return res.status(404).json({ erro: "acao_invalida" });
   if (acao === "estado" && req.method !== "GET") return res.status(405).json({ erro: "metodo_nao_permitido" });
-  if (acao !== "estado" && acao !== "configuracao" && req.method !== "POST") return res.status(405).json({ erro: "metodo_nao_permitido" });
-  if (acao === "configuracao" && req.method !== "GET" && req.method !== "POST") return res.status(405).json({ erro: "metodo_nao_permitido" });
+  const leitura = acao === "configuracao" || acao === "mensagens-automaticas";
+  if (acao !== "estado" && req.method !== "POST" && !(leitura && req.method === "GET")) return res.status(405).json({ erro: "metodo_nao_permitido" });
 
   const token = tokenDaRequisicao(req);
   const usuario = token ? await validarSessao(token) : null;

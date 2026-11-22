@@ -8,7 +8,7 @@ import { lerSegredo, gravarSegredo, apagarSegredo } from "../segredos.ts";
 import { porta as portaDaPonte } from "../claude.ts";
 import {
   CaixaWhatsapp, LimiteDeEnvios, caminhoDoQr, conversasDoGateway, dispositivoDoGateway, ehGrupo, eventoDoWebhook, jidNormalizado,
-  mensagensDoGateway, numeroParaExibir, recusaDaResposta, webhookAutentico, type ConversaWhatsapp, type EventoWhatsapp, type FiltrosWhatsapp, type MensagemWhatsapp, type RastroWhatsapp, type SituacaoDoVinculo,
+  mensagensDoGateway, numeroParaExibir, recusaDaResposta, webhookAutentico, TAMANHO_MAXIMO_DA_RESPOSTA, type ConversaWhatsapp, type EventoWhatsapp, type FiltrosWhatsapp, type MensagemWhatsapp, type RastroWhatsapp, type SituacaoDoVinculo,
 } from "./caixa.ts";
 import { aguardarGowaParar, alvoDaPlataforma, gowaInstalado, gowaRodando, iniciarGowa, instalacao, instalarGowa, pararGowa, pastaDoWhatsapp, portaLivre } from "./gowa.ts";
 
@@ -1087,6 +1087,111 @@ function agendadaDoGateway(a: Record<string, unknown>) {
     quando: typeof a.scheduled_at === "string" ? a.scheduled_at : "", proxima: typeof a.next_run_at === "string" ? a.next_run_at : null,
     erro: typeof a.last_error === "string" ? a.last_error : "",
   };
+}
+
+function idDeGrupoAutomatico(valor: unknown): string {
+  if (typeof valor !== "string" || !/^\d{1,25}(?:-\d{1,25})?@g\.us$/.test(valor)) throw new Error("grupo_invalido");
+  return valor;
+}
+
+export function agendamentoAutomaticoValido(dados: Record<string, unknown>, agora = Date.now()) {
+  const phone = idDeGrupoAutomatico(dados.jid);
+  const message = typeof dados.texto === "string" ? dados.texto.trim() : "";
+  if (!message || message.length > TAMANHO_MAXIMO_DA_RESPOSTA) throw new Error("agenda_texto_invalido");
+  const scheduled_at = quandoAgendavel(dados.quando, agora);
+  if (!scheduled_at) throw new Error("agenda_horario_invalido");
+  const recurrence = dados.frequencia;
+  if (recurrence !== "once" && recurrence !== "daily" && recurrence !== "weekly") throw new Error("agenda_repeticao_invalida");
+  const timezone = typeof dados.fuso === "string" ? dados.fuso : "";
+  let primeiroDia: number;
+  try {
+    if (!timezone || timezone.length > 100 || /^[+-]/.test(timezone)) throw new Error();
+    const dia = new Intl.DateTimeFormat("en-US", { timeZone: timezone, weekday: "short" }).format(new Date(scheduled_at));
+    primeiroDia = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(dia);
+  } catch { throw new Error("agenda_fuso_invalido"); }
+  const weekdays = recurrence === "weekly" && Array.isArray(dados.dias) ? [...new Set(dados.dias)] : [];
+  if (recurrence === "weekly") {
+    if (!weekdays.length || weekdays.some((dia) => !Number.isInteger(dia) || dia < 0 || dia > 6)) throw new Error("agenda_dias_invalidos");
+    if (!weekdays.includes(primeiroDia)) throw new Error("agenda_primeiro_dia_invalido");
+  }
+  const numeros = dados.numeros ?? [];
+  if (!Array.isArray(numeros) || numeros.length > 1024 || numeros.some((n) => typeof n !== "string" || !/^\d{7,15}$/.test(n))) {
+    throw new Error("agenda_mencoes_invalidas");
+  }
+  const mentions = dados.todos === true ? ["@everyone"] : [...new Set(numeros as string[])];
+  return { phone, message, scheduled_at, timezone, recurrence, ...(weekdays.length ? { weekdays } : {}), ...(mentions.length ? { mentions } : {}) };
+}
+
+function resultadoDoGateway(corpo: unknown) {
+  return (corpo as { results?: Record<string, unknown> } | null)?.results;
+}
+
+async function gruposDasMensagensAutomaticas() {
+  return nomesDeGruposDoGateway(await chamarComSucesso("GET", "/user/my/groups", { tempoMs: 20_000 }));
+}
+
+export async function participantesDasMensagensAutomaticas(jid: unknown) {
+  const id = idDeGrupoAutomatico(jid);
+  const resposta = resultadoDoGateway(await chamarComSucesso("GET", "/group/participants", { query: { group_id: id } }));
+  if (!Array.isArray(resposta?.participants)) throw new Error("agenda_participantes_indisponiveis");
+  const participantes = new Map<string, string>();
+  for (const item of resposta.participants) {
+    const telefone = typeof item?.phone_number === "string" ? item.phone_number : "";
+    const numero = telefone || /^([0-9]{7,15})@s\.whatsapp\.net$/.exec(String(item?.jid ?? ""))?.[1];
+    if (!numero || !/^\d{7,15}$/.test(numero)) continue;
+    const nome = typeof item.display_name === "string" ? item.display_name.trim().slice(0, 120) : "";
+    participantes.set(numero, nome || `+${numero}`);
+  }
+  return { participantes: [...participantes].map(([numero, nome]) => ({ numero, nome })).sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR")) };
+}
+
+async function agendamentosDeTextoDoGateway(limite: string) {
+  const dados = resultadoDoGateway(await chamarComSucesso("GET", "/send/schedules", { query: { limit: limite, message_type: "text" } }))?.data;
+  if (dados === null) return [];
+  if (!Array.isArray(dados)) throw new Error("agenda_lista_indisponivel");
+  return dados;
+}
+
+export async function listarMensagensAutomaticas() {
+  const [nomes, dados] = await Promise.all([
+    gruposDasMensagensAutomaticas(),
+    agendamentosDeTextoDoGateway("100"),
+  ]);
+  const agendadas = dados.flatMap((item) => {
+    if (!item || typeof item !== "object" || typeof item.id !== "string" || !item.id || typeof item.phone !== "string" || !ehGrupo(item.phone) || item.message_type !== "text") return [];
+    const resumo = agendadaDoGateway(item);
+    return [{ ...resumo, nome: nomes.get(resumo.jid) ?? resumo.nome, frequencia: String(item.recurrence ?? "once"),
+      dias: Array.isArray(item.weekdays) ? item.weekdays.filter((dia: unknown) => typeof dia === "number" && Number.isInteger(dia) && dia >= 0 && dia <= 6) : [],
+      fuso: typeof item.timezone === "string" ? item.timezone : "" }];
+  });
+  const grupos = [...nomes].map(([jid, nome]) => ({ jid, nome })).sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+  return { grupos, agendadas };
+}
+
+export async function criarMensagemAutomatica(dados: Record<string, unknown>) {
+  const pedido = agendamentoAutomaticoValido(dados);
+  if (!(await gruposDasMensagensAutomaticas()).has(pedido.phone)) throw new Error("grupo_invalido");
+  // Confirma que o gateway oferece agendamento antes de chamar o endpoint de envio.
+  await agendamentosDeTextoDoGateway("1");
+  if (pedido.mentions?.length && !pedido.mentions.includes("@everyone")) {
+    const { participantes } = await participantesDasMensagensAutomaticas(pedido.phone);
+    const numeros = new Set(participantes.map((item) => item.numero));
+    if (!pedido.mentions.every((numero) => numeros.has(numero))) throw new Error("agenda_mencoes_invalidas");
+  }
+  if (!envios.permitir()) throw new Error("resposta_muitas");
+  const corpo = await chamarComSucesso("POST", "/send/message", { json: pedido });
+  const id = resultadoDoGateway(corpo)?.schedule_id;
+  if (typeof id !== "string" || !id) throw new Error("agenda_gateway_sem_confirmacao");
+  return { id };
+}
+
+export async function cancelarMensagemAutomatica(valor: unknown) {
+  const id = idDeMensagem(valor);
+  const agendada = resultadoDoGateway(await chamarComSucesso("GET", `/send/schedules/${encodeURIComponent(id)}`));
+  if (!agendada || typeof agendada.phone !== "string" || !ehGrupo(agendada.phone) || agendada.message_type !== "text"
+    || !["active", "paused", "failed"].includes(String(agendada.status))) throw new Error("pedido_invalido");
+  await chamarComSucesso("POST", `/send/schedules/${encodeURIComponent(id)}/cancel`);
+  return { ok: true };
 }
 
 export async function listarAgendadas() {

@@ -19,7 +19,7 @@ export default defineConfig(({ mode }) => {
   // A ponte roda no mesmo processo do Vite, por isso precisa receber também
   // as variáveis sem prefixo VITE_ do .env.local. Elas nunca entram no bundle.
   const env = loadEnv(mode, process.cwd(), "");
-  for (const chave of ["KYRO_GATEWAY_URL", "VITE_GATEWAY_URL", "KYRO_GATEWAY_SECRET", "NIKO_GATEWAY_SECRET"]) {
+  for (const chave of ["KYRO_GATEWAY_URL", "VITE_GATEWAY_URL", "KYRO_GATEWAY_SECRET", "NIKO_GATEWAY_SECRET", "INVENTARIO_INTEGRACAO_TOKEN"]) {
     if (!process.env[chave] && env[chave]) process.env[chave] = env[chave];
   }
   return {

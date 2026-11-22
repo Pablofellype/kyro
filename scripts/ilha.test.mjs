@@ -17,10 +17,54 @@ const { areaDeTrabalhoNaFrente, focoDaAreaPeloElemento, mostrarLateraisDaIlha } 
 test("gerência e dono mantêm todas as abas pessoais configuradas, incluindo avisos sem notificações", async () => {
   const { abasVisiveisDaIlha } = await servidor.ssrLoadModule("/src/janelas/ilha/abasDaIlha.ts");
   const { CONFIG_PADRAO } = await servidor.ssrLoadModule("/src/estado/configuracoes.ts");
-  const esperado = ["hoje", "time", "conexoes", "whatsapp", "midia", "foco", "avisos"];
+  const esperado = ["hoje", "time", "conexoes", "whatsapp", "materiais", "midia", "foco", "avisos"];
   for (const perfil of ["dono", "gerencia"]) assert.deepEqual(abasVisiveisDaIlha({ perfil }, CONFIG_PADRAO.ilha, []), esperado);
   assert.deepEqual(abasVisiveisDaIlha({ perfil: "visitante" }, CONFIG_PADRAO.ilha, []), []);
   assert.deepEqual(abasVisiveisDaIlha(null, CONFIG_PADRAO.ilha, []), []);
+});
+
+test("configurações antigas recebem a aba de materiais e preservam a ordem das outras abas", async () => {
+  const { CONFIG_PADRAO } = await servidor.ssrLoadModule("/src/estado/configuracoes.ts");
+  const { configuracoesValidas } = await servidor.ssrLoadModule("/src/utilitarios/configuracoesValidas.ts");
+  const antiga = { ilha: { ordemAbas: ["midia", "time", "hoje", "avisos"], blocos: { avisos: false } } };
+  const atual = configuracoesValidas(antiga, CONFIG_PADRAO);
+  assert.deepEqual(atual.ilha.ordemAbas, ["midia", "time", "hoje", "avisos", "materiais"]);
+  assert.equal(atual.ilha.blocos.materiais, true);
+  assert.equal(atual.ilha.blocos.avisos, false);
+});
+
+test("a aba de materiais oferece consulta e mostra somente as solicitações da conta atual", async () => {
+  const { createElement } = await import("react");
+  const { renderToStaticMarkup } = await import("react-dom/server");
+  const { VisaoSolicitacoesMaterial } = await servidor.ssrLoadModule("/src/janelas/ilha/VisaoSolicitacoesMaterial.tsx");
+  const { useAuth } = await servidor.ssrLoadModule("/src/estado/autenticacao.ts");
+  const { useEstadoNotificacoesApps, textoDaSolicitacaoDeMaterial } = await servidor.ssrLoadModule("/src/modulos/escritorio/notificacoesAppsEmpresa.ts");
+  const auth = useAuth.getInitialState(), estado = useEstadoNotificacoesApps.getInitialState();
+  const { usuario } = auth;
+  const { consultas, vistos } = estado;
+  try {
+    auth.usuario = { id: 7, perfil: "gerencia" };
+    const pedido = { ordem: 4, protocolo: "MAT-10", solicitante: "Pessoa de Teste", tipo: "DML", itens: "Pano de limpeza", local: "Comercial", data: "" };
+    estado.consultas = { inventario: { usuarioId: 7, situacao: "conectado", notificacao: { assinatura: "atual", total: 4, recentes: [pedido] } } };
+    estado.vistos = { 7: { assinatura: "atual", total: 3 } };
+    const renderizar = () => renderToStaticMarkup(createElement(VisaoSolicitacoesMaterial));
+    assert.match(renderizar(), /1 nova solicitação/);
+    assert.match(renderizar(), /4 solicitações recebidas/);
+    assert.match(renderizar(), /Verificar agora/);
+    assert.match(renderizar(), /Abrir inventário/);
+    assert.match(renderizar(), /Solicitante: Pessoa de Teste/);
+    assert.match(renderizar(), /Pano de limpeza/);
+    assert.match(renderizar(), /Comercial · MAT-10/);
+    assert.equal(textoDaSolicitacaoDeMaterial(pedido), "Pessoa de Teste solicitou Pano de limpeza · Comercial · MAT-10");
+    assert.equal(textoDaSolicitacaoDeMaterial({ ...pedido, solicitante: "" }), "Nova solicitação de material: Pano de limpeza · Comercial · MAT-10");
+    auth.usuario = { id: 8, perfil: "dono" };
+    assert.doesNotMatch(renderizar(), /4 solicitações recebidas/);
+    assert.doesNotMatch(renderizar(), /Pessoa de Teste/);
+  } finally {
+    auth.usuario = usuario;
+    estado.consultas = consultas;
+    estado.vistos = vistos;
+  }
 });
 
 test("restaurar as abas da gerência respeita ordem e opções desligadas pelo usuário", async () => {

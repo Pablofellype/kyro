@@ -10,7 +10,7 @@ Rotina, estudos, finanças, metas e os serviços que você acompanha, reunidos e
 
 ![Windows 10 e 11](https://img.shields.io/badge/Windows-10%20%7C%2011-0b0d10?style=flat-square)
 ![Linux](https://img.shields.io/badge/Linux-Ubuntu%20%7C%20Fedora%20(GNOME)-0b0d10?style=flat-square)
-![Versão](https://img.shields.io/badge/versão-0.2.42-0b0d10?style=flat-square)
+![Versão](https://img.shields.io/badge/versão-0.2.43-0b0d10?style=flat-square)
 ![Licença](https://img.shields.io/badge/licença-proprietária-b42318?style=flat-square)
 
 <br />
@@ -361,6 +361,14 @@ O WhatsApp da ilha oferece busca, filtros de conversas e grupos, mensagens em fi
 No VPS, confira `WHATSAPP_WEBHOOK_EVENTS` em `/etc/kyro-gateway/gowa.env` ao publicar esta melhoria. A lista deve incluir `message,message.revoked,message.edited,message.reaction,message.ack,chat_presence`; se já houver outros eventos, mantenha-os e acrescente apenas os ausentes. Faça uma cópia do arquivo antes de editar e reinicie `kyro-gowa.service` após salvar. Mantenha as demais variáveis, credenciais, diretórios e bancos de sessão. Atualizar somente o binário GOWA não altera essa lista de eventos.
 
 O navegador mantém uma conexão WebSocket autenticada com o gateway. O gateway envia dados e estado do WhatsApp somente quando há mudança; não use timers de 1 ou 5 segundos para consultar o Neon. Se o WebSocket cair, o cliente usa apenas o fallback HTTP espaçado. Para o aviso de dados funcionar, `KYRO_GATEWAY_URL` e `KYRO_GATEWAY_SECRET` precisam estar na Vercel, e `NIKO_GATEWAY_SECRET` no gateway deve ter o mesmo valor de `KYRO_GATEWAY_SECRET`. O agendador do VPS continua independente do navegador e segue executando mensagens e prints mesmo com o computador desligado.
+
+### Aplicativos da empresa e notificações do inventário
+
+Em **Aplicativos → Gerenciar aplicativos**, o dono pode editar links e adicionar uma aba para cada novo aplicativo. A opção **Mostrar no portal público** controla se a aba também aparece para visitantes. Endereços fora das origens incorporadas abrem no navegador.
+
+Na Vercel, configure `INVENTARIO_INTEGRACAO_TOKEN` no projeto do Kyro com o mesmo valor do projeto do inventário e faça um redeploy. Para desenvolvimento local, use a mesma variável no `.env.local` da ponte. A integração consulta o inventário pelo backend.
+
+Cada pessoa com perfil de dono ou gerência pode ativar **Solicitações de material** em **Configurações → Geral → Notificações de aplicativos**. A ativação começa no cursor atual do inventário. O Kyro consulta as solicitações seguintes enquanto está aberto e salva o progresso por conta.
 
 ### Armazenamento de fotos na Vercel
 

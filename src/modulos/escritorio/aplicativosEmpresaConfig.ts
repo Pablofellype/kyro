@@ -1,4 +1,4 @@
-import type { UsuarioAutenticado } from "../../estado/autenticacao";
+import type { UsuarioAutenticado } from "../../estado/autenticacao.ts";
 
 export interface AplicativoEmpresa {
   id: string;
@@ -31,7 +31,7 @@ export const APLICATIVOS_EMPRESA: AplicativoEmpresa[] = [
     id: "materiais",
     nome: "Solicitação de material",
     descricao: "Acesse as solicitações de materiais da empresa.",
-    url: "https://inventario-internoo.vercel.app/manutencao.html",
+    url: "https://inventario-internoo.vercel.app/",
     status: "disponivel",
     publico: true,
   },
@@ -67,10 +67,16 @@ export interface ItemMenuAplicativoEmpresa {
   disponivel: boolean;
 }
 
-export function itensDoMenuAppsEmpresa(usuario: Pick<UsuarioAutenticado, "perfil" | "roboAderencias"> | null): ItemMenuAplicativoEmpresa[] {
+export const GERENCIAR_APLICATIVOS = "gerenciar-aplicativos";
+export const ORIGENS_DE_APPS_INCORPORADOS = new Set(APLICATIVOS_EMPRESA.flatMap((app) => app.url ? [new URL(app.url).origin] : []));
+
+export function itensDoMenuAppsEmpresa(
+  usuario: Pick<UsuarioAutenticado, "perfil" | "roboAderencias"> | null,
+  catalogo = APLICATIVOS_EMPRESA,
+): ItemMenuAplicativoEmpresa[] {
   const podeAderencias = usuario?.perfil === "dono" || (usuario?.perfil === "gerencia" && usuario.roboAderencias === true);
   return [
     ...(podeAderencias ? [{ id: "aderencias", nome: "Robô de Aderências", disponivel: true }] : []),
-    ...APLICATIVOS_EMPRESA.map((app) => ({ id: app.id, nome: app.nome, disponivel: app.status === "disponivel" && !!app.url })),
+    ...catalogo.map((app) => ({ id: app.id, nome: app.nome, disponivel: app.status === "disponivel" && !!app.url })),
   ];
 }

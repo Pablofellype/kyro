@@ -665,8 +665,29 @@ test("rota direta do robô continua protegida e solicitações recebidas ficam i
   assert.doesNotMatch(solicitacoes, /<iframe|apps-empresa-grade/);
 });
 
+test("só o dono abre o gerenciador e um novo domínio abre pelo navegador", async () => {
+  const { ConteudoAplicativoEmpresa } = await vite.ssrLoadModule("/src/modulos/escritorio/AplicativosEmpresa.tsx");
+  const { GERENCIAR_APLICATIVOS } = await import("../src/modulos/escritorio/aplicativosEmpresaConfig.ts");
+  const renderizar = (appId, perfil, aplicativos) => renderToStaticMarkup(createElement(ConteudoAplicativoEmpresa, {
+    appId, usuario: { perfil, roboAderencias: false }, aplicativos,
+  }));
+  assert.match(renderizar(GERENCIAR_APLICATIVOS, "dono"), /Gerenciar aplicativos/);
+  assert.match(renderizar(GERENCIAR_APLICATIVOS, "gerencia"), /não está disponível/);
+  const app = { id: "app-teste", nome: "Ferramenta", descricao: "", url: "https://ferramenta.example/", status: "disponivel", publico: false };
+  const html = renderizar(app.id, "gerencia", [app]);
+  assert.match(html, /Ferramenta/);
+  assert.match(html, /Abrir no navegador/);
+  assert.doesNotMatch(html, /<iframe/);
+});
+
 test("navegação entre apps troca o aplicativo e limpa a seleção ao mudar de área do menu", async (t) => {
-  const { useInterface } = await prepararModoVisualizacao(t, false);
+  const { useInterface, memoria } = await prepararModoVisualizacao(t, false);
+  useInterface.getState().definirArea("pessoal");
+  useInterface.getState().irPara("appsEmpresa", { app: "materiais" });
+  assert.equal(useInterface.getState().area, "empresa");
+  assert.equal(memoria.get("niko:area-sistema"), "empresa");
+  assert.equal(useInterface.getState().rota, "appsEmpresa");
+  assert.deepEqual(useInterface.getState().parametros, { app: "materiais" });
   useInterface.getState().irParaLocal("appsEmpresa", { app: "registros-limpeza" });
   assert.equal(useInterface.getState().rota, "appsEmpresa");
   assert.deepEqual(useInterface.getState().parametros, { app: "registros-limpeza" });
