@@ -145,22 +145,6 @@ pub fn ignorar_cursor(janela: &WebviewWindow, ignorar: bool) -> bool {
     janela.set_ignore_cursor_events(ignorar).is_ok()
 }
 
-pub fn proteger_abas_do_navegador(janela: &WebviewWindow, x: f64, y: f64) -> bool {
-    let (Ok(Some(monitor)), Ok(atual)) = (janela.current_monitor(), janela.outer_position()) else { return false };
-    let origem = monitor.position();
-    let centro = origem.x + monitor.size().width as i32 / 2;
-    let faixa = janela_frente::faixa_superior_do_navegador(monitor.scale_factor());
-    let topo = faixa
-        .filter(|r| r.left <= centro && centro < r.right && r.bottom > origem.y
-            && r.top <= origem.y + (janela_frente::ALTURA_FAIXA_NAVEGADOR * monitor.scale_factor()).ceil() as i32)
-        .map_or(origem.y, |r| r.bottom);
-    if atual.y != topo {
-        let _ = janela.set_position(tauri::PhysicalPosition::new(atual.x, topo));
-    }
-    faixa.is_some_and(|r| x >= f64::from(r.left) && x < f64::from(r.right)
-        && y >= f64::from(r.top) && y < f64::from(r.bottom))
-}
-
 pub fn retangulo_da_janela(janela: &WebviewWindow) -> Option<RECT> {
     let h = janela.hwnd().ok()?;
     let mut atual = RECT::default();
