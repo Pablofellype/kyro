@@ -1,6 +1,6 @@
 import type { AreaSistema, Rota } from "../../tipos";
 
-export const ROTAS_PESSOAIS: Rota[] = ["inicio", "journal", "estudos", "financas", "metas", "calendario"];
+export const ROTAS_PESSOAIS: Rota[] = ["inicio", "journal", "estudos", "financas", "metas", "calendario", "importados"];
 export const ROTAS_EMPRESA: Rota[] = ["escritorio", "appsEmpresa", "calendario"];
 // Atualização não aparece na barra lateral, mas continua acessível por Configurações > Sobre.
 export const ROTAS_COMPARTILHADAS: Rota[] = ["atualizacao", "configuracoes", "conexoes", "whatsapp"];

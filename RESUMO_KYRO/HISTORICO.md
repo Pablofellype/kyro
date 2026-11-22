@@ -1585,3 +1585,84 @@ Atualização desta pasta:
 - Esta entrada foi acrescentada ao final do HISTORICO.md. Alterações somente de documentação nesta tarefa de encerramento; conferidos o diff e os links locais, sem repetir testes de código.
 - Documentação salva localmente depois da publicação. Nenhum novo commit, push, tag ou deploy foi realizado para estes resumos.
 
+## 2026-11-22 — v0.2.43 — Navegação no celular
+
+- Objetivo. Melhorar a leitura e o acesso às páginas no celular após o usuário mostrar a faixa de navegação cortada na captura. A base confirmada é o commit **1ec6bfe**, tag **v0.2.43**.
+- Alterações. Cabeçalho compacto com área e página atual, Ajustes e botão Menu. O painel abre uma lista vertical com opções maiores para toque, seleção de área conforme as permissões e acesso aos aplicativos da empresa, perfil e tema. A ilha passa a abrir abaixo do cabeçalho no celular e o tour aponta para o botão Menu.
+- Validação. Build aprovado e 461 testes passaram. Chrome com dados fictícios em 320 px e 390 px, em paisagem e no desktop. Conferidos destaque de rota, troca de área, acesso a Ajustes e a um aplicativo da empresa, fechamento por toque fora e Escape com retorno de foco, e acesso ao botão Menu com a ilha visível.
+- Resultado. Ajuste implementado localmente na base 0.2.43.
+- Pendência. Conferir o visual no celular do usuário após publicação.
+
+## 2026-11-22 — v0.2.43 — Login, ilha e avisos no celular
+
+- Objetivo. Corrigir o login sem margem interna, a ilha que aparecia sobre o cabeçalho e o aviso repetido de solicitações ao entrar. O escopo é o modo celular.
+- Alterações. Login com formulário em cartão, campos maiores e acesso de visitante visível. Ilha disponível no Menu, sem abrir na entrada. O contador de solicitações por ver abre a aba de materiais, que usa a largura do painel para exibir todos os botões. A primeira consulta da sessão atualiza contador e histórico sem aviso. Novos pedidos durante a sessão geram aviso com a quantidade.
+- Validação. Build aprovado, suíte de 461 testes aprovada e verificação final de 70 testes de interface e ilha. No Chrome, com dados fictícios, foram conferidos login e recuperação, ilha sob demanda, pedidos em 320 e 390 px, nova solicitação sem repetição e reentrada silenciosa. A prévia do login, a ilha e o aviso detalhado foram conferidos no modo desktop.
+- Resultado. Correções locais no modo celular sobre a versão 0.2.43.
+- Pendência. Conferir no aparelho do usuário após publicação.
+
+## 2026-11-22 — v0.2.43 — Instaladores móveis ficam para uma próxima etapa
+
+- Objetivo. Registrar a decisão do usuário de preparar depois o APK de Android e a versão de iPhone pelo TestFlight.
+- Validação. O código do botão Baixar Kyro foi conferido. Ele mostra Em breve quando falta um link aceito para a plataforma.
+- Resultado. Pendência registrada no resumo.
+- Pendências. Preparar os instaladores, configurar os links na build web e testar a instalação nos dois sistemas.
+
+## 2026-11-22 — v0.2.43 — Seta da Ilha na tela do celular
+
+- Objetivo. Dar acesso à Ilha diretamente na tela do celular após o feedback sobre a etapa de abrir o menu lateral.
+- Alterações. O botão Ilha fica abaixo do cabeçalho, com seta que indica o estado e animação de abertura e fechamento. O contador de materiais acompanha o botão e abre na aba de solicitações quando há pedidos por ver. A opção saiu do menu lateral.
+- Validação. Build e testes de interface e ilha. No Chrome, com pedidos fictícios, foram conferidos toque para abrir e fechar, animação de saída, dimensões em retrato e paisagem, redução de movimento e funcionamento no desktop.
+- Resultado. Alteração local para celular.
+- Pendência. Conferir no aparelho do usuário após publicação.
+
+## 2026-11-22 — v0.2.43 — Mais espaço para Apps Empresa no celular
+
+- Objetivo. Dar mais espaço à página incorporada após o usuário mostrar a Avaliação NPS com duas linhas de botões.
+- Alterações. No celular, título e botão de três pontos ocupam uma linha. Abrir no navegador, Recarregar e Copiar link do sistema ficam nas opções. O aplicativo incorporado usa a altura disponível do painel.
+- Validação. Build e 37 testes de interface aprovados. No Chrome com página fictícia, a barra mediu 49 px em 390 × 720, 320 × 568 e 844 × 390. Conferidos atalho externo, recarga, cópia automática e manual, Escape com retorno de foco e os três botões no desktop.
+- Resultado. Alteração local para celular.
+- Pendência. Conferir o NPS real no celular após publicação.
+
+## 2026-11-22 — v0.2.43 — Ilha em repouso e avisos dos calendários
+
+- Objetivo. Permitir trocar de aba no navegador sem acionar a Ilha por engano e exibir os avisos de ambos os calendários.
+- Alterações. No web para computador e no Windows, a Ilha usa uma tirinha em repouso, mostra a versão compacta ao passar o mouse e abre por clique ou teclado. O Windows reposiciona a janela da Ilha abaixo da faixa superior do navegador quando ela chega ao topo e deixa o cursor passar nessa faixa. Notificações exibem a Ilha compacta até o aviso passar.
+- Calendário. Os eventos e lembretes do Kyro são avisados no horário do cadastro ou às 9h locais para eventos sem horário. A fila aceita itens simultâneos com o mesmo título, respeita recorrência, exceções e permissões e abre a área certa ao visitar o calendário pelo aviso. O celular mostra o aviso no rodapé.
+- Validação. Build web aprovado e 462 testes passaram, incluindo a fila com seis eventos e lembretes da Empresa. Chrome com calendário fictício confirmou os avisos Pessoal e Empresa, o retorno ao repouso, a abertura por clique e teclado e os avisos no celular. Rust passou pela análise de sintaxe do rustfmt.
+- Pendência. O Windows não tem linker MSVC nem bibliotecas do SDK neste ambiente. A compilação do executável e a conferência das abas no Chrome com o Kyro instalado ainda estão pendentes.
+
+## 2026-11-22 — v0.2.43 — Solicitações de material tiram a Ilha do repouso
+
+- Objetivo. Fazer o aviso aparecer na Ilha compacta automaticamente após o relato de que a solicitação só aparecia ao passar o mouse.
+- Alterações. A Ilha confirma a própria entrega após aceitar o aviso; o rodapé e o Windows usam um registro separado. A fila mantém avisos de material junto dos outros avisos, mesmo quando o limite comum está cheio. Pedidos já marcados como vistos são desconsiderados para o aviso visual. No celular, a entrada continua silenciosa e pedidos novos aparecem no rodapé.
+- Validação. Build web e 36 testes de Ilha e Apps Empresa aprovados. No Chrome com pedidos fictícios, a Ilha mostrou o pedido com um registro antigo de rodapé e sem movimento do mouse, exibiu o pedido seguinte da fila e voltou à tirinha. Também foram conferidos reentrada sem repetir o aviso e rodapé no celular.
+- Resultado. Correção local.
+- Pendência. Conferir com pedidos reais após publicação e na versão instalada do Windows.
+
+## 2026-11-22 — v0.2.43 — Retomada da importação de solicitações
+
+- Objetivo. Diagnosticar o aviso que continuava ausente na integração real após a correção da Ilha.
+- Diagnóstico. A API do inventário respondeu 200 com o cursor mais recente em zero e a consulta desde zero sem eventos. A assinatura do dono guardava um cursor positivo antigo; a API repetia esse cursor ao responder com uma página vazia.
+- Alterações. O código local compara o cursor quando a leitura para de avançar e volta ao início se a sequência da fonte foi reiniciada. A atualização normal preserva a assinatura, a contagem e o histórico e importa pedidos novos por protocolo.
+- Validação. Build e 36 testes aprovados, incluindo reinício sem pedidos e retomada com pedido já disponível. O código também detectou o reinício na API real em consulta somente de leitura.
+- Resultado. Com autorização, apenas a posição de leitura da assinatura do dono foi ajustada para zero no banco. A conferência posterior confirmou a posição em zero, o total anterior de 7 preservado e a fonte sem novos pedidos.
+- Pendências. Confirmar a entrega do próximo pedido real e publicar a recuperação automática do código em versão futura.
+
+## 2026-11-22 — v0.2.43 — Consulta automática para avisos de material
+
+- Objetivo. Conferir o relato de que os pedidos apareciam ao abrir a Ilha e validar a descoberta automática com a Ilha em repouso.
+- Diagnóstico. O total real de solicitações da assinatura do dono passou de 7 para 9, confirmando a retomada da importação. O aplicativo Windows em execução ainda é a 0.2.43 instalada antes das mudanças locais.
+- Alterações. Com o inventário ativo, a Ilha no computador passa a consultar a cada 15 segundos. O Chrome também consulta ao recuperar o foco. A Ilha exibe o aviso na forma compacta e retorna ao repouso após o aviso.
+- Validação. Build web e 36 testes aprovados. No Chrome, um pedido fictício inserido após a consulta inicial apareceu em 15,1 segundos sem mover o mouse, clicar, abrir a Ilha ou disparar uma atualização manual. A Ilha retornou à tirinha.
+- Pendência. A correção continua local. Falta gerar e instalar a versão do Windows com as alterações e confirmar a entrega com um pedido real no ambiente em que ocorreu o relato.
+
+## 2026-11-22 — v0.2.43 — Catálogo pessoal de importados
+
+- Objetivo. Organizar produtos a pesquisar para importação da China ao Brasil.
+- Alterações. Nova aba Importados na área Pessoal do dono. Cadastro, edição e exclusão com foto otimizada, link, valor, moeda (BRL, USD, CNY ou EUR), categoria, plataforma, fornecedor, origem e observações. As opções ficam disponíveis para reutilização e podem ser criadas também em Opções dos filtros.
+- Filtros. Busca combinada, seleção por categoria, plataforma, fornecedor e origem, faixa de preço por moeda e ordenação. O catálogo usa a persistência e o backup da conta do Kyro.
+- Validação. Build e 463 testes aprovados. Chrome com conta e produtos fictícios validou criação com foto, opções novas e existentes, busca, faixa de preço, edição, recarga com dados na API de teste, exclusão, presença somente na área Pessoal e filtros acessíveis até 320 px de largura.
+- Resultado. Catálogo implementado localmente.
+- Pendência. Publicação e conferência com produtos reais.
+

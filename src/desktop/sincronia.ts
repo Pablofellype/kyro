@@ -11,6 +11,7 @@ import { useOrganizacao } from "../estado/organizacao";
 import { useEscritorioIas } from "../estado/escritorioIas";
 import { useBuscaApps } from "../estado/buscaApps";
 import { useMateriais } from "../estado/materiais";
+import { CHAVE_IMPORTADOS, useImportados } from "../estado/importados";
 import { useHistoricoCodigo } from "../estado/historicoCodigo";
 import { aoMudarDeFora, chave } from "../ponte/armazenamento";
 
@@ -27,6 +28,7 @@ const LOJAS: Record<string, { persist: { rehydrate: () => Promise<void> | void }
   [chave("escritorio-ias")]: useEscritorioIas,
   [chave("busca-apps")]: useBuscaApps,
   [chave("materiais")]: useMateriais,
+  [CHAVE_IMPORTADOS]: useImportados,
   [chave("historico-codigo")]: useHistoricoCodigo,
 };
 

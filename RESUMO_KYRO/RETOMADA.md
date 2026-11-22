@@ -1,8 +1,28 @@
 # Retomada do Kyro
 
-## Estado atual — 16/11/2026 — v0.2.41 publicada
+## Estado atual — 22/11/2026 — v0.2.43
 
-Este é o ponto de retomada vigente. As seções de 13/11 e 12/11 mantidas abaixo são históricas; suas indicações de versão antiga, publicação pendente e testes antigos não descrevem o estado atual.
+- Base confirmada no repositório local pelo usuário e pelo commit **1ec6bfe — Prepara Kyro 0.2.43**, com tag **v0.2.43**.
+- O menu do Kyro no celular passou a abrir em um painel vertical com toque, indicação da página ativa e seleção Pessoal/Empresa. Cabeçalho compacto com atalhos de Menu e Ajustes. A posição da ilha acompanha o cabeçalho.
+- No celular, o login usa um cartão próprio para o formulário. A ilha abre e fecha com animação pela seta **Ilha** logo abaixo do cabeçalho. Se houver solicitações por ver, o contador aparece junto da seta e o painel abre na aba de materiais. A primeira consulta da sessão carrega os pedidos no contador e no histórico. Solicitações que chegam durante a sessão geram um aviso resumido.
+- Em Apps Empresa no celular, o título e o botão de opções ficam em uma linha. O aplicativo incorporado ocupa a altura restante e as ações ficam no botão de três pontos.
+- No web para computador e no Windows, a Ilha fica como uma tirinha em repouso, mostra a versão compacta ao passar o mouse e abre por completo ao clicar. No Windows, o código posiciona a sobreposição abaixo da faixa superior das janelas de navegador que chegam ao topo e exclui essa faixa da captura do cursor.
+- Eventos e lembretes registrados nos calendários Pessoal e Empresa entram na fila de avisos. Eventos sem horário avisam às 9h locais. No computador o aviso aparece na Ilha compacta, e no celular aparece no rodapé. A compilação e o teste do executável Windows ficam pendentes pelo SDK e linker ausentes.
+- No computador, solicitações de material também tiram a Ilha do repouso e exibem o aviso compacto. A entrega na Ilha é registrada separadamente do rodapé e do Windows. A fila preserva esses pedidos quando outro aviso está sendo exibido.
+- A Ilha no computador consulta o inventário ativo a cada 15 segundos, mesmo recolhida. Em teste com a Ilha em repouso, a consulta periódica mostrou um pedido após cerca de 15 segundos, sem interação, e a Ilha voltou à tirinha.
+- A API real do inventário havia reiniciado a sequência em zero, e a assinatura do dono ainda apontava para uma posição anterior. A posição foi corrigida no banco com autorização, preservando o histórico e o total de 7. O código local reconhece esse reinício automaticamente em futuras consultas. Na verificação após o ajuste, a fonte ainda estava sem pedidos pendentes.
+- Os ajustes de celular estão locais. A conferência no aparelho do usuário fica para depois da atualização do site.
+- A área Pessoal do dono tem o catálogo **Importados** com foto, nome, link, preço, moeda, categoria, plataforma, fornecedor, origem e observações. As opções podem ser cadastradas no produto ou em **Opções dos filtros** e ficam disponíveis para reutilização. A busca combina os campos e a faixa de valor usa a moeda escolhida. Implementação local.
+
+### Instaladores para celular — pendência futura
+
+- **Android.** Gerar e disponibilizar o APK assinado. Configurar `VITE_KYRO_ANDROID_APK_URL` com o link HTTPS direto para o arquivo `.apk`.
+- **iPhone.** Preparar e distribuir a versão de teste pelo TestFlight. Configurar `VITE_KYRO_IOS_TESTFLIGHT_URL` com o link HTTPS de convite `testflight.apple.com/join/…`.
+- Na versão atual, o botão **Baixar Kyro** mostra **Em breve** para cada opção cujo link está ausente ou inválido. Quando os links estiverem disponíveis, gerar uma nova build web com as variáveis configuradas e conferir a instalação em cada plataforma.
+
+## Histórico de 16/11/2026 — v0.2.41 publicada
+
+Este registro descreve a publicação e as verificações da 0.2.41. As seções seguintes preservam os registros de 13/11 e 12/11.
 
 ### Publicação e repositório
 
@@ -92,7 +112,7 @@ Atualizado em 12/11/2026, ao encerrar o trabalho para continuar no dia seguinte.
 - O usuário atualizou o VPS para esse mesmo commit, instalou as dependências e conferiu as quatro versões em 0.2.39.
 - Este resumo de encerramento foi salvo localmente depois da publicação. As alterações destes documentos ainda não foram enviadas ao GitHub.
 
-As pendências de publicação e criação de swap das entradas anteriores do histórico foram superadas pelos resultados abaixo. **O teste real do robô ainda está pendente.**
+As pendências de publicação e criação de swap daquele período foram superadas pelos resultados abaixo. O teste real do robô foi confirmado pelo usuário em 13/11.
 
 ## O que foi corrigido nesta última atualização
 

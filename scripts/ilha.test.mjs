@@ -14,6 +14,56 @@ const { atrasoDeFechamento, editandoNaIlha } = await servidor.ssrLoadModule("/sr
 const { controle, sistema } = await servidor.ssrLoadModule("/src/ponte/ponteLocal.ts");
 const { areaDeTrabalhoNaFrente, focoDaAreaPeloElemento, mostrarLateraisDaIlha } = await servidor.ssrLoadModule("/src/janelas/ilha/barra/visibilidadeDaBarra.ts");
 
+test("eventos e lembretes da Empresa entram na fila, inclusive quando têm o mesmo título e horário", async (t) => {
+  const { eventoDisparaEm, verificarAvisosDoCalendario } = await servidor.ssrLoadModule("/src/servicos/servicos.ts");
+  const { useAgentes } = await servidor.ssrLoadModule("/src/estado/agentes.ts");
+  const { useAuth } = await servidor.ssrLoadModule("/src/estado/autenticacao.ts");
+  const { useConfig } = await servidor.ssrLoadModule("/src/estado/configuracoes.ts");
+  const { useInterface } = await servidor.ssrLoadModule("/src/estado/interface.ts");
+  const { useOrganizacao } = await servidor.ssrLoadModule("/src/estado/organizacao.ts");
+  const estados = [useAgentes, useAuth, useConfig, useInterface, useOrganizacao].map((s) => [s, s.getState()]);
+  t.mock.method(window, "setTimeout", () => 0);
+  t.after(() => {
+    while (useIlha.getState().revelacao) useIlha.getState().dispensarRevelacao();
+    for (const [store, estado] of estados) store.setState(estado);
+  });
+  useAuth.setState({ usuario: { id: 7, perfil: "gerencia" } });
+  useConfig.setState((s) => ({ sons: { ...s.sons, ligado: false } }));
+  useAgentes.setState({ alertas: [] });
+  const agora = new Date(2026, 10, 22, 9, 0);
+  const base = { id: "dia", titulo: "Reunião", data: "2026-11-22", tipo: "evento", repeticao: "nenhuma", area: "empresa" };
+  assert.equal(eventoDisparaEm(base, agora), agora.toISOString());
+  assert.equal(eventoDisparaEm({ ...base, hora: "10:00" }, agora), null);
+  assert.equal(eventoDisparaEm({ ...base, feitos: [base.data] }, agora), null);
+  const recorrente = { ...base, repeticao: "diaria", data: "2015-01-01", hora: "09:00", ultimoDisparo: new Date(2026, 10, 21, 9, 0).toISOString() };
+  assert.equal(eventoDisparaEm(recorrente, agora), agora.toISOString());
+  assert.equal(eventoDisparaEm({ ...recorrente, excecoes: [base.data] }, agora), null);
+  useOrganizacao.setState({ eventos: [
+    base,
+    { ...base, id: "pessoal", area: "pessoal" },
+    ...Array.from({ length: 5 }, (_, i) => ({ ...base, id: `lembrete-${i}`, tipo: "lembrete", hora: "09:00" })),
+  ] });
+  verificarAvisosDoCalendario(agora);
+  verificarAvisosDoCalendario(agora);
+  assert.equal(useAgentes.getState().alertas.length, 6);
+  assert.ok(useAgentes.getState().alertas.every((alerta) => alerta.area === "empresa"));
+  assert.equal(useOrganizacao.getState().eventos.find((e) => e.id === "pessoal").ultimoDisparo, undefined);
+  const pedido = { texto: "Nova solicitação de material", tipo: "info", aba: "materiais" };
+  assert.equal(useIlha.getState().revelar(pedido), true);
+  const revelacoes = [];
+  while (useIlha.getState().revelacao) {
+    revelacoes.push(useIlha.getState().revelacao);
+    useIlha.getState().dispensarRevelacao();
+  }
+  assert.deepEqual(revelacoes.pop(), pedido);
+  assert.equal(revelacoes.length, 6);
+  assert.ok(revelacoes.every((aviso) => aviso.categoria === "lembretes" && aviso.texto.startsWith("Empresa")));
+  useAuth.setState({ usuario: { id: 1, perfil: "dono" } });
+  useInterface.getState().definirArea("pessoal");
+  useInterface.getState().irParaLocal("calendario", { area: "empresa" });
+  assert.equal(useInterface.getState().area, "empresa");
+});
+
 test("gerência e dono mantêm todas as abas pessoais configuradas, incluindo avisos sem notificações", async () => {
   const { abasVisiveisDaIlha } = await servidor.ssrLoadModule("/src/janelas/ilha/abasDaIlha.ts");
   const { CONFIG_PADRAO } = await servidor.ssrLoadModule("/src/estado/configuracoes.ts");

@@ -32,7 +32,7 @@ interface EstadoAgentes {
   relogio: number;
   registrar: (agente: AgenteId, texto: string) => void;
   trabalhar: (agente: AgenteId, texto: string, duracaoMs?: number) => Promise<void>;
-  alertar: (agente: AgenteId, texto: string, rota?: Rota, som?: NomeSom, servico?: ServicoId, urgente?: boolean) => string;
+  alertar: (agente: AgenteId, texto: string, rota?: Rota, som?: NomeSom, servico?: ServicoId, urgente?: boolean, origem?: Pick<Alerta, "id" | "area">) => string;
   resolverAlerta: (id: string) => void;
   marcarVistos: () => void;
   falhar: (agente: AgenteId, texto: string) => void;
@@ -94,12 +94,12 @@ export const useAgentes = create<EstadoAgentes>()(
           void tocarSom("finish", "personagens");
           setTimeout(() => set({ relogio: Date.now() }), 3100);
         },
-        alertar: (agente, texto, rota, som = "question", servico, urgente = false) => {
-          const repetido = get().alertas.find((a) => a.agenteId === agente && a.texto === texto);
+        alertar: (agente, texto, rota, som = "question", servico, urgente = false, origem) => {
+          const repetido = get().alertas.find((a) => origem ? a.id === origem.id : a.agenteId === agente && a.texto === texto);
           if (repetido) return repetido.id;
-          const id = gerarId();
+          const id = origem?.id ?? gerarId();
           set((s) => ({
-            alertas: [...s.alertas, { id, agenteId: agente, texto, rota, servico, criadoEm: new Date().toISOString() }].slice(-20),
+            alertas: [...s.alertas, { id, agenteId: agente, texto, rota, area: origem?.area, servico, criadoEm: new Date().toISOString() }].slice(-20),
             relogio: Date.now(),
           }));
           mudarSinal(agente, (x) => x);

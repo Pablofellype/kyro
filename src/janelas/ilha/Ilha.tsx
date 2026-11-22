@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as EventoDeTeclado } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import {
   Plus, Eye, EyeOff, Music, Timer, CalendarDays, MessageCircle, Plug, Bell, Volume2, VolumeX, AppWindow, ChevronUp, Pin, PinOff, Check, CircleAlert, Download, CodeXml, ShieldAlert, LoaderCircle, MessagesSquare,
@@ -129,7 +129,8 @@ function IconeAvisoMaterial({ reduzir }: { reduzir: boolean }) {
   </motion.span>;
 }
 
-export function Ilha() {
+export function Ilha({ mobileSobDemanda = false }: { mobileSobDemanda?: boolean } = {}) {
+  const tirinhaDesktop = !mobileSobDemanda && (!NATIVO || !NO_LINUX);
   const usuario = useAuth((s) => s.usuario);
   const cfg = useConfig((s) => s.ilha);
   const somLigado = useConfig((s) => s.sons.ligado);
@@ -148,10 +149,10 @@ export function Ilha() {
   const [conexaoSelecionada, setConexaoSelecionada] = useState<ServicoId | null>(null);
   const [personalizacaoAberta, setPersonalizacaoAberta] = useState(false);
   const revelacao = useIlha((s) => s.revelacao);
-  const saudacao = useIlha((s) => s.saudacao);
+  const saudacao = useIlha((s) => mobileSobDemanda ? null : s.saudacao);
   const encerrarSaudacao = useIlha((s) => s.encerrarSaudacao);
   const saudando = saudacao !== null;
-  usarSaudacaoDiaria(cfg.ativa);
+  usarSaudacaoDiaria(cfg.ativa && !mobileSobDemanda);
   const definirEstado = useIlha((s) => s.definirEstado);
   const abrir = useIlha((s) => s.abrir);
   const recolher = useIlha((s) => s.recolher);
@@ -179,6 +180,22 @@ export function Ilha() {
   const raiz = useRef<HTMLDivElement>(null);
   const corpoIlha = useRef<HTMLDivElement>(null);
   const [sobre, setSobre] = useState(false);
+  useEffect(() => {
+    if (!tirinhaDesktop) return;
+    const sair = () => setSobre(false);
+    const apontarFora = (evento: PointerEvent) => {
+      if (evento.target instanceof Node && !raiz.current?.contains(evento.target)) sair();
+    };
+    // O botão da tirinha é removido ao revelar a Ilha, podendo ficar sem pointerleave.
+    window.addEventListener("pointerover", apontarFora, true);
+    document.documentElement.addEventListener("pointerleave", sair);
+    window.addEventListener("blur", sair);
+    return () => {
+      window.removeEventListener("pointerover", apontarFora, true);
+      document.documentElement.removeEventListener("pointerleave", sair);
+      window.removeEventListener("blur", sair);
+    };
+  }, [tirinhaDesktop]);
   const atualizacao = useAtualizacao();
   useEffect(() => {
     const primeira = window.setTimeout(() => void useAtualizacao.getState().verificar(), 15000);
@@ -189,10 +206,14 @@ export function Ilha() {
     };
   }, []);
   usarAreaInterativa([".ilha-raiz:not(.ilha-raiz-oculta) .ilha", ".ilha-gatilho", ".ilha-barra-aba", ".ilha-pop"]);
-  usarCursorFora(useCallback(() => setSobre(false), []));
+  usarCursorFora(useCallback(() => {
+    setSobre(false);
+    if (tirinhaDesktop) setRevelada(false);
+  }, [tirinhaDesktop]));
   const aoClicarForaDaJanela = useRef<() => void>(() => undefined);
   usarCliqueFora(useCallback(() => aoClicarForaDaJanela.current(), []));
   useEffect(() => {
+    if (mobileSobDemanda) return;
     let ativo = true;
     let desligar: () => void = () => undefined;
     void ouvirEvento(EVENTO_DA_SAUDACAO, () => useIlha.getState().saudar()).then((f) => {
@@ -203,7 +224,7 @@ export function Ilha() {
       ativo = false;
       desligar();
     };
-  }, []);
+  }, [mobileSobDemanda]);
   const [barraEmUso, setBarraEmUso] = useState(false);
   const [lateralAberta, setLateralAberta] = useState<LadoDaIlha | null>(null);
   const fecharLaterais = useCallback(() => setLateralAberta(null), []);
@@ -306,11 +327,19 @@ export function Ilha() {
   const trabalhando = AGENTES.filter((a) => ["pensando", "escrevendo"].includes(estadoDoAgente(agentes, a)));
 
   const pedidoPendente = MOSTRAR_CODIGO_NA_ILHA && pedidosClaude.length > 0;
-  const estadoEfetivo = saudando ? "compacta" : coberta && estado !== "expandida" && !revelacao && !pedidoPendente ? "escondida" : (cfg.modo === "fixo" || pedidoPendente) && estado === "escondida" ? "compacta" : estadoComAviso(estado, Boolean(revelacao));
+  const emRepouso = tirinhaDesktop && estado !== "expandida" && !saudando
+    && !sobre && !revelada && !barraEmUso && !revelacao
+    && !pedidoPendente && !pomodoro.rodando && atualizacao.fase === "nada";
+  const estadoEfetivo = saudando ? "compacta"
+    : emRepouso ? "escondida"
+    : tirinhaDesktop && (sobre || revelada || barraEmUso) && estado !== "expandida" ? "compacta"
+    : coberta && estado !== "expandida" && !revelacao && !pedidoPendente ? "escondida"
+    : (cfg.modo === "fixo" || pedidoPendente) && estado === "escondida" ? "compacta"
+    : estadoComAviso(estado, Boolean(revelacao));
   useEffect(() => {
     if (estadoEfetivo !== "expandida" || abaAtual !== "conexoes") setConexaoSelecionada(null);
   }, [estadoEfetivo, abaAtual]);
-  const oculta = estadoEfetivo === "escondida";
+  const oculta = estadoEfetivo === "escondida" && !emRepouso;
   useEffect(() => {
     if (!cfg.ativa || !cfg.laterais || frente.telaCheia || oculta || saudando) fecharLaterais();
   }, [cfg.ativa, cfg.laterais, frente.telaCheia, oculta, saudando, fecharLaterais]);
@@ -336,7 +365,7 @@ export function Ilha() {
 
   useEffect(() => {
     const atraso = atrasoDeFechamento(cfg.fechamentoSeg, abaAtual);
-    if (estadoEfetivo !== "expandida" || sobre || barraEmUso || atraso === null || fixada) {
+    if (mobileSobDemanda || estadoEfetivo !== "expandida" || sobre || barraEmUso || atraso === null || fixada) {
       setRestanteFechar(null);
       return;
     }
@@ -360,7 +389,7 @@ export function Ilha() {
     const t = window.setInterval(verificar, 100);
     const imediato = atraso === 0 ? window.setTimeout(verificar, 0) : undefined;
     return () => { window.clearInterval(t); window.clearTimeout(imediato); };
-  }, [estadoEfetivo, sobre, barraEmUso, cfg.fechamentoSeg, recolher, abaAtual, fixada]);
+  }, [mobileSobDemanda, estadoEfetivo, sobre, barraEmUso, cfg.fechamentoSeg, recolher, abaAtual, fixada]);
 
   useEffect(() => {
     if (estadoEfetivo !== "expandida") return;
@@ -372,6 +401,7 @@ export function Ilha() {
     };
     const aoClicarFora = (e: PointerEvent) => {
       if (e.target instanceof Element && e.target.closest(".ilha-barra, .ilha-pop")) return;
+      if (mobileSobDemanda && e.target instanceof Element && e.target.closest(".barra-mobile-ilha-botao")) return;
       if (!fixada && raiz.current && !raiz.current.contains(e.target as Node)) recolher();
     };
     aoClicarForaDaJanela.current = () => {
@@ -384,7 +414,7 @@ export function Ilha() {
       window.removeEventListener("keydown", aoTeclar);
       window.removeEventListener("pointerdown", aoClicarFora, true);
     };
-  }, [estadoEfetivo, recolher, fixada]);
+  }, [estadoEfetivo, recolher, fixada, mobileSobDemanda]);
 
   const claudeIndisponivel = !cfg.ativa || !MOSTRAR_CODIGO_NA_ILHA;
   useEffect(() => {
@@ -441,6 +471,7 @@ export function Ilha() {
     : compacta.largura + (cfg.laterais ? 64 : 0) + (materiaisPendentes && compacta.tipo !== "revelacao" ? 26 : 0);
   const alvoBase = saudando
     ? { w: LARGURA_DA_SAUDACAO, h: ALTURA_DA_SAUDACAO, r: 40 }
+    : emRepouso ? { w: 160, h: 8, r: 6 }
     : estadoEfetivo === "escondida"
       ? { w: 120, h: 6, r: 6 }
       : estadoEfetivo === "compacta"
@@ -453,6 +484,8 @@ export function Ilha() {
   const escala = ehMobile
     ? 1
     : escalaQueCabe(ESCALA[cfg.tamanho], { largura: alvo.w, altura: alvo.h }, { largura: tela.largura - margemTela * 2 - (cfg.laterais ? reservaDasLaterais(tela.largura) : 0), altura: tela.altura - ALTURA_DA_FAIXA - margemTela });
+  const mostrarIlha = !mobileSobDemanda || estadoEfetivo === "expandida";
+  const entradaMobile = { opacity: 0, y: reduzirAnimacoes ? 0 : -12 };
   const crescendo = alvo.w * alvo.h >= anterior.current.w * anterior.current.h;
   anterior.current = { w: alvo.w, h: alvo.h };
   const transicao = crescendo ? MOLA : FECHAR;
@@ -462,8 +495,8 @@ export function Ilha() {
   const agenteCompacto = ["agente", "pomodoro", "relogio", "nada"].includes(compacta.tipo) ? agenteDaVez : compacta.tipo === "trabalho" ? trabalhando[0] : compacta.tipo === "revelacao" && !revelacao?.marca ? revelacao?.agente : undefined;
   const agenteContinuo = estadoEfetivo === "expandida" ? agenteLateral : agenteCompacto ?? agenteDaVez;
   const restantePomodoro = restanteAtual(pomodoro, agora);
-  const barraVisivel = !ehMobile && !oculta && mostrarLateraisDaIlha({ ativadas: cfg.laterais, estado: estadoEfetivo, saudando, telaCheia: frente.telaCheia, areaEmFoco: lateraisLivres, sistemaEmFoco, emUso: barraEmUso || lateralAberta !== null });
-  const comSetas = cfg.laterais && !ehMobile && !oculta && !saudando;
+  const barraVisivel = !ehMobile && !oculta && !emRepouso && mostrarLateraisDaIlha({ ativadas: cfg.laterais, estado: estadoEfetivo, saudando, telaCheia: frente.telaCheia, areaEmFoco: lateraisLivres, sistemaEmFoco, emUso: barraEmUso || lateralAberta !== null });
+  const comSetas = cfg.laterais && !ehMobile && !oculta && !emRepouso && !saudando;
 
   const abaDaCompacta = (): VisaoIlha | undefined =>
     compacta.tipo === "revelacao" ? revelacao?.aba : compacta.tipo === "pomodoro" ? "foco" : compacta.tipo === "midia" ? "midia" : compacta.tipo === "trabalho" ? "chat" : compacta.tipo === "claude" || compacta.tipo === "claudePedido" ? "claude" : materiaisPendentes ? "materiais" : undefined;
@@ -477,6 +510,12 @@ export function Ilha() {
     abrir(abaDaCompacta());
     if (compacta.tipo === "revelacao") useIlha.getState().dispensarRevelacao();
     void tocarSom("open");
+  };
+
+  const acionarCompactaPeloTeclado = (evento: EventoDeTeclado) => {
+    if (evento.key !== "Enter" && evento.key !== " ") return;
+    evento.preventDefault();
+    acionarCompacta();
   };
 
   const conteudoCompacta = () => {
@@ -586,7 +625,7 @@ export function Ilha() {
 
   return (
     <>
-      {cfg.laterais && (
+      {!mobileSobDemanda && cfg.laterais && (
         <BarraDoTopo
           visivel={barraVisivel}
           ladoAberto={lateralAberta}
@@ -598,7 +637,7 @@ export function Ilha() {
           aoUsar={setBarraEmUso}
         />
       )}
-      {estadoEfetivo === "escondida" && (
+      {!mobileSobDemanda && oculta && (
         <div
           className="ilha-gatilho"
           onDragEnter={(e) => {
@@ -613,14 +652,18 @@ export function Ilha() {
           }}
         />
       )}
-      <motion.div
+      <AnimatePresence>
+      {mostrarIlha && <motion.div
         ref={raiz}
+        key="ilha"
+        id={mobileSobDemanda ? "ilha-mobile-painel" : undefined}
         className={`ilha-raiz${oculta ? " ilha-raiz-oculta" : ""}`}
         data-privacidade={privacidade ? "sim" : "nao"}
         {...atributosDoFundo(aparencia)}
-        initial={false}
-        animate={movimentoDeVisibilidade.animate}
-        transition={movimentoDeVisibilidade.transition}
+        initial={mobileSobDemanda && !reduzirAnimacoes ? entradaMobile : false}
+        animate={mobileSobDemanda ? { opacity: 1, y: 0 } : movimentoDeVisibilidade.animate}
+        exit={mobileSobDemanda ? entradaMobile : undefined}
+        transition={mobileSobDemanda ? { duration: reduzirAnimacoes ? 0 : 0.24, ease: "easeOut" } : movimentoDeVisibilidade.transition}
         style={{
           ...variaveisDaBorda(aparencia),
           x: ehMobile ? 0 : "-50%",
@@ -631,6 +674,9 @@ export function Ilha() {
         onPointerEnter={() => {
           setSobre(true);
           window.clearTimeout(relogioRevelada.current);
+          if (emRepouso) {
+            definirEstado("compacta");
+          }
           // No Linux o Rust não enxerga o cursor sobre apps Wayland, então a própria ilha libera o teclado.
           if (NATIVO && NO_LINUX) void janelaAtual().then((j) => j.setFocusable(true)).catch(() => undefined);
         }}
@@ -649,12 +695,14 @@ export function Ilha() {
         <motion.div
           ref={corpoIlha}
           className="ilha"
+          data-repouso={emRepouso || undefined}
           data-com-laterais={comSetas ? "sim" : undefined}
           style={{ ["--fundo-ilha" as string]: aparencia.fundo }}
           initial={false}
           animate={{ width: alvo.w, height: alvo.h, borderTopLeftRadius: ehMobile ? alvo.r : 0, borderTopRightRadius: ehMobile ? alvo.r : 0, borderBottomLeftRadius: alvo.r, borderBottomRightRadius: alvo.r }}
           transition={transicao}
         >
+          {emRepouso && <button type="button" className="ilha-tirinha" aria-label={T.ilha.expandir} onClick={acionarCompacta} onKeyDown={acionarCompactaPeloTeclado} />}
           {comSetas && <SetasLaterais aberta={lateralAberta} expandida={estadoEfetivo === "expandida"} aoAlternar={(lado) => {
             window.clearTimeout(relogioHover.current);
             void tocarSom(lateralAberta === lado ? "close" : "open");
@@ -687,15 +735,10 @@ export function Ilha() {
                   animate={{ opacity: 1, filter: "blur(0px)", scale: 1, transition: { delay: 0.16, duration: 0.3 } }}
                   exit={{ opacity: 0, filter: "blur(8px)", scale: 0.97, transition: { duration: 0.16 } }}
                   onClick={acionarCompacta}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      acionarCompacta();
-                    }
-                  }}
+                  onKeyDown={acionarCompactaPeloTeclado}
                   onPointerEnter={() => {
                     window.clearTimeout(relogioHover.current);
-                    if (cfg.abrirHover && compacta.tipo !== "atualizacao") relogioHover.current = window.setTimeout(() => useIlha.getState().estado === "compacta" && abrir(abaDaCompacta()), 280);
+                    if (!tirinhaDesktop && cfg.abrirHover && compacta.tipo !== "atualizacao") relogioHover.current = window.setTimeout(() => useIlha.getState().estado === "compacta" && abrir(abaDaCompacta()), 280);
                   }}
                   onPointerLeave={() => window.clearTimeout(relogioHover.current)}
                 >
@@ -929,7 +972,8 @@ export function Ilha() {
             <span className="ilha-contagem" style={{ width: (restanteFechar / 10000) * 160 }} aria-hidden="true" />
           )}
         </motion.div>
-      </motion.div>
+      </motion.div>}
+      </AnimatePresence>
       <div className="ilha-pops" {...atributosDoFundo(aparencia)} style={variaveisDaBorda(aparencia)}>
         <AnimatePresence>
           {personalizacaoAberta && estadoEfetivo === "expandida" && <Personalizacao key="personalizar" topo={ALTURA_DA_FAIXA + 36 * escala} aoFechar={() => setPersonalizacaoAberta(false)} />}

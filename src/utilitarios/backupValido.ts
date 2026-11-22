@@ -38,6 +38,10 @@ const esquemas: Record<string, Record<string, Regra>> = {
     pilares: [{ id, nome: "s", nota: "n" }], metas: [{ id, nome: "s", pilarId: id, tipo: "habito|estudo|financeira|tarefas|manual", alvo: "n", atual: "n", periodo: "trimestre|ano", prazo: "?d", historico: [{ data: "d", valor: "n" }] }],
     visao: [{ id, titulo: "s", descricao: "s", estado: "em_andamento|planejada|concluida", prazo: "?d" }], eventos: [evento],
   },
+  importados: {
+    produtos: [{ id, nome: "s!", link: "s", foto: "s", preco: "z", moeda: "BRL|USD|CNY|EUR", categoria: "s", plataforma: "s", fornecedor: "s", origem: "s", nota: "s" }],
+    opcoes: [{ id, campo: "categoria|plataforma|fornecedor|origem", nome: "s!" }],
+  },
   comunicacao: {
     conversas: [{ id, titulo: "s", agenteId: id, criadaEm: "t", atualizadaEm: "t", mensagens: [{ id, autor: "usuario|agente", agenteId: id, texto: "s", criadaEm: "t" }] }],
     memoria: [{ id, texto: "s", agenteId: id, origem: "comando|manual", data: "t" }], conexoes: [{ id, ligada: "b", chaveSalva: "b", intervalo: "n", status: "conectado|sem_chave|erro|pausado|sem_internet", resumo: "s", fixadaNaIlha: "b" }],

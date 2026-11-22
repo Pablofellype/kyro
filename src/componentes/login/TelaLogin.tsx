@@ -12,6 +12,7 @@ import "./entrada.css";
 
 interface Props {
   aoSucesso?: () => void;
+  mobile?: boolean;
 }
 
 function mensagemDoErroDeAcesso(erro: string) {
@@ -24,7 +25,7 @@ function mensagemDoErroDeAcesso(erro: string) {
   return mensagens[erro] ?? erro;
 }
 
-export function TelaLogin({ aoSucesso }: Props) {
+export function TelaLogin({ aoSucesso, mobile = false }: Props) {
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
   const [mostrarSenha, setMostrarSenha] = useState(false);
@@ -170,7 +171,7 @@ export function TelaLogin({ aoSucesso }: Props) {
   const abrirPortalVisitante = () => window.location.assign("/?visitante=1");
 
   return (
-    <div className="estilo-sistema kyro-entrada">
+    <div className={mobile ? "estilo-sistema kyro-entrada kyro-entrada-mobile" : "estilo-sistema kyro-entrada"}>
       <div className="kyro-entrada-shell">
         <header className="kyro-entrada-topo">
           <a href="/" className="kyro-entrada-marca" aria-label="Kyro, início"><LogoNiko tamanho={36} brilho={false} /><span>kyro<span className="kyro-entrada-marca-ponto">.</span></span></a>
@@ -179,17 +180,20 @@ export function TelaLogin({ aoSucesso }: Props) {
         </header>
 
         <main className="kyro-entrada-principal">
-          <section className="kyro-entrada-apresentacao" aria-labelledby="kyro-entrada-chamada">
+          {!mobile && <section className="kyro-entrada-apresentacao" aria-labelledby="kyro-entrada-chamada">
             <div className="kyro-entrada-copy">
               <span className="kyro-entrada-kicker"><i /> PESSOAL. EMPRESA. CONECTADOS.</span>
               <h1 id="kyro-entrada-chamada">Tudo o que move <br />o seu dia<span>.</span></h1>
               <p>Seu tempo, sua equipe e seus aplicativos. <br />Finalmente, no mesmo lugar.</p>
             </div>
             <PreviaKyro />
-          </section>
+          </section>}
 
           <section className="kyro-entrada-acesso" aria-labelledby="kyro-entrada-titulo">
-            <div className="kyro-entrada-acesso-intro"><span className="kyro-entrada-selo"><LockKeyhole size={13} /> ACESSO KYRO</span><h2 id="kyro-entrada-titulo">Entre.<br />Sinta-se em casa.</h2><p>O seu espaço está aqui.<br />Acesse com a sua conta para continuar.</p></div>
+            {mobile ? <div className="kyro-entrada-acesso-intro">
+              <h1 id="kyro-entrada-titulo">Entre no Kyro</h1>
+              <p>Acesse com seu e-mail e senha.</p>
+            </div> : <div className="kyro-entrada-acesso-intro"><span className="kyro-entrada-selo"><LockKeyhole size={13} /> ACESSO KYRO</span><h2 id="kyro-entrada-titulo">Entre.<br />Sinta-se em casa.</h2><p>O seu espaço está aqui.<br />Acesse com a sua conta para continuar.</p></div>}
             <form className="kyro-entrada-form" onSubmit={submeter} aria-busy={carregando}>
               {erro && <div className="kyro-entrada-erro" role="alert"><AlertCircle size={16} /><span>{erro}</span></div>}
               {erro && <button type="button" className="kyro-entrada-diagnostico-botao" onClick={() => void testarConexao()} disabled={testandoConexao}>{testandoConexao ? "Testando conexão..." : "Testar conexão"}</button>}
@@ -197,8 +201,8 @@ export function TelaLogin({ aoSucesso }: Props) {
               <label className="kyro-entrada-campo" htmlFor="kyro-entrada-email"><span>E-mail</span><div><Mail size={17} /><input id="kyro-entrada-email" type="email" placeholder="seu@email.com" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" autoCapitalize="none" spellCheck={false} disabled={carregando} required /></div></label>
               <label className="kyro-entrada-campo" htmlFor="kyro-entrada-senha"><span>Senha</span><div><LockKeyhole size={17} /><input id="kyro-entrada-senha" type={mostrarSenha ? "text" : "password"} placeholder="Sua senha de acesso" value={senha} onChange={(e) => setSenha(e.target.value)} autoComplete="current-password" disabled={carregando} required /><button type="button" onClick={() => setMostrarSenha((valor) => !valor)} aria-label={mostrarSenha ? "Ocultar senha" : "Ver senha"} aria-pressed={mostrarSenha}>{mostrarSenha ? <EyeOff size={17} /> : <Eye size={17} />}</button></div></label>
               <button type="button" className="kyro-entrada-esqueci" onClick={abrirRecuperacao} disabled={carregando}>Esqueceu a senha?</button>
-              <button type="submit" className="kyro-entrada-submit" disabled={carregando}>{carregando ? <><span>Entrando...</span><LoaderCircle size={18} className="girando" /></> : <><span>Entrar no meu espaço</span><ArrowRight size={18} /></>}</button>
-              <span className="kyro-entrada-protecao"><ShieldCheck size={13} /> Seu acesso. Suas permissões.</span>
+              <button type="submit" className="kyro-entrada-submit" disabled={carregando}>{carregando ? <><span>Entrando...</span><LoaderCircle size={18} className="girando" /></> : <><span>{mobile ? "Entrar" : "Entrar no meu espaço"}</span><ArrowRight size={18} /></>}</button>
+              {!mobile && <span className="kyro-entrada-protecao"><ShieldCheck size={13} /> Seu acesso. Suas permissões.</span>}
             </form>
             <div className="kyro-entrada-visitante">
               <span>Veio acessar um sistema da empresa?</span>
@@ -207,7 +211,7 @@ export function TelaLogin({ aoSucesso }: Props) {
           </section>
         </main>
 
-        <footer className="kyro-entrada-rodape"><span><span className="kyro-entrada-rodape-marca">k.</span> Mais espaço para o que importa.</span><span>KYRO <i /> v{manifesto.version}</span></footer>
+        <footer className="kyro-entrada-rodape">{!mobile && <span><span className="kyro-entrada-rodape-marca">k.</span> Mais espaço para o que importa.</span>}<span>KYRO <i /> v{manifesto.version}</span></footer>
       </div>
 
       <Modal aberto={!!fluxoAcesso} titulo={fluxoAcesso === "recuperar" ? "Recuperar acesso" : fluxoAcesso === "convite" ? "Ativar convite" : "Criar nova senha"} aoFechar={() => { if (carregandoAcesso) return; setFluxoAcesso(null); setMensagemAcesso(""); setErroAcesso(""); }}>

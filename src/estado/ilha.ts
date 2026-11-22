@@ -91,7 +91,7 @@ export const useIlha = create<EstadoDaIlha>()((set, get) => {
       }
       const pendente = { r, ms };
       if (get().revelacao) {
-        if (fila.length >= 3 || fila.some((f) => f.r.texto === r.texto)) return false;
+        if (r.categoria !== "lembretes" && r.aba !== "materiais" && (fila.length >= 3 || fila.some((f) => f.r.texto === r.texto))) return false;
         fila.push(pendente);
         return true;
       }

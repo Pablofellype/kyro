@@ -17,6 +17,7 @@ import {
   Settings,
   Users,
   MessageCircle,
+  PackageSearch,
   type LucideIcon,
 } from "lucide-react";
 import type { Rota } from "../../tipos";
@@ -30,6 +31,7 @@ export const ICONE_ROTA: Record<Rota, LucideIcon> = {
   journal: BookOpen,
   estudos: GraduationCap,
   financas: Wallet,
+  importados: PackageSearch,
   metas: Target,
   calendario: CalendarDays,
   atualizacao: RefreshCw,
@@ -41,7 +43,7 @@ export const ICONE_ROTA: Record<Rota, LucideIcon> = {
   whatsapp: MessageCircle,
 };
 
-export const PAGINA_ROTA: Record<Rota, React.LazyExoticComponent<() => React.JSX.Element>> = {
+export const PAGINA_ROTA: Record<Rota, React.LazyExoticComponent<(props: { mobile?: boolean }) => React.JSX.Element>> = {
   inicio: lazy(() => import("../../modulos/inicio/Inicio")),
   chat: lazy(() => import("../../modulos/chat/Chat")),
   escritorio: lazy(() => import("../../modulos/escritorio/Escritorio")),
@@ -50,6 +52,7 @@ export const PAGINA_ROTA: Record<Rota, React.LazyExoticComponent<() => React.JSX
   journal: lazy(() => import("../../modulos/journal/Journal")),
   estudos: lazy(() => import("../../modulos/estudos/Estudos")),
   financas: lazy(() => import("../../modulos/financas/Financas")),
+  importados: lazy(() => import("../../modulos/importados/Importados")),
   metas: lazy(() => import("../../modulos/metas/Metas")),
   calendario: lazy(() => import("../../modulos/calendario/Calendario")),
   atualizacao: lazy(() => import("../../modulos/atualizacao/Atualizacao")),

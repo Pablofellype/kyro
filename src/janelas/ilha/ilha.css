@@ -41,6 +41,22 @@
   cursor: default;
 }
 
+.ilha[data-repouso]::before,
+.ilha[data-repouso]::after { display: none; }
+
+.ilha-tirinha {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  cursor: pointer;
+}
+.ilha-tirinha:focus-visible { outline-offset: -2px; }
+
 .ilha::before,
 .ilha::after {
   content: "";
@@ -3641,7 +3657,6 @@ html[data-mobile="sim"] .ilha-gatilho {
   }
 }
 
-/* No celular a Ilha fica fora da hierarquia do cabeçalho e permanece no topo. */
 @media (max-width: 768px), (pointer: coarse) and (max-width: 1024px) {
   .ilha-raiz,
   html[data-mobile="sim"] .ilha-raiz,
@@ -3656,4 +3671,31 @@ html[data-mobile="sim"] .ilha-gatilho {
     top: calc(max(6px, env(safe-area-inset-top, 6px)) + 7px) !important;
     bottom: auto !important;
   }
+}
+
+.area-trabalho.area-web[data-mobile="sim"] {
+  --topo-ilha-mobile: calc(env(safe-area-inset-top, 0px) + var(--altura-barra-mobile) + var(--altura-atalho-ilha, 0px) + 6px);
+}
+
+.area-trabalho.area-web[data-mobile="sim"] :is(.ilha-raiz, .ilha-gatilho) {
+  top: var(--topo-ilha-mobile) !important;
+}
+
+.area-trabalho.area-web[data-mobile="sim"] .ilha-raiz > .ilha {
+  max-height: calc(100dvh - var(--topo-ilha-mobile) - max(8px, env(safe-area-inset-bottom, 0px)));
+}
+
+.area-web[data-mobile="sim"] .ilha-miolo:has(.ilha-materiais) .ilha-lateral {
+  display: none;
+}
+
+.area-web[data-mobile="sim"] .ilha-materiais {
+  grid-template-columns: minmax(0, 1fr);
+  overscroll-behavior: contain;
+}
+
+.area-web[data-mobile="sim"] .ilha-materiais-acoes .ilha-botao {
+  min-height: 44px;
+  max-width: 100%;
+  white-space: normal;
 }

@@ -227,10 +227,6 @@
 
 @media (max-width: 768px), (pointer: coarse) and (max-width: 1024px) {
   .estilo-sistema .sistema .pagina { gap: 18px; }
-  .estilo-sistema .sistema .barra-marca { font-size: 19px; }
-  .estilo-sistema .sistema .barra-base { padding-top: 0; }
-  .estilo-sistema .sistema .barra-item { background: var(--superficie); border-color: var(--borda-suave); color: var(--texto-2); }
-  .estilo-sistema .sistema .barra-item[aria-current="page"] { background: var(--destaque); border-color: var(--destaque); color: var(--destaque-sobre); }
   .estilo-sistema .sistema .inicio-painel { gap: 16px; }
   .estilo-sistema .sistema .inicio-abertura { padding: 24px 20px; border-radius: 16px; }
   .estilo-sistema .sistema .inicio-abertura .cabecalho-aba { gap: 22px; }

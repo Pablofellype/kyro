@@ -6,6 +6,8 @@ use windows::Win32::UI::Shell::{SHQueryUserNotificationState, QUNS_BUSY, QUNS_PR
 use windows::Win32::UI::WindowsAndMessaging::{GetAncestor, GA_ROOTOWNER, GetClassNameW, GetForegroundWindow, GetWindowLongW, GetWindowRect, GetWindowThreadProcessId, IsIconic, IsWindow, IsWindowVisible, IsZoomed, GWL_STYLE, WS_CAPTION, WS_THICKFRAME};
 
 const CLASSES_DO_SHELL: [&str; 4] = ["Progman", "WorkerW", "Shell_TrayWnd", "Shell_SecondaryTrayWnd"];
+// Inclui a barra de abas, a barra de endereço e a margem de redimensionamento.
+pub(super) const ALTURA_FAIXA_NAVEGADOR: f64 = 96.0;
 
 #[derive(Serialize, Default, Clone, Copy, PartialEq)]
 #[serde(rename_all = "snake_case")]
@@ -92,6 +94,25 @@ unsafe fn janela_atras_da_sobreposta() -> Option<HWND> {
 unsafe fn janela_dona(janela: HWND) -> HWND {
     let dona = GetAncestor(janela, GA_ROOTOWNER);
     if !dona.is_invalid() && IsWindowVisible(dona).as_bool() { dona } else { janela }
+}
+
+pub fn faixa_superior_do_navegador(escala: f64) -> Option<RECT> {
+    let ultima = HWND(super::ultima_frente() as *mut core::ffi::c_void);
+    unsafe {
+        if !janela_aberta(ultima) { return None; }
+        let janela = janela_dona(ultima);
+        let mut pid = 0;
+        GetWindowThreadProcessId(janela, Some(&mut pid));
+        if pid == std::process::id() { return None; }
+        let mut classe = [0u16; 64];
+        let tamanho = GetClassNameW(janela, &mut classe).max(0) as usize;
+        let classe = String::from_utf16_lossy(&classe[..tamanho]);
+        if !classe.starts_with("Chrome_WidgetWin_") && classe != "MozillaWindowClass" { return None; }
+        let mut faixa = RECT::default();
+        GetWindowRect(janela, &mut faixa).ok()?;
+        faixa.bottom = faixa.bottom.min(faixa.top + (ALTURA_FAIXA_NAVEGADOR * escala).ceil() as i32);
+        Some(faixa)
+    }
 }
 
 unsafe fn ler_janela_da_frente(app: &AppHandle, monitor_alvo: HMONITOR) -> EstadoDaFrente {

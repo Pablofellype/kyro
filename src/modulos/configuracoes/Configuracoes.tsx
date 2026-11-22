@@ -310,7 +310,7 @@ function numeroLimitado(texto: string, min: number, max: number, padrao: number)
   return Math.max(min, Math.min(max, Math.round(Number(texto) || padrao)));
 }
 
-export default function Configuracoes() {
+export default function Configuracoes({ mobile = false }: { mobile?: boolean } = {}) {
   const cfg = useConfig();
   const usuario = useAuth((st) => st.usuario);
   const logout = useAuth((st) => st.logout);
@@ -337,7 +337,8 @@ export default function Configuracoes() {
     if (secoesVisiveis.length > 0 && !secoesVisiveis.includes(secao)) setSecao(secoesVisiveis[0]);
   }, [secoesVisiveis, secao]);
   const secaoAtual = podeAcessarConfiguracao(usuario, secao) ? secao : "geral";
-  const barraEditavel = cfg.barraLateral.filter((b) => rotaLigada(b.rota, cfg.funcoesDesligadas) && podeAcessarRota(usuario, b.rota, "empresa"));
+  const barraEditavel = cfg.barraLateral.filter((b) => rotaLigada(b.rota, cfg.funcoesDesligadas)
+    && (podeAcessarRota(usuario, b.rota, "empresa") || podeAcessarRota(usuario, b.rota, "pessoal")));
   const [previaVisual, setPreviaVisual] = useState<ReturnType<typeof validarVisual>>(null);
   const [erroVisual, setErroVisual] = useState("");
   const [novoFato, setNovoFato] = useState("");
@@ -571,7 +572,7 @@ export default function Configuracoes() {
             {[10, 30, 60, 120, 300].map((s) => <option key={s} value={s}>{T.conexoes.segundos(s)}</option>)}
           </select>
         </LinhaAjuste>
-        <AlternadorAjuste rotulo={T.configuracoes.abrirHover} ligado={cfg.ilha.abrirHover} aoMudar={(v) => cfg.definirIlha({ abrirHover: v })} />
+        {(mobile || (NATIVO && NO_LINUX)) && <AlternadorAjuste rotulo={T.configuracoes.abrirHover} ligado={cfg.ilha.abrirHover} aoMudar={(v) => cfg.definirIlha({ abrirHover: v })} />}
         <AlternadorAjuste rotulo={T.ilha.midiaNaCompacta} dica={T.ilha.midiaNaCompactaDica} ligado={cfg.ilha.midiaNaCompacta} aoMudar={(v) => cfg.definirIlha({ midiaNaCompacta: v })} />
         <AlternadorAjuste rotulo={T.configuracoes.lateraisIlha} dica={T.configuracoes.lateraisDica} ligado={cfg.ilha.laterais} aoMudar={(v) => cfg.definirIlha({ laterais: v })} />
         <LinhaAjuste rotulo={T.configuracoes.notificacoesIlha} dica={T.configuracoes.notificacoesDica[cfg.ilha.notificacoes]}>

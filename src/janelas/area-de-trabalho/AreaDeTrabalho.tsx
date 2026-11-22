@@ -48,7 +48,7 @@ export function AreaDeTrabalho() {
   }
 
   if (!usuario) {
-    return <TelaLogin />;
+    return <TelaLogin mobile={ehMobile} />;
   }
 
   const dono = usuario.perfil === "dono";
@@ -61,7 +61,7 @@ export function AreaDeTrabalho() {
           <JanelaConexao key={j.id} janela={j} />
         ))}
       </AnimatePresence>
-      <Ilha />
+      <Ilha mobileSobDemanda={ehMobile} />
       {!ehMobile && <Dock />}
       {!ehMobile && <AssistiveTouch />}
       {dono && <BuscaGlobal />}

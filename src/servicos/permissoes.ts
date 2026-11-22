@@ -26,6 +26,7 @@ export function podeAcessarRota(
   rota: Rota,
   area: AreaSistema,
 ): boolean {
+  if (rota === "importados") return usuario?.perfil === "dono" && area === "pessoal";
   if (!usuario || usuario.perfil === "dono") return true;
   if (area !== "empresa") return false;
   if (usuario.perfil === "gerencia") return ROTAS_DA_EMPRESA.includes(rota);

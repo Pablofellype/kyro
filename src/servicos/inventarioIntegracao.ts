@@ -93,6 +93,18 @@ export async function consultarInventario(cursor?: string, consultar: typeof fet
   }
 }
 
+export async function retomarConsultaInventario(cursor: string, consultar: typeof fetch = fetch) {
+  const signal = AbortSignal.timeout(13_000);
+  const pagina = await consultarInventario(cursor, consultar, signal);
+  if (pagina.cursor !== cursor || !/^[1-9]\d{0,18}$/.test(cursor)) return { ...pagina, reiniciado: false };
+
+  // Uma página vazia repete o cursor de entrada mesmo quando a sequência do inventário voltou ao início.
+  const atual = await consultarInventario(undefined, consultar, signal);
+  if (!/^\d{1,19}$/.test(atual.cursor) || BigInt(atual.cursor) >= BigInt(cursor)) return { ...pagina, reiniciado: false };
+  const primeira = atual.cursor === "0" ? atual : await consultarInventario("0", consultar, signal);
+  return { ...primeira, reiniciado: true };
+}
+
 export async function lerHistoricoInventario(consultar: typeof fetch = fetch) {
   const signal = AbortSignal.timeout(13_000);
   let cursor = "0";

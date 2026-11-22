@@ -148,7 +148,7 @@ function FormEvento({ aberto, dataInicial, edicao, aoSalvar, aoFechar }: { abert
             </select>
           </Campo>
         </div>
-        {tipo === "lembrete" && <p className="campo-dica">{T.calendario.lembreteDica}</p>}
+        <p className="campo-dica">{tipo === "lembrete" ? T.calendario.lembreteDica : T.calendario.eventoDica}</p>
         <div className="formulario-acoes">
           <Botao onClick={aoFechar}>{T.geral.cancelar}</Botao>
           <Botao type="submit" variante="primario">{edicao ? T.geral.salvar : T.geral.criar}</Botao>

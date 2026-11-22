@@ -4,7 +4,7 @@ Esta pasta é o resumo permanente do projeto e deve ser usada para continuar o t
 
 O ponto de retomada mais recente está em [RETOMADA.md](RETOMADA.md), com o estado confirmado, as correções publicadas e os testes ainda pendentes. Consulte esse arquivo junto com o final do histórico para não tratar pendências antigas já concluídas como abertas.
 
-**Estado atualizado em 16/11/2026:** versão **0.2.41** publicada, tag **v0.2.41**, commit de lançamento **5b19a97** e correção posterior em **d4d9351** na main. A nova verificação do GitHub passou no Windows e no Linux; os instaladores Windows estão publicados. O usuário confirmou a versão 0.2.41 no VPS, os dois serviços ativos e o health da API/banco positivo. O resumo destes resultados foi salvo localmente após a atualização; estas alterações de documentação ainda não foram enviadas ao GitHub.
+**Estado atualizado em 22/11/2026.** A base atual é a **0.2.43**, tag local **v0.2.43** no commit **1ec6bfe**. A revisão do menu para celular está no código local. O registro de 16/11 descreve a publicação e o VPS da versão 0.2.41.
 
 ## Regra obrigatória para qualquer continuação
 

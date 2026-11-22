@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { getDb, validarSessao } from "./autenticacao.ts";
-import { chaveDaSolicitacaoMaterial, consultarInventario, InventarioIndisponivel, lerHistoricoInventario, unirSolicitacoesMaterial, type SolicitacaoMaterialRecebida } from "./inventarioIntegracao.ts";
+import { chaveDaSolicitacaoMaterial, consultarInventario, InventarioIndisponivel, lerHistoricoInventario, retomarConsultaInventario, unirSolicitacoesMaterial, type SolicitacaoMaterialRecebida } from "./inventarioIntegracao.ts";
 import { APLICATIVOS_EMPRESA, type AplicativoEmpresa } from "../modulos/escritorio/aplicativosEmpresaConfig.ts";
 
 let tabelasProntas: Promise<unknown> | undefined;
@@ -87,7 +87,7 @@ async function salvarAplicativo(app: NonNullable<ReturnType<typeof validarAplica
 }
 
 const FONTES = {
-  inventario: { consultar: consultarInventario },
+  inventario: { consultar: consultarInventario, acompanhar: retomarConsultaInventario },
 };
 type Fonte = keyof typeof FONTES;
 
@@ -135,9 +135,9 @@ async function alterarPreferencia(usuarioId: number, fonte: Fonte, ativa: boolea
 async function acompanharNotificacoes(usuarioId: number, fonte: Fonte) {
   const anterior = await lerAssinatura(usuarioId, fonte);
   if (!anterior) return null;
-  const { cursor, solicitacoes } = await FONTES[fonte].consultar(anterior.cursor);
+  const { cursor, solicitacoes, reiniciado } = await FONTES[fonte].acompanhar(anterior.cursor);
   const sql = getDb();
-  if (cursor !== anterior.cursor || !anterior.contagem) {
+  if (cursor !== anterior.cursor || reiniciado || !anterior.contagem) {
     // Somente uma consulta pode contabilizar a mesma página de eventos.
     const chaves = new Set(anterior.contagem?.chaves);
     const recentes = new Map<string, SolicitacaoMaterialRecebida>();

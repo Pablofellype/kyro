@@ -3,6 +3,8 @@ import type { AreaSistema, Rota, ServicoId } from "../tipos";
 import { gerarId } from "../utilitarios/basicos";
 import { NATIVO, enviarComando, foraDoSistema, mostrarSistema } from "../desktop/desktop";
 import { rotaLigada } from "../utilitarios/funcoes";
+import { useAuth } from "./autenticacao";
+import { podeAcessarArea } from "../servicos/permissoes";
 
 export type TipoAviso = "sucesso" | "info" | "alerta" | "erro";
 
@@ -189,7 +191,11 @@ export const useInterface = create<EstadoInterface>()((set, get) => ({
     const rota = rotaLigada(rotaPedida) ? rotaPedida : "inicio";
     const parametros = rota === rotaPedida ? parametrosPedidos : {};
     const atual = get();
-    const area = rota === "appsEmpresa" ? "empresa" : atual.area;
+    const areaDoCalendario = parametros.area === "pessoal" || parametros.area === "empresa" ? parametros.area : undefined;
+    const area = rota === "appsEmpresa" ? "empresa"
+      : rota === "importados" && useAuth.getState().usuario?.perfil === "dono" ? "pessoal"
+      : rota === "calendario" && areaDoCalendario && podeAcessarArea(useAuth.getState().usuario, areaDoCalendario) ? areaDoCalendario
+      : atual.area;
     const mesmoDestino = atual.rota === rota && JSON.stringify(parametros) === JSON.stringify(atual.parametros);
     salvarSistemaAberto(true);
     set({

@@ -19,7 +19,7 @@ const ICONES: Record<string, LucideIcon> = {
   [GERENCIAR_APLICATIVOS]: Settings2,
 };
 
-export function AppsEmpresaNoMenu({ recolhida, nome = "Aplicativos" }: { recolhida: boolean; nome?: string }) {
+export function AppsEmpresaNoMenu({ recolhida, nome = "Aplicativos", aoNavegar }: { recolhida: boolean; nome?: string; aoNavegar?: () => void }) {
   const rota = useInterface((s) => s.rota);
   const appId = useInterface((s) => s.parametros.app ?? "");
   const irPara = useInterface((s) => s.irPara);
@@ -106,6 +106,7 @@ export function AppsEmpresaNoMenu({ recolhida, nome = "Aplicativos" }: { recolhi
       setPainelAberto(false);
       if (flutuante) botao.current?.focus();
       irPara("appsEmpresa", { app: app.id });
+      aoNavegar?.();
     }}>
       <span className="barra-apps-icone"><Icone size={16} /></span>
       <span className="cortar">{app.nome}</span>

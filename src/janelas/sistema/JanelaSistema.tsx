@@ -83,21 +83,21 @@ export function JanelaSistema({ mobile = false }: { mobile?: boolean } = {}) {
 
   const conteudoSistema = (
     <>
-      <div className="sistema">
-        <BarraLateral recolhida={recolhida} />
+      <div className={mobile ? "sistema sistema-mobile" : "sistema"}>
+        <BarraLateral recolhida={recolhida} mobile={mobile} />
         <main className="sistema-conteudo" ref={conteudo}>
           <LimiteDeErro key={chavePagina} aoVoltar={() => useInterface.getState().irPara("inicio")}>
             <Suspense fallback={<div className="carregando-pagina" aria-busy="true" />}>
               <div className="pagina" key={chavePagina}>
-                <Pagina />
+                <Pagina mobile={mobile} />
               </div>
             </Suspense>
           </LimiteDeErro>
         </main>
       </div>
       <AvisosRodape />
-      <NotificacoesSistema />
-      <TourDoNiko />
+      <NotificacoesSistema mobile={mobile} />
+      <TourDoNiko mobile={mobile} />
       <EstilosDaMidia />
     </>
   );

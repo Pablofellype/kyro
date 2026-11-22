@@ -356,19 +356,23 @@ fn atualizar_cursor(app: &AppHandle, mut fora: HashMap<String, bool>) -> HashMap
     };
     let Ok(cursor) = app.cursor_position() else { return fora };
     let pressionado = plataforma::botao_do_mouse_pressionado();
-    let clicou = pressionado && !BOTAO_PRESSIONADO.swap(pressionado, Ordering::Relaxed);
+    let clicou = !BOTAO_PRESSIONADO.swap(pressionado, Ordering::Relaxed) && pressionado;
     let sobrepostas: Vec<(String, WebviewWindow)> = app.webview_windows().into_iter().filter(|(r, _)| r == "ilha" || r == "assistive" || docks::eh_dock(r)).collect();
     fora.retain(|r, _| sobrepostas.iter().any(|(s, _)| s == r));
     for (rotulo, janela) in &sobrepostas {
         if ENCERRANDO.load(Ordering::Relaxed) { break; }
         let rotulo = rotulo.as_str();
         if !janela.is_visible().unwrap_or(false) { continue; }
+        #[cfg(windows)]
+        let protegido = rotulo == "ilha" && plataforma::proteger_abas_do_navegador(janela, cursor.x, cursor.y);
         let dentro = if let Some(lista) = areas.get(rotulo).filter(|a| !a.is_empty()) {
             let (Ok(origem), Ok(escala)) = (janela.outer_position(), janela.scale_factor()) else { continue };
             let x = (cursor.x - origem.x as f64) / escala;
             let y = (cursor.y - origem.y as f64) / escala;
             lista.iter().any(|r| x >= r.x - 4.0 && x <= r.x + r.w + 4.0 && y >= r.y - 4.0 && y <= r.y + r.h + 4.0)
         } else { false };
+        #[cfg(windows)]
+        let dentro = dentro && !protegido;
         let agora_fora = !dentro;
         if clicou && agora_fora {
             let _ = janela.emit_to(rotulo, "niko://clique-fora", ());

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Sun, Moon, PanelLeftClose, PanelLeftOpen, Check, Settings, ChevronDown, LogOut, UserRound, Building2, LayoutDashboard } from "lucide-react";
+import { Sun, Moon, PanelLeftClose, PanelLeftOpen, Check, Settings, ChevronDown, LogOut, UserRound, Building2, LayoutDashboard, Menu, X } from "lucide-react";
 import { useConfig, GRUPO_DA_ROTA } from "../../estado/configuracoes";
 import { useInterface } from "../../estado/interface";
 import { useRotina, tarefasDoDia } from "../../estado/rotina";
@@ -23,6 +23,10 @@ import { ehDono, podeAcessarArea, podeAcessarRota, rotuloDoPapel } from "../../s
 import { AppsEmpresaNoMenu } from "./AppsEmpresaNoMenu";
 import "./barraLateral.css";
 import { conexaoVisivelPara } from "../../utilitarios/visibilidadeConexoes";
+import { useIlha } from "../../estado/ilha";
+import { abasVisiveisDaIlha } from "../ilha/abasDaIlha";
+import { usarResumoDoInventario } from "../../modulos/escritorio/notificacoesAppsEmpresa";
+import { tocarSom } from "../../ponte/sons";
 
 function useContadores(): Partial<Record<Rota, { n: number; alerta?: boolean }>> {
   const usuario = useAuth((s) => s.usuario);
@@ -55,7 +59,7 @@ function mesmaCaixa(a: Caixa, b: Caixa) {
   return a.l === b.l && a.t === b.t && a.w === b.w && a.h === b.h;
 }
 
-function usarIndicador(rota: string, recolhida: boolean) {
+function usarIndicador(rota: string, recolhida: boolean, mobile: boolean) {
   const rolagem = useRef<HTMLDivElement>(null);
   const [caixa, setCaixa] = useState<Caixa | null>(null);
   const atual = useRef<Caixa | null>(null);
@@ -74,7 +78,7 @@ function usarIndicador(rota: string, recolhida: boolean) {
 
   const posicionar = useCallback(() => {
     const nav = rolagem.current;
-    if (!nav) return;
+    if (mobile || !nav) return;
     const botao = nav.querySelector<HTMLElement>('.barra-item[aria-current="page"]');
     if (!botao) {
       if (atual.current) definir(null);
@@ -91,7 +95,7 @@ function usarIndicador(rota: string, recolhida: boolean) {
     rotaDoIndicador.current = rotaViva.current;
     if (animando.current) return;
     if (!antes || !mesmaCaixa(antes, alvo)) definir(alvo);
-  }, [definir]);
+  }, [definir, mobile]);
 
   const animar = (o: Caixa, alvo: Caixa, largura: number) => {
     relogios.current.forEach(clearTimeout);
@@ -133,13 +137,14 @@ function usarIndicador(rota: string, recolhida: boolean) {
   });
 
   useEffect(() => {
+    if (mobile) return;
     const t = [120, 240].map((ms) => window.setTimeout(posicionar, ms));
     return () => t.forEach(clearTimeout);
-  }, [recolhida, posicionar]);
+  }, [recolhida, posicionar, mobile]);
 
   useEffect(() => {
     const nav = rolagem.current;
-    if (!nav) return;
+    if (mobile || !nav) return;
     const obs = new ResizeObserver(() => posicionar());
     obs.observe(nav);
     const mudancas = new MutationObserver(() => posicionar());
@@ -150,13 +155,40 @@ function usarIndicador(rota: string, recolhida: boolean) {
       obs.disconnect();
       mudancas.disconnect();
       ativos.current.forEach(clearTimeout);
+      animando.current = false;
+      rotaDoIndicador.current = null;
     };
-  }, [posicionar]);
+  }, [posicionar, mobile]);
 
   return { rolagem, caixa };
 }
 
-export function BarraLateral({ recolhida }: { recolhida: boolean }) {
+function AcessoMobileDaIlha() {
+  const config = useConfig((s) => s.ilha);
+  const desligadas = useConfig((s) => s.funcoesDesligadas);
+  const usuario = useAuth((s) => s.usuario);
+  const aberta = useIlha((s) => s.estado === "expandida");
+  const { novas } = usarResumoDoInventario();
+  if (!config.ativa) return null;
+  const pendentes = abasVisiveisDaIlha(usuario, config, desligadas).includes("materiais") ? novas : 0;
+  const rotuloPendentes = pendentes === 1 ? "1 solicitação de material por ver" : `${pendentes} solicitações de material por ver`;
+  return (
+    <div className="barra-mobile-ilha">
+      <button type="button" className="barra-mobile-ilha-botao" aria-expanded={aberta} aria-controls={aberta ? "ilha-mobile-painel" : undefined} onClick={() => {
+        const ilha = useIlha.getState();
+        if (aberta) ilha.recolher();
+        else ilha.abrir(pendentes > 0 ? "materiais" : undefined);
+        void tocarSom(aberta ? "close" : "open");
+      }}>
+        <span>Ilha</span>
+        {pendentes > 0 && <span className="barra-mobile-ilha-contador" aria-label={rotuloPendentes}>{pendentes > 99 ? "99+" : pendentes}</span>}
+        <ChevronDown size={17} aria-hidden="true" />
+      </button>
+    </div>
+  );
+}
+
+export function BarraLateral({ recolhida, mobile = false }: { recolhida: boolean; mobile?: boolean }) {
   const barra = useConfig((s) => s.barraLateral);
   const tema = useConfig((s) => s.tema);
   const nome = useConfig((s) => s.nome);
@@ -170,7 +202,8 @@ export function BarraLateral({ recolhida }: { recolhida: boolean }) {
   const tarefas = useRotina((s) => s.tarefas);
   const mudarStatus = useRotina((s) => s.mudarStatus);
   const contadores = useContadores();
-  const { rolagem, caixa } = usarIndicador(rota === "appsEmpresa" ? `${rota}:${appEmpresa}` : rota, recolhida);
+  const { rolagem, caixa } = usarIndicador(rota === "appsEmpresa" ? `${rota}:${appEmpresa}` : rota, recolhida, mobile);
+  const menuMobile = useRef<HTMLDialogElement>(null);
   const logout = useAuth((s) => s.logout);
   const usuario = useAuth((s) => s.usuario);
   const naoLidasWhatsapp = useWhatsapp((s) => s.estado?.naoLidas ?? 0);
@@ -191,7 +224,7 @@ export function BarraLateral({ recolhida }: { recolhida: boolean }) {
 
   useEffect(() => {
     const el = rolagem.current;
-    if (!el) return;
+    if (mobile || !el) return;
     const medir = () => setFade({ topo: el.scrollTop > 4, base: el.scrollTop + el.clientHeight < el.scrollHeight - 4 });
     medir();
     el.addEventListener("scroll", medir, { passive: true });
@@ -202,7 +235,7 @@ export function BarraLateral({ recolhida }: { recolhida: boolean }) {
       el.removeEventListener("scroll", medir);
       obs.disconnect();
     };
-  }, [recolhida, fechados.length, rolagem]);
+  }, [recolhida, fechados.length, rolagem, mobile]);
 
   const grupos = (["principal", "organizacao", "ferramentas"] as const).map((g) => ({
     grupo: g,
@@ -224,16 +257,23 @@ export function BarraLateral({ recolhida }: { recolhida: boolean }) {
     if (!rotaDisponivelNaArea(rota, proxima)) irPara(primeiraRotaDaArea(proxima));
   };
 
+  const fecharMenu = () => menuMobile.current?.close();
+  const navegar = (destino: Rota, parametros?: Record<string, string>) => {
+    fecharMenu();
+    irPara(destino, parametros);
+  };
+  const rotuloDaRota = (destino: Rota) => (area === "pessoal" ? ROTULOS_PESSOAIS[destino] : ROTULOS_EMPRESA[destino]) || T.rotas[destino];
+
   const item = (r: Rota, nomeItem?: string) => {
     const Icone = r === "escritorio" ? LayoutDashboard : ICONE_ROTA[r];
     const ativo = rota === r;
-    const rotulo = nomeItem || (area === "pessoal" ? ROTULOS_PESSOAIS[r] : ROTULOS_EMPRESA[r]) || T.rotas[r];
+    const rotulo = nomeItem || rotuloDaRota(r);
     const posicao = visiveis.findIndex((v) => v.rota === r) + 1;
     const contador = contadores[r];
     const atalho = posicao > 0 && posicao <= 9 ? ` (Ctrl + ${posicao})` : "";
     const compacto = nomeItem || ({ conexoes: "Conexões", calendario: "Agenda", journal: "Rotina", metas: "Objetivos" } as Partial<Record<Rota, string>>)[r] || T.rotas[r];
     return (
-      <button key={r} type="button" className="barra-item" data-rota={r} aria-label={rotulo} aria-current={ativo ? "page" : undefined} title={`${rotulo}${atalho}`} onClick={() => irPara(r)}>
+      <button key={r} type="button" className="barra-item" data-rota={r} aria-label={rotulo} aria-current={ativo ? "page" : undefined} title={`${rotulo}${atalho}`} onClick={() => navegar(r)}>
         <Icone size={16} />
         <span className="barra-item-texto cortar">{recolhida ? compacto : rotulo}</span>
         {contador && contador.n > 0 && <span className={`barra-contador ${contador.alerta ? "barra-contador-alerta" : ""}`} aria-label={String(contador.n)}>{recolhida ? "" : contador.n}</span>}
@@ -242,7 +282,7 @@ export function BarraLateral({ recolhida }: { recolhida: boolean }) {
   };
 
   const itemDoWhatsapp = () => (
-    <button key="whatsapp" type="button" className="barra-item barra-whatsapp" data-rota="whatsapp" aria-label={T.rotas.whatsapp} aria-current={rota === "whatsapp" ? "page" : undefined} title={T.rotas.whatsapp} onClick={() => irPara("whatsapp")}>
+    <button key="whatsapp" type="button" className="barra-item barra-whatsapp" data-rota="whatsapp" aria-label={T.rotas.whatsapp} aria-current={rota === "whatsapp" ? "page" : undefined} title={T.rotas.whatsapp} onClick={() => navegar("whatsapp")}>
       <Marca marca="whatsapp" tamanho={15} monocromatica={rota === "whatsapp"} />
       <span className="barra-item-texto cortar">{T.rotas.whatsapp}</span>
       {naoLidasWhatsapp > 0 && <span className="barra-contador barra-contador-whatsapp" aria-label={String(naoLidasWhatsapp)}>{recolhida ? "" : naoLidasWhatsapp > 99 ? "99+" : naoLidasWhatsapp}</span>}
@@ -255,9 +295,9 @@ export function BarraLateral({ recolhida }: { recolhida: boolean }) {
   const rotuloTema = escuroAgora ? T.barraLateral.temaClaro : T.barraLateral.temaEscuro;
   const emAjustes = rota === "configuracoes";
 
-  return (
-    <nav className={`barra-lateral ${recolhida ? "barra-recolhida" : ""}`} aria-label={T.barraLateral.navegacao}>
-      <div className="barra-topo">
+  const conteudo = (
+    <>
+      {!mobile && <div className="barra-topo">
         <LogoNiko tamanho={26} />
         {!recolhida && <span className="barra-marca">{T.app.nome}</span>}
         {!recolhida && (
@@ -265,7 +305,7 @@ export function BarraLateral({ recolhida }: { recolhida: boolean }) {
             <PanelLeftClose size={15} />
           </button>
         )}
-      </div>
+      </div>}
       {recolhida && (
         <button type="button" className="barra-icone barra-icone-largo barra-expandir" aria-label={T.barraLateral.expandir} title={`${T.barraLateral.expandir} (Ctrl + B)`} onClick={() => recolherBarra(false)}>
           <PanelLeftOpen size={16} />
@@ -285,11 +325,11 @@ export function BarraLateral({ recolhida }: { recolhida: boolean }) {
         </button>
       </div>}
       <div ref={rolagem} className="barra-rolagem" data-fade-topo={fade.topo ? "sim" : "nao"} data-fade-base={fade.base ? "sim" : "nao"}>
-        <span
+        {!mobile && <span
           className="barra-indicador"
           aria-hidden="true"
           style={caixa ? { left: caixa.l, top: caixa.t, width: caixa.w, height: caixa.h, borderRadius: caixa.r, transition: caixa.tr, opacity: 1 } : { left: 0, top: 0, width: 0, height: 0, opacity: 0 }}
-        />
+        />}
         {grupos.map(({ grupo, itens }) => {
           if (itens.length === 0) return null;
           const fechado = !recolhida && fechados.includes(grupo) && !itens.some((i) => i.rota === rota || (rota === "whatsapp" && i.rota === "conexoes"));
@@ -301,11 +341,11 @@ export function BarraLateral({ recolhida }: { recolhida: boolean }) {
                   <ChevronDown size={12} className="barra-rotulo-seta" />
                 </button>
               )}
-              {!fechado && itens.map((i) => i.rota === "appsEmpresa" ? <AppsEmpresaNoMenu key="appsEmpresa" recolhida={recolhida} nome={i.nome} /> : i.rota === "conexoes" ? <div key="conexoes" className="barra-conexoes">{item(i.rota, i.nome)}{itemDoWhatsapp()}</div> : item(i.rota, i.nome))}
+              {!fechado && itens.map((i) => i.rota === "appsEmpresa" ? <AppsEmpresaNoMenu key="appsEmpresa" recolhida={recolhida} nome={i.nome} aoNavegar={fecharMenu} /> : i.rota === "conexoes" ? <div key="conexoes" className="barra-conexoes">{item(i.rota, i.nome)}{itemDoWhatsapp()}</div> : item(i.rota, i.nome))}
             </div>
           );
         })}
-        {!recolhida && mostrarHoje && (area !== "empresa" || hoje.length > 0) && (
+        {!mobile && !recolhida && mostrarHoje && (area !== "empresa" || hoje.length > 0) && (
           <div className="barra-grupo" data-grupo="hoje">
             <button type="button" className="barra-rotulo" aria-expanded={!hojeFechado} onClick={() => alternarGrupo("hoje")}>
               <span className="rotulo-secao">{T.gruposBarra.hoje}</span>
@@ -334,7 +374,7 @@ export function BarraLateral({ recolhida }: { recolhida: boolean }) {
       <div className="barra-base">
         <IndicadorSincronia recolhida={recolhida} />
         <div className="barra-base-linha">
-          <button type="button" className="barra-perfil" title={podeConfigurar ? T.perfil.abrirPerfil : nomeExibido} disabled={!podeConfigurar} onClick={() => irPara("configuracoes", { secao: "geral" })}>
+          <button type="button" className="barra-perfil" title={podeConfigurar ? T.perfil.abrirPerfil : nomeExibido} disabled={!podeConfigurar} onClick={() => navegar("configuracoes", { secao: "geral" })}>
             <Avatar tamanho={28} />
             {!recolhida && <span className="barra-perfil-identidade"><strong className="cortar">{nomeExibido}</strong><small>{usuario ? rotuloDoPapel(usuario.perfil) : "Seu perfil"}</small></span>}
           </button>
@@ -342,15 +382,48 @@ export function BarraLateral({ recolhida }: { recolhida: boolean }) {
               <button type="button" className="barra-icone" role="switch" aria-checked={escuroAgora} aria-label={rotuloTema} title={rotuloTema} onClick={(evento) => mudarTema(escuroAgora ? "claro" : "escuro", evento.currentTarget)}>
                 {escuroAgora ? <Moon size={15} /> : <Sun size={15} />}
               </button>
-              {podeConfigurar && <button type="button" className="barra-icone" data-tour="ajustes" aria-current={emAjustes ? "page" : undefined} aria-label={T.rotas.configuracoes} title={T.rotas.configuracoes} onClick={() => irPara("configuracoes")}>
+              {!mobile && podeConfigurar && <button type="button" className="barra-icone" data-tour="ajustes" aria-current={emAjustes ? "page" : undefined} aria-label={T.rotas.configuracoes} title={T.rotas.configuracoes} onClick={() => navegar("configuracoes")}>
                 <Settings size={15} />
               </button>}
-              <button type="button" className="barra-icone barra-sair" aria-label="Sair da conta" title="Sair da conta" onClick={() => void logout()}>
+              <button type="button" className="barra-icone barra-sair" aria-label="Sair da conta" title="Sair da conta" onClick={() => { fecharMenu(); void logout(); }}>
                 <LogOut size={15} />
               </button>
           </div>
         </div>
       </div>
-    </nav>
+    </>
+  );
+
+  if (!mobile) return <nav className={`barra-lateral ${recolhida ? "barra-recolhida" : ""}`} aria-label={T.barraLateral.navegacao}>{conteudo}</nav>;
+
+  const nomeDaRota = visiveis.find((item) => item.rota === rota)?.nome || rotuloDaRota(rota);
+  return (
+    <>
+      <header className="barra-mobile-topo">
+        <LogoNiko tamanho={32} />
+        <div className="barra-mobile-contexto">
+          <strong>{T.app.nome}</strong>
+          <span className="cortar">{area === "empresa" ? "Empresa" : "Pessoal"} · {nomeDaRota}</span>
+        </div>
+        {podeConfigurar && <button type="button" className="barra-mobile-acao" data-tour="ajustes" aria-current={emAjustes ? "page" : undefined} aria-label={T.rotas.configuracoes} onClick={() => navegar("configuracoes")}>
+          <Settings size={19} />
+        </button>}
+        <button type="button" className="barra-mobile-acao barra-mobile-abrir" aria-haspopup="dialog" aria-controls="barra-mobile-menu" onClick={() => menuMobile.current?.showModal()}>
+          <Menu size={19} /> Menu
+        </button>
+      </header>
+      <AcessoMobileDaIlha />
+      <dialog id="barra-mobile-menu" className="barra-mobile-menu" ref={menuMobile} aria-labelledby="barra-mobile-titulo" onClick={(evento) => {
+        if (evento.target === evento.currentTarget) fecharMenu();
+      }}>
+        <nav className="barra-lateral" aria-labelledby="barra-mobile-titulo">
+          <div className="barra-mobile-cabecalho">
+            <h2 id="barra-mobile-titulo">Menu</h2>
+            <button type="button" className="barra-mobile-acao" aria-label="Fechar menu" onClick={fecharMenu}><X size={21} /></button>
+          </div>
+          {conteudo}
+        </nav>
+      </dialog>
+    </>
   );
 }

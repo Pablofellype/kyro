@@ -19,6 +19,7 @@ export type Rota =
   | "journal"
   | "estudos"
   | "financas"
+  | "importados"
   | "metas"
   | "calendario"
   | "atualizacao"
@@ -445,6 +446,7 @@ export interface Alerta {
   agenteId: AgenteId;
   texto: string;
   rota?: Rota;
+  area?: AreaSistema;
   servico?: ServicoId;
   criadoEm: string;
   visto?: boolean;

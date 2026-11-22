@@ -71,14 +71,25 @@ test("permissões do catálogo e notificações do inventário são aplicadas po
   const assinaturas = new Map();
   const cursores = [];
   let tokenAceito = true;
+  let fimDaFila = "5";
+  let inventarioReiniciado = false;
   t.mock.method(globalThis, "fetch", async (url) => {
     const cursor = url.searchParams.get("cursor");
     cursores.push(cursor);
     if (!tokenAceito) return new Response(null, { status: 401 });
-    if (cursor === "6") return Response.json({ proximo_cursor: "7", eventos: [{ id: 7, tipo: "solicitacao.recebida", solicitacao: { ...pedidoApi, itens: "Luvas" } }], tem_mais: false });
+    if (inventarioReiniciado) {
+      const eventos = cursor === "0" && fimDaFila !== "0"
+        ? [{ id: 1, tipo: "solicitacao.recebida", solicitacao: { ...pedidoApi, protocolo: "MAT-NOVO" } }]
+        : [];
+      return Response.json({ proximo_cursor: cursor === null || eventos.length > 0 ? fimDaFila : cursor, eventos, tem_mais: false });
+    }
+    if (cursor === "6") {
+      fimDaFila = "7";
+      return Response.json({ proximo_cursor: "7", eventos: [{ id: 7, tipo: "solicitacao.recebida", solicitacao: { ...pedidoApi, itens: "Luvas" } }], tem_mais: false });
+    }
     return Response.json(cursor === "5" || cursor === "0"
       ? { proximo_cursor: "6", eventos: [{ id: 6, tipo: "solicitacao.recebida", solicitacao: pedidoApi }], tem_mais: false }
-      : { proximo_cursor: cursor ?? "5", eventos: [], tem_mais: false });
+      : { proximo_cursor: cursor ?? fimDaFila, eventos: [], tem_mais: false });
   });
   const resultado = (nomes, rows, tipos = { publico: 16 }) => ({
     fields: nomes.map((name) => ({ name, dataTypeID: tipos[name] ?? 25 })),
@@ -165,6 +176,23 @@ test("permissões do catálogo e notificações do inventário são aplicadas po
   assert.equal(corrigido.corrigidas, 1);
   assert.deepEqual(corrigido.ordensCorrigidas, [2]);
   assert.equal(corrigido.recentes[0].itens, "Pano de limpeza · Luvas");
+
+  inventarioReiniciado = true;
+  fimDaFila = "0";
+  const retomado = (await acompanhar("gerencia")).dados.notificacao;
+  assert.equal(assinaturas.get("2")[0], "0");
+  assert.deepEqual(retomado, corrigido);
+
+  // O processo também alcança pedidos que já chegaram após o reinício.
+  assinaturas.get("2")[0] = "7";
+  fimDaFila = "1";
+  const pedidoNovo = (await acompanhar("gerencia")).dados.notificacao;
+  assert.equal(assinaturas.get("2")[0], "1");
+  assert.equal(pedidoNovo.assinatura, corrigido.assinatura);
+  assert.equal(pedidoNovo.total, 2);
+  assert.deepEqual(pedidoNovo.recentes.map((pedido) => pedido.protocolo), ["MAT-NOVO", "MAT-100"]);
+  assert.equal((await acompanhar("gerencia")).dados.notificacao.total, 2);
+  inventarioReiniciado = false;
   assert.deepEqual((await preferencia("gerencia", false)).dados, { fontesAtivas: [] });
   assert.deepEqual((await acompanhar("gerencia")).dados, { notificacao: null });
   const historico = (token) => tratarAplicativosEmpresa("GET", "historico-inventario", token, async () => ({}));

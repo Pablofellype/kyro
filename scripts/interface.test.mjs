@@ -17,6 +17,55 @@ after(() => vite.close());
 const { LimiteDeErro } = await vite.ssrLoadModule("/src/componentes/LimiteDeErro.tsx");
 const { circuloDoTema, animarTrocaDeTema } = await vite.ssrLoadModule("/src/utilitarios/transicaoTema.ts");
 
+test("Importados aparece na área Pessoal do dono e preserva opções reutilizáveis e filtros por moeda", async (t) => {
+  const { BarraLateral } = await vite.ssrLoadModule("/src/janelas/sistema/BarraLateral.tsx");
+  const { useAuth } = await vite.ssrLoadModule("/src/estado/autenticacao.ts");
+  const { useInterface } = await vite.ssrLoadModule("/src/estado/interface.ts");
+  const { useImportados, filtrarImportados, listarOpcoesImportados } = await vite.ssrLoadModule("/src/estado/importados.ts");
+  const { lerBackup } = await vite.ssrLoadModule("/src/utilitarios/backupValido.ts");
+  const auth = useAuth.getInitialState(), ui = useInterface.getInitialState();
+  const usuarioAnterior = auth.usuario, areaAnterior = ui.area;
+  const estado = useImportados.getState();
+  const armazenamentoAnterior = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
+  const itens = new Map();
+  Object.defineProperty(globalThis, "localStorage", { configurable: true, value: { getItem: (nome) => itens.get(nome) ?? null, setItem: (nome, valor) => itens.set(nome, valor) } });
+  t.after(() => {
+    auth.usuario = usuarioAnterior; ui.area = areaAnterior;
+    useImportados.setState(estado);
+    if (armazenamentoAnterior) Object.defineProperty(globalThis, "localStorage", armazenamentoAnterior);
+    else delete globalThis.localStorage;
+  });
+  auth.usuario = { id: 1, perfil: "dono" };
+  ui.area = "pessoal";
+  const barra = () => renderToStaticMarkup(createElement(BarraLateral, { recolhida: false }));
+  assert.match(barra(), /data-rota="importados"/);
+  ui.area = "empresa";
+  assert.doesNotMatch(barra(), /data-rota="importados"/);
+  auth.usuario = { id: 2, perfil: "gerencia" };
+  ui.area = "pessoal";
+  assert.doesNotMatch(barra(), /data-rota="importados"/);
+
+  const { adicionarOpcao, salvarProduto, excluirProduto } = useImportados.getState();
+  assert.equal(adicionarOpcao("categoria", "Eletrônicos"), true);
+  assert.equal(adicionarOpcao("categoria", " eletronicos "), false);
+  const base = { nome: "Câmera compacta", link: "https://loja.example/camera", foto: "", preco: 7250, moeda: "CNY", categoria: "eletronicos", plataforma: "Alibaba", fornecedor: "Fornecedor A", origem: "Shenzhen", nota: "Caixa pequena" };
+  assert.equal(salvarProduto(base), true);
+  assert.equal(salvarProduto({ ...base, nome: "Câmera USB", preco: 7000, moeda: "USD" }), true);
+  assert.equal(salvarProduto({ ...base, link: "javascript:alert(1)" }), false);
+  const { produtos, opcoes } = useImportados.getState();
+  const filtros = { busca: "camera shenzhen", moeda: "CNY", minimo: 7000, maximo: 8000, categoria: "eletronicos", plataforma: "Alibaba", origem: "", fornecedor: "Fornecedor A" };
+  const filtrados = filtrarImportados(produtos, filtros);
+  assert.deepEqual(filtrados.map((produto) => produto.nome), ["Câmera compacta"]);
+  assert.equal(filtrados[0].categoria, "Eletrônicos");
+  assert.equal(salvarProduto({ ...base, preco: 9000 }, filtrados[0].id), true);
+  assert.deepEqual(filtrarImportados(useImportados.getState().produtos, filtros), []);
+  assert.equal(JSON.parse(itens.get("niko:importados")).state.produtos.find((produto) => produto.id === filtrados[0].id).preco, 9000);
+  excluirProduto(filtrados[0].id);
+  assert.deepEqual(listarOpcoesImportados(opcoes).fornecedor, ["Fornecedor A"]);
+  const dados = { "niko:importados": JSON.stringify({ state: { produtos, opcoes }, version: 0 }) };
+  assert.deepEqual(lerBackup({ tipo: "niko-backup", versao: 1, dados }).dados, dados);
+});
+
 test("gerência acessa configurações pessoais sem receber acesso administrativo ou à área pessoal", async () => {
   const { podeAcessarRota, podeAcessarConfiguracao } = await vite.ssrLoadModule("/src/servicos/permissoes.ts");
   const gerencia = { perfil: "gerencia" };

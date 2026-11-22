@@ -24,11 +24,14 @@ import { rotuloJanela } from "../utilitarios/consumo";
 import { T } from "../textos/textos";
 import { conexaoEmTestes } from "../utilitarios/disponibilidadeConexoes";
 import type { Evento, Habito, ServicoId } from "../tipos";
-import { addDays, addMonths, addWeeks } from "date-fns";
+import { addMonths } from "date-fns";
 import { conquistaLigada, funcaoLigada } from "../utilitarios/funcoes";
 import { ponteLocalDisponivel } from "../ponte/ambiente";
 import { useAuth } from "../estado/autenticacao";
 import { conexaoVisivelPara } from "../utilitarios/visibilidadeConexoes";
+import { ocorrencias } from "../utilitarios/itensDoCalendario";
+import { podeAcessarRota } from "./permissoes";
+import { NATIVO, frenteEmTelaCheia, notificarWindows } from "../desktop/desktop";
 
 function notificar(titulo: string, corpo: string, categoria?: CategoriaDeAviso) {
   if (useConfig.getState().naoPerturbe || !avisoLigado(categoria)) return;
@@ -39,28 +42,19 @@ function notificar(titulo: string, corpo: string, categoria?: CategoriaDeAviso) 
   }
 }
 
+const HORA_AVISO_DIA_INTEIRO = "09:00";
+
 export function eventoDisparaEm(e: Evento, agora: Date): string | null {
-  if (e.tipo !== "lembrete" || !e.hora) return null;
-  let data = new Date(`${e.data}T${e.hora}:00`);
-  if (e.repeticao !== "nenhuma") {
-    const proxima = (d: Date) => (e.repeticao === "diaria" ? addDays(d, 1) : e.repeticao === "semanal" ? addWeeks(d, 1) : addMonths(d, 1));
-    let protecao = 0;
-    while (data < new Date(agora.getTime() - 86400000) && protecao < 2000) {
-      data = proxima(data);
-      protecao++;
-    }
-    const pular = new Set(e.excecoes ?? []);
-    while (pular.has(paraISO(data)) && data <= agora && protecao < 2100) {
-      data = proxima(data);
-      protecao++;
-    }
+  if (e.tipo === "lembrete" && !e.hora) return null;
+  const inicio = new Date(agora.getTime() - 6 * 3600000);
+  for (const dia of ocorrencias(e, paraISO(inicio), paraISO(agora))) {
+    if (e.feitos?.includes(dia)) continue;
+    const data = new Date(`${dia}T${e.hora || HORA_AVISO_DIA_INTEIRO}:00`);
+    if (!Number.isFinite(data.getTime()) || data < inicio || data > agora) continue;
+    const chave = data.toISOString();
+    if (!e.ultimoDisparo || e.ultimoDisparo < chave) return chave;
   }
-  if (data > agora) return null;
-  if ((e.feitos ?? []).includes(paraISO(data))) return null;
-  if (agora.getTime() - data.getTime() > 6 * 3600000) return null;
-  const chave = data.toISOString();
-  if (e.ultimoDisparo && e.ultimoDisparo >= chave) return null;
-  return chave;
+  return null;
 }
 
 function verificarPomodoro() {
@@ -79,17 +73,29 @@ function verificarPomodoro() {
   notificar(T.app.nome, texto);
 }
 
-function verificarLembretes() {
-  if (!funcaoLigada("calendario")) return;
-  const agora = new Date();
+export function verificarAvisosDoCalendario(agora = new Date()) {
+  const usuario = useAuth.getState().usuario;
+  if (!usuario || !funcaoLigada("calendario")) return;
   const org = useOrganizacao.getState();
   for (const e of org.eventos) {
+    const area = e.area ?? "pessoal";
+    if (!podeAcessarRota(usuario, "calendario", area)) continue;
     const disparo = eventoDisparaEm(e, agora);
     if (!disparo) continue;
     org.atualizarEvento(e.id, { ultimoDisparo: disparo });
-    const texto = T.calendario.lembreteDisparado(e.titulo);
-    useAgentes.getState().alertar("organizador", texto, "calendario", "wink", undefined, true);
-    notificar(T.app.nome, texto, "lembretes");
+    const aviso = e.tipo === "lembrete" ? T.calendario.lembreteDisparado(e.titulo) : `Evento agora: ${e.titulo}`;
+    const texto = area === "empresa" ? `Empresa · ${aviso}` : aviso;
+    useAgentes.getState().alertar("organizador", texto, "calendario", "wink", undefined, true, { id: `calendario:${e.id}:${disparo}`, area });
+    const cfg = useConfig.getState();
+    if (cfg.naoPerturbe || !avisoLigado("lembretes")) continue;
+    if (NATIVO) {
+      void frenteEmTelaCheia().then((telaCheia) => {
+        if (useAuth.getState().usuario?.id !== usuario.id) return;
+        if (telaCheia || !cfg.ilha.ativa || document.hidden) void notificarWindows(T.app.nome, texto);
+      });
+    } else {
+      notificar(T.app.nome, texto, "lembretes");
+    }
   }
 }
 
@@ -303,6 +309,7 @@ function lerConexoes() {
 }
 export function useServicos() {
   const inatividade = useConfig((s) => s.agentes.inatividadeMin);
+  const usuarioId = useAuth((s) => s.usuario?.id);
 
   usarPreferenciasDaJanela();
 
@@ -342,7 +349,7 @@ export function useServicos() {
         lerConexoes();
       }, 1000);
       lento = window.setInterval(() => {
-        verificarLembretes();
+        verificarAvisosDoCalendario();
         avisarHabitosNaHora();
         verificarOrcamento();
         verificarConquistas();
@@ -352,7 +359,7 @@ export function useServicos() {
         useRotina.getState().marcarAbertura();
         useFinancas.getState().gerarRecorrentes();
       }, 20000);
-      verificarLembretes();
+      verificarAvisosDoCalendario();
       avisarHabitosNaHora();
       verificarOrcamento();
     };
@@ -366,6 +373,7 @@ export function useServicos() {
       if (document.hidden) {
         parar();
         rapido = window.setInterval(verificarPomodoro, 5000);
+        lento = window.setInterval(verificarAvisosDoCalendario, 20000);
       } else iniciar();
     };
     iniciar();
@@ -374,5 +382,5 @@ export function useServicos() {
       parar();
       document.removeEventListener("visibilitychange", aoMudarVisibilidade);
     };
-  }, [inatividade]);
+  }, [inatividade, usuarioId]);
 }

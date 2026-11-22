@@ -19,6 +19,9 @@ export const FONTES_DE_NOTIFICACOES = [
 ] as const;
 
 export const EVENTO_PREFERENCIAS_APPS = "kyro:preferencias-notificacoes-apps";
+const INTERVALO_AVISOS_DA_ILHA_MS = 15_000;
+const INTERVALO_AVISOS_DO_SISTEMA_MS = 60_000;
+const INTERVALO_SEM_FONTE_MS = 300_000;
 
 const ERROS_INVENTARIO: Record<string, string> = {
   inventario_token_ausente: "O token do inventário está faltando no backend do Kyro.",
@@ -75,6 +78,7 @@ type EstadoDaConsulta = {
   notificacao?: NotificacaoRecebida;
 };
 type AvisoDeMaterial = { texto: string; detalhe?: string };
+const chaveDeVistos = (usuarioId: number) => `kyro:solicitacoes-material-vistas:${usuarioId}`;
 
 export const useEstadoNotificacoesApps = create<{
   consultas: Record<string, EstadoDaConsulta | undefined>;
@@ -99,7 +103,7 @@ export function usarResumoDoInventario(confirmada?: NotificacaoRecebida | null) 
   const vistos = useEstadoNotificacoesApps((s) => usuarioId === undefined ? undefined : s.vistos[usuarioId]);
   const estado = consulta?.usuarioId === usuarioId ? consulta : undefined;
   const notificacao = estado?.notificacao ?? confirmada ?? undefined;
-  const chave = `kyro:solicitacoes-material-vistas:${usuarioId}`;
+  const chave = usuarioId === undefined ? "" : chaveDeVistos(usuarioId);
   const lidas = useMemo(() => {
     if (vistos || usuarioId === undefined) return vistos;
     try {
@@ -127,6 +131,7 @@ export function usarResumoDoInventario(confirmada?: NotificacaoRecebida | null) 
 function revelarNaIlha(aviso: AvisoDeMaterial) {
   const revelou = useIlha.getState().revelar({ ...aviso, tipo: "info", aba: "materiais" }, 10_000);
   if (revelou) void tocarSom("pop", "avisos");
+  return revelou;
 }
 
 function lerContagem(chave: string): ContagemDeSolicitacoes | undefined {
@@ -137,21 +142,22 @@ function lerContagem(chave: string): ContagemDeSolicitacoes | undefined {
   return undefined;
 }
 
-export function usarNotificacoesAppsEmpresa(janela: "sistema" | "ilha" = "sistema") {
+export function usarNotificacoesAppsEmpresa(janela: "sistema" | "ilha" = "sistema", mobile = false) {
   const usuarioId = useAuth((s) => s.usuario?.perfil === "dono" || s.usuario?.perfil === "gerencia" ? s.usuario.id : null);
   const token = useAuth((s) => s.token);
 
   useEffect(() => {
     useEstadoNotificacoesApps.setState({ consultas: {} });
     if (!token || usuarioId === null) return;
+    const avisarNaIlha = !mobile && (!NATIVO || janela === "ilha");
     const entregues = new Map<string, ContagemDeSolicitacoes>();
     const chaveDaFonte = (fonte: string) => `kyro:notificacoes-apps:${usuarioId}:${fonte}`;
-    if (janela === "ilha") {
-      for (const { id } of FONTES_DE_NOTIFICACOES) {
-        const anterior = lerContagem(`${chaveDaFonte(id)}:ilha`) ?? lerContagem(chaveDaFonte(id));
-        if (anterior) entregues.set(id, anterior);
+    const registrarEntrega = (chave: string, contagem: ContagemDeSolicitacoes) => {
+      entregues.set(chave, contagem);
+      if (!mobile) {
+        try { localStorage.setItem(chave, JSON.stringify(contagem)); } catch { /* Mantém o registro em memória. */ }
       }
-    }
+    };
     let consulta: AbortController | undefined;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let repetir = false;
@@ -169,37 +175,53 @@ export function usarNotificacoesAppsEmpresa(janela: "sistema" | "ilha" = "sistem
       let temFonteAtiva = false;
       try {
         for (const fonte of FONTES_DE_NOTIFICACOES) {
+          const chave = chaveDaFonte(fonte.id);
           registrarConsulta(fonte.id, { usuarioId, situacao: "consultando" });
           try {
             const { notificacao } = await consultarAppsEmpresa<{ notificacao: NotificacaoRecebida | null }>("notificacoes", token, { fonte: fonte.id }, atual.signal);
             if (atual.signal.aborted) return;
             if (!notificacao) {
+              if (mobile) entregues.delete(chave);
               registrarConsulta(fonte.id, { usuarioId, situacao: "inativo" });
               continue;
             }
             temFonteAtiva = true;
             if (!Number.isSafeInteger(notificacao.total) || notificacao.total < 0) throw new Error("total_invalido");
-            const chave = chaveDaFonte(fonte.id) + (janela === "ilha" ? ":ilha" : "");
-            const anterior = entregues.get(fonte.id);
-            const armazenado = lerContagem(chave);
-            const totalAnterior = Math.max(totalDaContagem(anterior, notificacao), totalDaContagem(armazenado, notificacao));
             registrarConsulta(fonte.id, { usuarioId, situacao: "conectado", notificacao });
-            if (notificacao.total <= totalAnterior || (!NATIVO && document.hidden)) continue;
-            const quantidade = notificacao.total - totalAnterior;
-            const solicitacao = notificacao.recentes?.find((item) => item.ordem > totalAnterior);
-            const aviso = fonte.mensagem(quantidade);
+            if (!NATIVO && document.hidden) continue;
             const { assinatura, total, corrigidas } = notificacao;
             const contagem = { assinatura, total, corrigidas };
-            entregues.set(fonte.id, contagem);
-            try { localStorage.setItem(chave, JSON.stringify(contagem)); } catch { /* Mantém o registro em memória. */ }
+            const totalEntregue = (destino: string) => Math.max(
+              totalDaContagem(entregues.get(destino), notificacao),
+              totalDaContagem(mobile ? undefined : lerContagem(destino), notificacao),
+            );
             if (janela === "sistema") {
-              const mensagem = solicitacao ? `${textoDaSolicitacaoDeMaterial(solicitacao)}${quantidade > 1 ? ` (+${quantidade - 1})` : ""}` : aviso;
-              useInterface.getState().avisar(mensagem, undefined, "info", 10_000);
-              if (NATIVO) void notificarWindows("Kyro · Inventário", aviso);
+              const anterior = totalEntregue(chave);
+              const quantidade = total - anterior;
+              if (mobile && entregues.get(chave)?.assinatura !== assinatura) {
+                // Carrega o histórico em silêncio na primeira consulta do celular.
+                registrarEntrega(chave, contagem);
+              } else if (quantidade > 0) {
+                const aviso = fonte.mensagem(quantidade);
+                const solicitacao = notificacao.recentes?.find((item) => item.ordem > anterior);
+                const mensagem = !mobile && solicitacao ? `${textoDaSolicitacaoDeMaterial(solicitacao)}${quantidade > 1 ? ` (+${quantidade - 1})` : ""}` : aviso;
+                useInterface.getState().avisar(mensagem, undefined, "info", mobile ? 4500 : 10_000);
+                registrarEntrega(chave, contagem);
+                if (NATIVO) void notificarWindows("Kyro · Inventário", aviso);
+              }
             }
-            if (!NATIVO || janela === "ilha") {
-              const titulo = solicitacao?.solicitante ? `${solicitacao.solicitante} solicitou material` : aviso;
-              revelarNaIlha({ texto: titulo, detalhe: solicitacao && detalheDaSolicitacao(solicitacao) });
+            if (avisarNaIlha) {
+              // O rodapé e o Windows podem avisar antes da Ilha. Cada destino confirma a própria entrega.
+              const chaveVisual = `${chave}:visual-ilha`;
+              const vistos = useEstadoNotificacoesApps.getState().vistos[usuarioId] ?? lerContagem(chaveDeVistos(usuarioId));
+              const anterior = Math.max(totalEntregue(chaveVisual), totalDaContagem(vistos, notificacao));
+              const quantidade = total - anterior;
+              if (quantidade <= 0) continue;
+              const solicitacao = notificacao.recentes?.find((item) => item.ordem > anterior);
+              const titulo = quantidade === 1 && solicitacao?.solicitante ? `${solicitacao.solicitante} solicitou material` : fonte.mensagem(quantidade);
+              if (revelarNaIlha({ texto: titulo, detalhe: solicitacao && detalheDaSolicitacao(solicitacao) })) {
+                registrarEntrega(chaveVisual, contagem);
+              }
             }
           } catch (falha) {
             if (atual.signal.aborted) return;
@@ -216,7 +238,12 @@ export function usarNotificacoesAppsEmpresa(janela: "sistema" | "ilha" = "sistem
         if (ativo && repetir) {
           repetir = false;
           void atualizar();
-        } else if (ativo) timer = setTimeout(() => void atualizar(), temFonteAtiva || janela === "ilha" ? 60_000 : 300_000);
+        } else if (ativo) {
+          const intervalo = temFonteAtiva && avisarNaIlha ? INTERVALO_AVISOS_DA_ILHA_MS
+            : temFonteAtiva || janela === "ilha" ? INTERVALO_AVISOS_DO_SISTEMA_MS
+            : INTERVALO_SEM_FONTE_MS;
+          timer = setTimeout(() => void atualizar(), intervalo);
+        }
       }
     };
 
@@ -224,12 +251,14 @@ export function usarNotificacoesAppsEmpresa(janela: "sistema" | "ilha" = "sistem
     const renovar = () => { void atualizar(); };
     document.addEventListener("visibilitychange", renovar);
     window.addEventListener(EVENTO_PREFERENCIAS_APPS, renovar);
+    if (avisarNaIlha && !NATIVO) window.addEventListener("focus", renovar);
     return () => {
       ativo = false;
       consulta?.abort();
       clearTimeout(timer);
       document.removeEventListener("visibilitychange", renovar);
       window.removeEventListener(EVENTO_PREFERENCIAS_APPS, renovar);
+      if (avisarNaIlha && !NATIVO) window.removeEventListener("focus", renovar);
     };
-  }, [janela, token, usuarioId]);
+  }, [janela, mobile, token, usuarioId]);
 }

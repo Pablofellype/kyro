@@ -766,7 +766,7 @@ export function VisaoAvisos() {
             className="ilha-botao ilha-botao-primario"
             onClick={() => {
               if (atual.servico) abrirJanela(atual.servico);
-              else if (atual.rota) irPara(atual.rota);
+              else if (atual.rota) irPara(atual.rota, atual.area ? { area: atual.area } : undefined);
               resolver(atual.id);
               recolher();
             }}

@@ -57,6 +57,7 @@ export const BARRA_PADRAO: ItemBarra[] = [
   { rota: "financas", visivel: true },
   { rota: "metas", visivel: true },
   { rota: "calendario", visivel: true },
+  { rota: "importados", visivel: true },
 ];
 
 export const GRUPO_DA_ROTA: Record<Rota, "principal" | "organizacao" | "ferramentas"> = {
@@ -68,6 +69,7 @@ export const GRUPO_DA_ROTA: Record<Rota, "principal" | "organizacao" | "ferramen
   journal: "organizacao",
   estudos: "organizacao",
   financas: "organizacao",
+  importados: "organizacao",
   metas: "organizacao",
   calendario: "organizacao",
   atualizacao: "organizacao",

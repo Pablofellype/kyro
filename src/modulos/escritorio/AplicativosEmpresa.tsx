@@ -9,10 +9,11 @@ import { GerenciarAplicativosEmpresa } from "./GerenciarAplicativosEmpresa";
 import { SistemaEmpresaAberto } from "./SistemaEmpresaAberto";
 import { Aderencias } from "./Aderencias";
 
-export function ConteudoAplicativoEmpresa({ appId, usuario, aplicativos = APLICATIVOS_EMPRESA }: {
+export function ConteudoAplicativoEmpresa({ appId, usuario, aplicativos = APLICATIVOS_EMPRESA, mobile = false }: {
   appId: string;
   usuario: Pick<UsuarioAutenticado, "perfil" | "roboAderencias"> | null;
   aplicativos?: AplicativoEmpresa[];
+  mobile?: boolean;
 }) {
   if (appId === GERENCIAR_APLICATIVOS || (!appId && usuario?.perfil === "dono")) {
     return usuario?.perfil === "dono" ? <GerenciarAplicativosEmpresa /> : <AvisoFaixa tipo="alerta">Este aplicativo não está disponível para sua conta.</AvisoFaixa>;
@@ -28,12 +29,12 @@ export function ConteudoAplicativoEmpresa({ appId, usuario, aplicativos = APLICA
   if (appId === "aderencias") return <Aderencias />;
 
   const app = aplicativos.find((atual) => atual.id === appId);
-  return app ? <SistemaEmpresaAberto key={`${app.id}:${app.url}`} app={app} /> : null;
+  return app ? <SistemaEmpresaAberto key={`${app.id}:${app.url}`} app={app} mobile={mobile} /> : null;
 }
 
-export default function AplicativosEmpresa() {
+export default function AplicativosEmpresa({ mobile = false }: { mobile?: boolean }) {
   const appId = useInterface((s) => s.parametros.app ?? "");
   const usuario = useAuth((s) => s.usuario);
   const { aplicativos } = useCatalogoAppsEmpresa();
-  return <ConteudoAplicativoEmpresa appId={appId} usuario={usuario} aplicativos={aplicativos} />;
+  return <ConteudoAplicativoEmpresa appId={appId} usuario={usuario} aplicativos={aplicativos} mobile={mobile} />;
 }

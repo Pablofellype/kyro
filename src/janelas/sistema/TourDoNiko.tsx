@@ -18,7 +18,14 @@ export const PASSOS_DO_TOUR: PassoDoTour[] = [
   { titulo: P.ilha.titulo, texto: P.ilha.texto },
 ];
 
-export function TourDoNiko() {
+const PASSOS_MOBILE: PassoDoTour[] = [
+  PASSOS_DO_TOUR[0],
+  { alvo: ".barra-mobile-abrir", titulo: "Navegue pelo Menu", texto: "Toque em Menu para ver as páginas e alternar entre os espaços disponíveis.", lado: "baixo" },
+  PASSOS_DO_TOUR[2],
+  ...PASSOS_DO_TOUR.slice(-2),
+];
+
+export function TourDoNiko({ mobile = false }: { mobile?: boolean }) {
   const aberto = useTour((s) => s.aberto);
   const fechar = useTour((s) => s.fechar);
 
@@ -30,7 +37,7 @@ export function TourDoNiko() {
 
   return (
     <TourGuiado
-      passos={PASSOS_DO_TOUR}
+      passos={mobile ? PASSOS_MOBILE : PASSOS_DO_TOUR}
       aberto={aberto}
       aoFechar={() => {
         fechar();

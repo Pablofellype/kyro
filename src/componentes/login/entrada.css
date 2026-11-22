@@ -374,6 +374,48 @@
   .kyro-tour-ilha[data-aberta="true"] { width: 86%; }
 }
 
+.kyro-entrada-mobile .kyro-entrada-shell {
+  grid-template-rows: auto auto auto;
+  align-content: start;
+  gap: 20px;
+  width: min(100%, 480px);
+  padding: max(12px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+}
+.kyro-entrada-mobile .kyro-entrada-topo { gap: 12px; padding-inline: 4px; }
+.kyro-entrada-mobile .kyro-entrada-assinatura,
+.kyro-entrada-mobile .kyro-entrada-download > svg:last-child { display: none; }
+.kyro-entrada-mobile .kyro-entrada-download { padding-inline: 6px; font-size: 13px; }
+.kyro-entrada-mobile .kyro-entrada-principal { display: block; }
+.kyro-entrada-mobile .kyro-entrada-acesso {
+  width: 100%;
+  padding: clamp(18px, 5.5vw, 28px);
+  box-shadow: 0 8px 24px rgb(44 41 36 / .05);
+}
+.kyro-entrada-mobile .kyro-entrada-acesso-intro h1 {
+  margin: 0 0 6px;
+  font: 600 clamp(29px, 8vw, 36px)/1.08 var(--fonte-titulo);
+  letter-spacing: -.05em;
+}
+.kyro-entrada-mobile .kyro-entrada-acesso-intro > p { font-size: 14px; }
+.kyro-entrada-mobile .kyro-entrada-form { margin-top: 22px; gap: 14px; }
+.kyro-entrada-mobile .kyro-entrada-campo { gap: 7px; font-size: 14px; }
+.kyro-entrada-mobile .kyro-entrada-campo input { height: 50px; font-size: 16px; }
+.kyro-entrada-mobile .kyro-entrada-esqueci { min-height: 44px; margin: -7px 0; color: var(--entrada-acento); font-size: 13px; }
+.kyro-entrada-mobile .kyro-entrada-submit { min-height: 48px; font-size: 15px; }
+.kyro-entrada-mobile .kyro-entrada-visitante { margin-top: 20px; padding-top: 16px; }
+.kyro-entrada-mobile .kyro-entrada-visitante > span { font-size: 12px; }
+.kyro-entrada-mobile .kyro-entrada-visitante > button {
+  min-height: 56px;
+  margin-top: 9px;
+  padding: 10px 12px;
+  border: 1px solid var(--entrada-linha);
+  border-radius: 10px;
+}
+.kyro-entrada-mobile .kyro-entrada-visitante strong { font-size: 14px; font-weight: 600; }
+.kyro-entrada-mobile .kyro-entrada-visitante small { font-size: 11px; }
+.kyro-entrada-mobile .kyro-entrada-rodape { justify-content: center; padding: 0; border: 0; }
+.kyro-entrada-mobile .kyro-login-acesso-campo .campo { font-size: 16px; }
+
 @media (prefers-reduced-motion: reduce) {
   .kyro-tour *, .kyro-entrada-submit, .kyro-entrada-campo input { animation: none !important; transition: none; }
 }
