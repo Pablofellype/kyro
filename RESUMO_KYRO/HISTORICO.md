@@ -1666,3 +1666,37 @@ Atualização desta pasta:
 - Resultado. Catálogo implementado localmente.
 - Pendência. Publicação e conferência com produtos reais.
 
+## 2026-11-22 — v0.2.46 — Recuperação do financeiro e isolamento do localhost
+
+- Objetivo. Recuperar os dados de **Pessoal → Finanças** após o relato de contas e lançamentos vazios.
+- Diagnóstico. O histórico do Neon registrou às 16h12 de Brasília uma gravação do cliente de desenvolvimento em `localhost:5420`. Os backups automáticos ainda disponíveis no aplicativo já continham o financeiro vazio.
+- Recuperação. O usuário abriu a prévia histórica de 22/11/2026 às 16h11 no Neon. A consulta histórica retornou o estado financeiro e foi usada para restaurar somente a chave `niko:financas` na conta principal do Neon e na instância local.
+- Resultado. Leituras posteriores confirmaram **1 conta, 21 lançamentos, 15 categorias, 5 recorrências e 1 meta** nas duas instâncias. O usuário confirmou o retorno dos dados no localhost.
+- Prevenção. O Vite usa um banco local de desenvolvimento e bloqueia `/api/dados` nesse ambiente. O teste de regressão verifica que a instância local usa a ponte, preserva a fila da conta e impede a gravação no banco de produção.
+- Configurações e mensagens automáticas. As configurações disponíveis na conta foram copiadas para a base isolada do localhost. A ponte ganhou um caminho autenticado pela API publicada para consultas ao gateway quando faltam variáveis locais. A consulta de mensagens automáticas retornou um agendamento ativo.
+- Validação. A suíte de 464 testes passou após o isolamento inicial. Os testes de pré-lançamento cobrindo o armazenamento voltaram a passar na validação final.
+
+## 2026-11-22 — v0.2.46 — Importados, fornecedores, fotos e conversão
+
+- Objetivo. Preservar o formulário quando o usuário troca de aba no celular para copiar um link, ampliar o cadastro e tornar os valores mais claros.
+- Alterações. No celular, o formulário de produto fica na página e conserva campos e fotos durante a sessão da aba. Um rascunho que estava aberto é retomado após recarregar. A aba **Fornecedores** cadastra nome, categoria, plataforma e link direto.
+- Fotos. O produto aceita até três imagens otimizadas, com visualização por miniaturas e remoção individual. O catálogo e os backups aceitam o formato anterior com uma foto.
+- Conversão. O preço original é preservado na moeda de entrada. O Kyro consulta a AwesomeAPI pela ponte no desenvolvimento e no desktop e pela função `/api/cotacoes` no site. A tela recalcula as equivalências em BRL, USD e CNY a partir da cotação disponível, inclusive para produtos já cadastrados. Os cartões separam o preço original das conversões e mostram bandeira, nome e sigla da moeda.
+- Validação. Tipos e build aprovados, 39 testes de interface e 30 de pré-lançamento passaram. Em Chrome isolado com 390 px, o rascunho e três fotos sobreviveram à recarga, um fornecedor fictício foi cadastrado e a mudança da taxa simulada alterou o valor convertido com o preço original preservado. Os cartões com bandeiras foram conferidos no celular e no desktop.
+- Pendência. A rota pública `/api/cotacoes` da Vercel respondeu duas vezes com HTTP 503 e `cotacao_indisponivel` durante a atualização destes resumos. As bandeiras responderam no site e a ponte do localhost retornou as taxas. A causa da falha em produção está pendente de diagnóstico.
+
+## 2026-11-22 — v0.2.46 — Publicação e atualização da DigitalOcean
+
+- Objetivo. Publicar a v0.2.46 e colocar o gateway no mesmo commit.
+- GitHub. A `main` e a tag `v0.2.46` foram publicadas no commit `2c054de`. Os workflows [Verificar](https://github.com/Pablofellype/kyro/actions/runs/45090882216) e [Pacotes Windows](https://github.com/Pablofellype/kyro/actions/runs/45090882323) concluíram com sucesso. Na [release v0.2.46](https://github.com/Pablofellype/kyro/releases/tag/v0.2.46) foram conferidos EXE, MSI, assinaturas e `latest.json`.
+- DigitalOcean. O usuário atualizou `/opt/kyro` de `c822412` para `2c054de`, instalou as dependências com lockfile congelado, verificou as quatro versões em 0.2.46 e reiniciou `kyro-gowa.service` e `kyro-worker.service`. Os dois retornaram `active`.
+- Resultado. A primeira chamada à porta 47831 recusou a conexão. Na repetição, o health check retornou `"api":"ok"` e `"banco":"ok"` às 21h56 de 22/11 em Brasília, com registro `2026-11-23T00:56:32.933Z`.
+- Pendências. Confirmar a instalação do Windows e o fluxo de Importados no aparelho do usuário. A falha de cotações no site é uma pendência da Vercel.
+
+## 2026-11-22 — base v0.2.46 — Cotação de referência quando a fonte principal falha
+
+- Diagnóstico. O site publicado respondeu HTTP 200 na página inicial e HTTP 503 com `cotacao_indisponivel` na API de Importados. A AwesomeAPI respondeu no ambiente local. O trecho de log fornecido mostra o build até a renderização dos chunks. A causa na função da Vercel depende das mensagens de execução.
+- Alterações. A AwesomeAPI continua como fonte principal. Se ela falhar, a função consulta o Frankfurter, converte as taxas para a base usada pelo Kyro e preserva a data da observação. A interface identifica quando mostra uma cotação de referência. A função registra os erros das fontes no log.
+- Validação. Três testes passaram, cobrindo a fonte principal, a ativação do fallback, a rejeição de respostas incompletas e a recuperação em nova tentativa. Com uma falha 503 simulada na fonte principal, o Frankfurter real retornou BRL, USD, CNY e EUR.
+- Pendência. Publicar a correção e confirmar `GET /api/cotacoes` com HTTP 200 no site.
+

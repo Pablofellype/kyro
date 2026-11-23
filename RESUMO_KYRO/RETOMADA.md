@@ -1,6 +1,37 @@
 # Retomada do Kyro
 
-## Estado atual — 22/11/2026 — v0.2.43
+## Estado atual — 22/11/2026 — v0.2.46
+
+### Publicação e DigitalOcean
+
+- **`2c054de` — Prepara release 0.2.46 com melhorias em Importados** está na `main` e na tag `v0.2.46`. `package.json`, `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml` e `src-tauri/Cargo.lock` estão sincronizados em 0.2.46.
+- O workflow [Verificar](https://github.com/Pablofellype/kyro/actions/runs/45090882216) e o workflow [Pacotes Windows](https://github.com/Pablofellype/kyro/actions/runs/45090882323) concluíram com sucesso. A [release v0.2.46](https://github.com/Pablofellype/kyro/releases/tag/v0.2.46) oferece EXE, MSI, assinaturas e `latest.json`.
+- O usuário atualizou `/opt/kyro` para `2c054de` no console do Droplet. A instalação com lockfile congelado e a verificação de versão passaram. `kyro-gowa.service` e `kyro-worker.service` retornaram `active` após o reinício.
+- A primeira chamada ao health check recusou a conexão na porta 47831. A repetição respondeu `{"ok":true,"api":"ok","banco":"ok","data":"2026-11-23T00:56:32.933Z"}` em `http://127.0.0.1:47831/api/health`, às 21h56 de 22/11 em Brasília.
+- A posição da Ilha no Windows foi ajustada na v0.2.45, commit `c822412`. Essa alteração integra a v0.2.46.
+
+### Pessoal → Importados
+
+- Ao editar um produto no celular, o formulário fica na página e guarda o rascunho por conta na sessão da aba, com campos e fotos. Se a aba recarregar com um formulário ativo, a navegação retorna a Importados e reabre o rascunho.
+- A aba **Fornecedores** permite cadastrar nome, categoria, plataforma e link direto. As opções ficam disponíveis para reutilização no catálogo.
+- Cada produto aceita até três fotos, com miniaturas e remoção individual. Produtos e backups anteriores com uma única foto continuam compatíveis.
+- O catálogo guarda o preço na moeda escolhida e recalcula as equivalências em real, dólar e yuan usando a cotação disponível. A consulta roda ao retornar à aba e a cada minuto enquanto está visível. Os cartões destacam o preço original, identificam as conversões com bandeira, nome e sigla e usam ícones para plataforma, fornecedor e origem.
+- Build web aprovado. O Chrome isolado em 390 px confirmou a retomada do rascunho com três fotos após recarregar, o cadastro de fornecedor e a mudança da conversão quando a taxa variou. O cartão foi conferido em tamanhos de celular e desktop.
+
+### Financeiro e ambiente de desenvolvimento
+
+- O histórico do Neon mostrou que a execução de desenvolvimento em `localhost:5420` gravou um estado vazio para o financeiro às 16h12 de 22/11, horário de Brasília. O ambiente de desenvolvimento agora usa o banco local isolado e bloqueia o acesso de sincronização à conta por `/api/dados`.
+- Foi usada a prévia histórica do Neon de **22/11/2026 às 16h11 de Brasília** para recuperar a chave `niko:financas`. Foram confirmados **1 conta, 21 lançamentos, 15 categorias, 5 recorrências e 1 meta** no Neon e no localhost. O usuário confirmou que o financeiro voltou no localhost.
+- A visualização de configurações e mensagens automáticas no localhost também foi recuperada. A ponte local passou a consultar a API publicada com a sessão da conta quando as variáveis do gateway estão ausentes. A consulta confirmou um agendamento ativo no servidor.
+
+### Pendências verificadas
+
+- **Cotações na Vercel.** O site publicado serviu as imagens das bandeiras e `/api/cotacoes` respondeu **HTTP 503 — `cotacao_indisponivel`**. A correção local usa a AwesomeAPI como fonte principal e o Frankfurter como fonte de referência se a primeira falhar. O fallback foi validado com falha simulada e resposta real do Frankfurter. Falta publicar a correção, conferir HTTP 200 na Vercel e consultar os logs da função para confirmar a causa original. O health check do Droplet confirma a API do gateway e o Neon.
+- **Conferência em uso real.** A instalação da v0.2.46 no Windows e o fluxo completo de Importados no celular do usuário ainda estão pendentes de confirmação.
+
+## Registro de 22/11/2026 — base v0.2.43
+
+Esta seção descreve a etapa anterior à publicação das versões 0.2.44 a 0.2.46.
 
 - Base confirmada no repositório local pelo usuário e pelo commit **1ec6bfe — Prepara Kyro 0.2.43**, com tag **v0.2.43**.
 - O menu do Kyro no celular passou a abrir em um painel vertical com toque, indicação da página ativa e seleção Pessoal/Empresa. Cabeçalho compacto com atalhos de Menu e Ajustes. A posição da ilha acompanha o cabeçalho.
@@ -27,7 +58,7 @@ Este registro descreve a publicação e as verificações da 0.2.41. As seções
 ### Publicação e repositório
 
 - Projeto: C:\Users\pfmmelo\Downloads\kyro.
-- Versão atual: **0.2.41**, sincronizada em package.json, tauri.conf.json, Cargo.toml e Cargo.lock.
+- Versão desta publicação: **0.2.41**, sincronizada em package.json, tauri.conf.json, Cargo.toml e Cargo.lock.
 - Lançamento: **5b19a97 — Prepara release 0.2.41**, enviado pelo usuário com a tag **v0.2.41**.
 - Correção posterior: **d4d9351 — Corrige fuso horario do teste do painel da empresa**, enviada pelo assistente para main a pedido do usuário.
 - A tag permanece no commit de lançamento. A correção posterior alterou somente o teste; não exige trocar a tag ou gerar outra versão.
@@ -85,7 +116,7 @@ O usuário executou os comandos no Console do Droplet como root. O assistente co
 
 ## Registros anteriores
 
-O conteúdo abaixo preserva o contexto de 13/11 e 12/11. Para versão, publicação, testes e estado do VPS, prevalecem os resultados de 16/11 acima.
+O conteúdo abaixo preserva o contexto de 13/11 e 12/11. O estado atual da publicação, dos testes e do VPS está no início do arquivo.
 
 ## Atualização de 13/11/2026 — prioridade ao retomar
 

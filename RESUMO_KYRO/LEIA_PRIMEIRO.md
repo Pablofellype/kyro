@@ -4,7 +4,7 @@ Esta pasta é o resumo permanente do projeto e deve ser usada para continuar o t
 
 O ponto de retomada mais recente está em [RETOMADA.md](RETOMADA.md), com o estado confirmado, as correções publicadas e os testes ainda pendentes. Consulte esse arquivo junto com o final do histórico para não tratar pendências antigas já concluídas como abertas.
 
-**Estado atualizado em 22/11/2026.** A base atual é a **0.2.43**, tag local **v0.2.43** no commit **1ec6bfe**. A revisão do menu para celular está no código local. O registro de 16/11 descreve a publicação e o VPS da versão 0.2.41.
+**Estado atualizado em 22/11/2026, horário de Brasília.** A versão atual é **0.2.46**, commit **2c054de** na `main` e na tag `v0.2.46`. A Release Windows está publicada e a DigitalOcean respondeu com a API e o banco saudáveis. **Pessoal → Finanças** foi recuperado no Neon e no localhost. A pendência mais recente é a cotação de Importados no site publicado, cuja rota respondeu `503` durante a conferência.
 
 ## Regra obrigatória para qualquer continuação
 

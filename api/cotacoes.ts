@@ -10,7 +10,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const cotacoes = await lerCotacoesImportados();
     res.setHeader("Cache-Control", "public, max-age=0, s-maxage=60");
     return res.status(200).json(cotacoes);
-  } catch {
+  } catch (erro) {
+    console.error("Cotação de Importados indisponível:", erro);
     return res.status(503).json({ erro: "cotacao_indisponivel" });
   }
 }

@@ -272,6 +272,10 @@ export default function Importados({ mobile = false }: { mobile?: boolean }) {
       if (atual?.chave === rascunho.chave) gravarRascunho(fn(atual));
     }} fechar={fecharEditor} concluir={() => gravarRascunho(null)} />;
   const mostraCambio = Boolean(rascunho?.aberto || produtos.some((produto) => produto.preco !== null));
+  const cambioReferencia = cambio?.fonte === "frankfurter";
+  const dataDaCotacao = cambio && new Date(cambio.atualizadaEm).toLocaleString("pt-BR", cambioReferencia
+    ? { dateStyle: "short", timeZone: "UTC" }
+    : { dateStyle: "short", timeStyle: "short" });
 
   return (
     <section className="importados" aria-label="Importados">
@@ -287,7 +291,7 @@ export default function Importados({ mobile = false }: { mobile?: boolean }) {
       </div>
       {aba === "fornecedores" ? <Fornecedores opcoes={opcoes} /> : <>
       {mostraCambio && <p className="importados-cotacao" role="status">
-        {cambio ? `${falhou ? "Última cotação disponível" : "Cotação de"} ${new Date(cambio.atualizadaEm).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}`
+        {cambio ? `${falhou ? "Última cotação disponível de" : cambioReferencia ? "Cotação de referência de" : "Cotação de"} ${dataDaCotacao}${cambioReferencia ? " · Frankfurter" : ""}`
           : falhou ? "Cotação indisponível. Os valores originais estão disponíveis." : "Consultando cotação…"}
       </p>}
       {mobile && editor ? editor : <>

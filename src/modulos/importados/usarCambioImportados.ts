@@ -6,6 +6,7 @@ import { MOEDAS_IMPORTADOS, type MoedaImportada } from "../../estado/importados"
 export interface CambioImportados {
   taxas: Record<MoedaImportada, number>;
   atualizadaEm: string;
+  fonte?: "awesomeapi" | "frankfurter";
 }
 
 const INTERVALO_MS = 60_000;
