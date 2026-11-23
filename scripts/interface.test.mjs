@@ -64,6 +64,63 @@ test("Importados aparece na área Pessoal do dono e preserva opções reutilizá
   assert.deepEqual(listarOpcoesImportados(opcoes).fornecedor, ["Fornecedor A"]);
   const dados = { "niko:importados": JSON.stringify({ state: { produtos, opcoes }, version: 0 }) };
   assert.deepEqual(lerBackup({ tipo: "niko-backup", versao: 1, dados }).dados, dados);
+
+  const fotoAntiga = "data:image/jpeg;base64,AAAA";
+  const { fotos: _fotos, ...produtoLegado } = produtos[0];
+  const legado = { "niko:importados": JSON.stringify({ state: { produtos: [{ ...produtoLegado, foto: fotoAntiga }], opcoes }, version: 0 }) };
+  assert.deepEqual(lerBackup({ tipo: "niko-backup", versao: 1, dados: legado }).dados, legado);
+  itens.set("niko:importados", legado["niko:importados"]);
+  await useImportados.persist.rehydrate();
+  assert.deepEqual(useImportados.getState().produtos[0].fotos, [fotoAntiga]);
+
+  const salvarFornecedor = useImportados.getState().salvarFornecedor;
+  const fornecedor = { nome: "Fornecedor A", categoria: "Eletrônicos", plataforma: "Alibaba", link: "https://loja.example/fornecedor" };
+  assert.equal(salvarFornecedor(fornecedor), true);
+  assert.equal(salvarFornecedor({ ...fornecedor, nome: " fornecedor a " }), false);
+  assert.equal(salvarFornecedor({ ...fornecedor, nome: "Inválido", link: "javascript:alert(1)" }), false);
+  const novo = useImportados.getState().fornecedores[0];
+  assert.equal(salvarFornecedor({ ...fornecedor, nome: "Fornecedor atualizado" }, novo.id), true);
+  const produto = useImportados.getState().produtos[0];
+  assert.equal(produto.fornecedor, "Fornecedor atualizado");
+  const fotos = [fotoAntiga, "data:image/jpeg;base64,BBBB", "data:image/jpeg;base64,CCCC", "data:image/jpeg;base64,DDDD"];
+  assert.equal(salvarProduto({ ...produto, fotos }, produto.id), true);
+  await useImportados.persist.rehydrate();
+  assert.deepEqual(useImportados.getState().produtos[0].fotos, fotos.slice(0, 3));
+  assert.equal(useImportados.getState().fornecedores[0].link, fornecedor.link);
+  const atualizado = { "niko:importados": itens.get("niko:importados") };
+  assert.deepEqual(lerBackup({ tipo: "niko-backup", versao: 1, dados: atualizado }).dados, atualizado);
+});
+
+test("rascunho de Importados conserva texto e fotos ao recarregar e o câmbio usa o preço original", async (t) => {
+  const { guardarRascunhoProduto, lerRascunhoProduto } = await vite.ssrLoadModule("/src/modulos/importados/rascunhoProduto.ts");
+  const { converterPrecoImportado } = await vite.ssrLoadModule("/src/modulos/importados/usarCambioImportados.ts");
+  const anterior = Object.getOwnPropertyDescriptor(globalThis, "sessionStorage");
+  const itens = new Map();
+  Object.defineProperty(globalThis, "sessionStorage", { configurable: true, value: {
+    getItem: (chave) => itens.get(chave) ?? null,
+    setItem: (chave, valor) => itens.set(chave, valor),
+    removeItem: (chave) => itens.delete(chave),
+  } });
+  t.after(() => {
+    if (anterior) Object.defineProperty(globalThis, "sessionStorage", anterior);
+    else delete globalThis.sessionStorage;
+  });
+  const rascunho = { chave: "novo", produtoId: null, aberto: true, preco: "100,", dados: {
+    nome: "Câmera", link: "https://loja.", fotos: ["data:image/jpeg;base64,AAAA"], moeda: "CNY",
+    preco: null, categoria: "Eletrônicos", plataforma: "", fornecedor: "", origem: "", nota: "Buscar URL",
+  } };
+  guardarRascunhoProduto(1, rascunho);
+  assert.deepEqual(lerRascunhoProduto(1), rascunho);
+  assert.equal(lerRascunhoProduto(2), null);
+  guardarRascunhoProduto(1, null);
+  assert.equal(lerRascunhoProduto(1), null);
+
+  const cambio = { taxas: { BRL: 1, USD: 5, CNY: 0.7, EUR: 6 }, atualizadaEm: "2026-11-22T18:00:00.000Z" };
+  assert.equal(converterPrecoImportado(10_000, "CNY", "USD", cambio), 1400);
+  assert.equal(converterPrecoImportado(10_000, "CNY", "BRL", cambio), 7000);
+  assert.equal(converterPrecoImportado(10_000, "CNY", "CNY", cambio), 10_000);
+  assert.equal(converterPrecoImportado(10_000, "CNY", "BRL", { ...cambio, taxas: { ...cambio.taxas, CNY: 0.8 } }), 8000);
+  assert.equal(converterPrecoImportado(10_000, "CNY", "BRL"), null);
 });
 
 test("gerência acessa configurações pessoais sem receber acesso administrativo ou à área pessoal", async () => {

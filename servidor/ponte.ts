@@ -12,7 +12,7 @@ import { pedirJanelas } from "./janelas.ts";
 import { configPublica, estadoConexoes, lerConexao, salvarChaveConexao, removerChaveConexao, servicoValido, chaveDe, lerAbaDasPlanilhas, SERVICOS as SERVICOS_CONEXAO } from "./conexoes.ts";
 import { buscarGmail, criarRascunhoGmail, enviarGmail } from "./gmail.ts";
 import { lerAgendaGoogle } from "./agendaGoogle.ts";
-import { lerCotacoes } from "./cotacoes.ts";
+import { lerCotacoes, lerCotacoesImportados } from "./cotacoes.ts";
 import { lerAudio, lerNivelDaSaida, definirVolume, definirMudo, ajustarSessao, lerTema, lerIniciar, definirTema, abrirFerramenta, agirNaEnergia, lerBandeja, abrirDaBandeja, pastaDaBandeja, encerrarDaBandeja, listarApps, iconesDeApps, abrirApp, appDaJanela, abrirComandoDoSistema } from "./controleRapido.ts";
 import { ocrDaRequisicao } from "./ocr.ts";
 import { receberEventoDoGancho, ehRotaDoGancho, ouvirEventos, decidirPedido, estadoDaInstalacao, previaDaInstalacao, removerGanchos, abrirProjeto, trazerTerminal, terminalNaFrente, ehRotaDaStatus, receberStatusDoClaude } from "./claude.ts";
@@ -202,12 +202,48 @@ async function atenderAderencia(req: IncomingMessage, res: ServerResponse, acao:
   });
 }
 
+async function encaminharPelaApiPublica(
+  req: IncomingMessage,
+  res: ServerResponse,
+  servico: "aderencias" | "whatsapp",
+  acao: AcaoAderencia | AcaoWhatsappRemota,
+) {
+  const token = tokenDaRequisicao(req);
+  if (!token) return responder(res, 401, { erro: "nao_autenticado" });
+  const url = new URL(`/api/${servico}`, "https://kyro-drab.vercel.app");
+  const consulta = new URL(req.url ?? "/", "http://localhost");
+  for (const [chave, valor] of consulta.searchParams) url.searchParams.set(chave, valor);
+  url.searchParams.set("acao", acao);
+  try {
+    const binario = acao === "enviar-arquivo";
+    const corpo = req.method === "POST"
+      ? binario ? new Uint8Array(await lerBytes(req)) : JSON.stringify(await lerCorpo(req))
+      : undefined;
+    const resposta = await fetch(url, {
+      method: req.method,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        ...(corpo ? { "content-type": binario ? String(req.headers["content-type"] ?? "application/octet-stream") : "application/json" } : {}),
+      },
+      body: corpo,
+      redirect: "error",
+      signal: AbortSignal.timeout(55_000),
+    });
+    res.statusCode = resposta.status;
+    res.setHeader("content-type", resposta.headers.get("content-type") ?? "application/json; charset=utf-8");
+    res.setHeader("cache-control", "no-store");
+    return res.end(Buffer.from(await resposta.arrayBuffer()));
+  } catch {
+    return responder(res, 502, { erro: "gateway_remoto_indisponivel" });
+  }
+}
+
 async function encaminharAderenciaRemota(req: IncomingMessage, res: ServerResponse, acao: AcaoAderencia, usuarioId = usuarioDaAderencia(req)) {
   const base = (process.env.KYRO_GATEWAY_URL || process.env.VITE_GATEWAY_URL)?.trim().replace(/\/+$/, "");
   const segredo = process.env.KYRO_GATEWAY_SECRET?.trim();
-  if (!base || !segredo) return responder(res, 503, { erro: "gateway_remoto_nao_configurado" });
   if (acao === "estado" && req.method !== "GET") return responder(res, 405, { erro: "metodo_nao_permitido" });
   if (acao !== "estado" && req.method !== "GET" && req.method !== "POST") return responder(res, 405, { erro: "metodo_nao_permitido" });
+  if (!base || !segredo) return encaminharPelaApiPublica(req, res, "aderencias", acao);
   try {
     const url = new URL(`/gateway/aderencias/${acao}`, base);
     const enviaCorpo = req.method === "POST";
@@ -276,9 +312,9 @@ async function atenderWhatsappRemoto(req: IncomingMessage, res: ServerResponse, 
 async function encaminharWhatsappRemoto(req: IncomingMessage, res: ServerResponse, acao: AcaoWhatsappRemota, desde = 0) {
   const base = (process.env.KYRO_GATEWAY_URL || process.env.VITE_GATEWAY_URL)?.trim().replace(/\/+$/, "");
   const segredo = (process.env.KYRO_GATEWAY_SECRET || process.env.NIKO_GATEWAY_SECRET)?.trim();
-  if (!base || !segredo) return responder(res, 503, { erro: "gateway_remoto_nao_configurado" });
   const leitura = acao === "estado" || acao === "novidades" || acao === "midia" || acao === "historico" || acao === "rastros" || acao === "agendadas";
   if (req.method !== (leitura ? "GET" : "POST")) return responder(res, 405, { erro: "metodo_nao_permitido" });
+  if (!base || !segredo) return encaminharPelaApiPublica(req, res, "whatsapp", acao);
   try {
     const url = new URL(`/gateway/whatsapp/${acao}`, base);
     const consulta = new URL(req.url ?? "/", "http://localhost");
@@ -694,7 +730,10 @@ export const rotas: Connect.NextHandleFunction = async (req, res, proximo) => {
     if (caminho === "/conexoes" && req.method === "GET") {
       return responder(res, 200, estadoConexoes());
     }
-    if (caminho === "/cotacoes" && req.method === "GET") return responder(res, 200, await lerCotacoes());
+    if (caminho === "/cotacoes" && req.method === "GET") {
+      if (url.searchParams.get("escopo") === "importados") return responder(res, 200, await lerCotacoesImportados());
+      return responder(res, 200, await lerCotacoes());
+    }
     if (caminho === "/google/login-direto" && req.method === "GET") return responder(res, 200, { disponivel: false, emTestes: true });
     if (caminho === "/conexoes/planilhas/aba" && req.method === "GET") {
       const gid = url.searchParams.get("gid");
@@ -811,6 +850,14 @@ export function ponteLocal(): Plugin {
     name: "niko-ponte-local",
     configureServer(servidor) {
       process.env.NIKO_TOKEN ||= randomBytes(32).toString("hex");
+      servidor.middlewares.use((req, res, proximo) => {
+        const caminho = new URL(req.url ?? "/", "http://localhost").pathname;
+        if (caminho === "/api/dados") return responder(res, 403, { erro: "sincronizacao_desativada_no_desenvolvimento" });
+        if (caminho === "/ponte/dados" || caminho.startsWith("/ponte/dados/") || caminho === "/ponte/confirmacoes/reservar") {
+          req.headers["x-niko-banco"] ||= "desenvolvimento";
+        }
+        proximo();
+      });
       servidor.middlewares.use(rotas);
       if (servidor.httpServer) instalarSincroniaTempoReal(servidor.httpServer);
     },

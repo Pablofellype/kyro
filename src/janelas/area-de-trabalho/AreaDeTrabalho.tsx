@@ -17,6 +17,7 @@ import { usarTamanhoDaTela, verificarSeEhMobile } from "../usarTamanhoDaTela";
 import { useAuth } from "../../estado/autenticacao";
 import { TelaLogin } from "../../componentes/login/TelaLogin";
 import { CarregamentoKyro } from "../../componentes/login/CarregamentoKyro";
+import { guardarRascunhoProduto, lerRascunhoProduto } from "../../modulos/importados/rascunhoProduto";
 
 export function AreaDeTrabalho() {
   usarTema();
@@ -34,6 +35,19 @@ export function AreaDeTrabalho() {
   useEffect(() => {
     void verificar();
   }, [verificar]);
+
+  const donoId = usuario?.perfil === "dono" ? usuario.id : undefined;
+  useEffect(() => {
+    if (!donoId) return;
+    if (ehMobile && useInterface.getState().rota === "inicio" && lerRascunhoProduto(donoId)?.aberto) {
+      useInterface.getState().irParaLocal("importados");
+    }
+    return useInterface.subscribe((atual, anterior) => {
+      if (anterior.rota !== "importados" || atual.rota === "importados") return;
+      const rascunho = lerRascunhoProduto(donoId);
+      if (rascunho?.aberto) guardarRascunhoProduto(donoId, { ...rascunho, aberto: false });
+    });
+  }, [donoId, ehMobile]);
 
   useEffect(() => {
     if (ehMobile) {

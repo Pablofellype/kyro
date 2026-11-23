@@ -39,7 +39,8 @@ const esquemas: Record<string, Record<string, Regra>> = {
     visao: [{ id, titulo: "s", descricao: "s", estado: "em_andamento|planejada|concluida", prazo: "?d" }], eventos: [evento],
   },
   importados: {
-    produtos: [{ id, nome: "s!", link: "s", foto: "s", preco: "z", moeda: "BRL|USD|CNY|EUR", categoria: "s", plataforma: "s", fornecedor: "s", origem: "s", nota: "s" }],
+    produtos: [{ id, nome: "s!", link: "s", foto: "?s", fotos: ["s"], preco: "z", moeda: "BRL|USD|CNY|EUR", categoria: "s", plataforma: "s", fornecedor: "s", origem: "s", nota: "s" }],
+    fornecedores: [{ id, nome: "s!", categoria: "s", plataforma: "s", link: "s" }],
     opcoes: [{ id, campo: "categoria|plataforma|fornecedor|origem", nome: "s!" }],
   },
   comunicacao: {
@@ -80,7 +81,7 @@ function conferir(valor: unknown, regra: Regra) {
   } else {
     exigir(objeto(valor));
     for (const [campo, teste] of Object.entries(regra)) {
-      if ((campo === "parcela" || campo === "excecoes" || campo === "feitos") && valor[campo] === undefined) continue;
+      if ((campo === "parcela" || campo === "excecoes" || campo === "feitos" || campo === "fotos") && valor[campo] === undefined) continue;
       conferir(valor[campo], teste);
     }
   }

@@ -13,7 +13,7 @@ import { create } from "zustand";
 
 const estabilizar = () => new Promise((r) => setImmediate(r));
 
-function armazenamentoIsolado(nativo = false, sessao = null, memoria = new Map()) {
+function armazenamentoIsolado(nativo = false, sessao = null, memoria = new Map(), desenvolvimento = false) {
   const timers = new Map();
   let proximo = 0;
   const janela = Object.assign(new EventTarget(), {
@@ -27,7 +27,7 @@ function armazenamentoIsolado(nativo = false, sessao = null, memoria = new Map()
   if (sessao) {
     memoria.set("kyro_token", "t".repeat(32));
     memoria.set("kyro_usuario", JSON.stringify({ id: sessao.id ?? 1 }));
-    if (sessao.fila) memoria.set("niko:sincronia-pendente:1", JSON.stringify(sessao.fila));
+    if (sessao.fila) memoria.set(`niko:sincronia-pendente:${sessao.id ?? 1}`, JSON.stringify(sessao.fila));
   }
   const ouvintes = new Map();
   const comandos = [];
@@ -43,10 +43,31 @@ function armazenamentoIsolado(nativo = false, sessao = null, memoria = new Map()
     fetch: async () => ({ ok: true, json: async () => ({ dados: {} }) }),
   });
   const codigo = stripTypeScriptTypes(readFileSync("src/ponte/armazenamento.ts", "utf8")).replace(/^import .*;\r?\n/gm, "").replace(/^export /gm, "")
+    .replace("import.meta.env.DEV", String(desenvolvimento))
     .replaceAll('await import("@tauri-apps/api/event")', "globalThis.eventos").replaceAll('await import("@tauri-apps/api/core")', "globalThis.nativo");
   vm.runInContext(`${codigo}\nglobalThis.api = { iniciarArmazenamento, salvarAgora, gravarChave, lerChave, zerarTudo, aoPrepararSaida, aoMudarDeFora };`, contexto);
   return { api: contexto.api, contexto, janela, timers, ouvintes, comandos, eventos, memoria };
 }
+
+test("desenvolvimento autenticado grava em banco local isolado sem consumir a fila remota", async () => {
+  const fila = { versao: "0", itens: { "niko:financas": "versao-de-producao" } };
+  const a = armazenamentoIsolado(false, { id: 7, fila }, new Map(), true);
+  const chamadas = [];
+  a.contexto.fetch = async (url, opcoes) => {
+    chamadas.push({ url, opcoes });
+    return { ok: true, json: async () => ({ dados: {} }) };
+  };
+  await a.api.iniciarArmazenamento();
+  a.api.gravarChave("niko:financas", "versao-de-teste");
+  await a.api.salvarAgora();
+  assert.deepEqual(chamadas.map(({ url }) => url), ["/ponte/dados", "/ponte/dados"]);
+  for (const { opcoes } of chamadas) {
+    assert.equal(opcoes.headers["x-niko-banco"], "desenvolvimento");
+    assert.equal(opcoes.headers.Authorization, undefined);
+  }
+  assert.deepEqual(JSON.parse(chamadas[1].opcoes.body).itens, { "niko:financas": "versao-de-teste" });
+  assert.deepEqual(JSON.parse(a.memoria.get("niko:sincronia-pendente:7")), fila);
+});
 
 test("WhatsApp em tempo real descarta eventos da conta que já saiu", async () => {
   const a = armazenamentoIsolado(false, { id: 7 });

@@ -5,10 +5,11 @@ import { objeto } from "../utilitarios/validacoes";
 import { endpointTempoReal } from "./tempoReal";
 
 export const PREFIXO = "niko:";
+const emDesenvolvimento = import.meta.env.DEV;
 const bancoDeTeste = (() => {
   try {
     const nome = new URLSearchParams(window.location.search).get("banco") ?? "";
-    return /^[a-z0-9-]{1,20}$/.test(nome) ? nome : "";
+    return /^[a-z0-9-]{1,20}$/.test(nome) ? nome : emDesenvolvimento ? "desenvolvimento" : "";
   } catch {
     return "";
   }
@@ -35,6 +36,10 @@ function tokenDaSessao(): string | null {
   }
 }
 
+function tokenDaSincronia(): string | null {
+  return emDesenvolvimento ? null : tokenDaSessao();
+}
+
 let tokenDoArmazenamento = tokenDaSessao();
 let usuarioDoArmazenamento = idDoUsuarioLocal();
 
@@ -57,7 +62,7 @@ function guardarConfiguracoesLocais(nome: string, valor: string | null) {
 }
 
 function endpointDosDados(): string {
-  return tokenDaSessao() ? urlApi("/api/dados") : "/ponte/dados";
+  return tokenDaSincronia() ? urlApi("/api/dados") : "/ponte/dados";
 }
 
 function clienteDaInstalacao(): string | null {
@@ -80,7 +85,7 @@ export function idDoCliente(): string | null {
 }
 
 function cabecalhosDosDados(): Record<string, string> {
-  const token = tokenDaSessao();
+  const token = tokenDaSincronia();
   const usuarioId = idDoUsuarioLocal();
   const usuario: Record<string, string> = usuarioId ? { "x-kyro-user-id": usuarioId } : {};
   if (!token) return { ...CABECALHOS, ...usuario };
@@ -152,6 +157,7 @@ function definirSituacaoSincronia(estado: EstadoSincronia, pendentes = 0, ultima
 }
 
 function chaveDaFilaSincronia(): string | null {
+  if (emDesenvolvimento) return null;
   try {
     const usuario = JSON.parse(localStorage.getItem("kyro_usuario") ?? "null") as { id?: unknown } | null;
     return typeof usuario?.id === "number" && Number.isSafeInteger(usuario.id) && usuario.id > 0 ? `${CHAVE_FILA_SINCRONIA}${usuario.id}` : null;
@@ -341,7 +347,7 @@ function reconciliarConflito(itens: Record<string, string | null>, resposta: unk
 
 async function recarregarDaPonte() {
   if (modo !== "banco" || !mesmaSessaoDoArmazenamento()) return;
-  const token = tokenDaSessao();
+  const token = tokenDaSincronia();
   try {
     const endpoint = endpointDosDados();
     const desde = token && versaoRemota ? `?desde=${encodeURIComponent(versaoRemota)}` : "";
@@ -372,7 +378,7 @@ async function recarregarDaPonte() {
 function urlDaSincroniaTempoReal(): string | null {
   const local = endpointTempoReal();
   if (local) return local;
-  if (typeof window === "undefined" || !tokenDaSessao()) return null;
+  if (typeof window === "undefined" || !tokenDaSincronia()) return null;
 
   // Em uma build web, usamos o mesmo host da API configurada no HTML. Se ela
   // estiver em um VPS com WebSocket, o navegador mantém a sincronização aberta.
@@ -392,7 +398,7 @@ function urlDaSincroniaTempoReal(): string | null {
 }
 
 function agendarReconexaoTempoReal() {
-  if (temporizadorReconexaoWebsocket || !tokenDaSessao()) return;
+  if (temporizadorReconexaoWebsocket || !tokenDaSincronia()) return;
   const atraso = atrasoReconexaoWebsocket;
   atrasoReconexaoWebsocket = Math.min(atrasoReconexaoWebsocket * 2, 15 * 60_000);
   temporizadorReconexaoWebsocket = window.setTimeout(() => {
@@ -402,10 +408,10 @@ function agendarReconexaoTempoReal() {
 }
 
 function conectarTempoReal() {
-  if (modo !== "banco" || !tokenDaSessao() || typeof WebSocket === "undefined") return;
+  if (modo !== "banco" || !tokenDaSincronia() || typeof WebSocket === "undefined") return;
   if (websocketSincronia && (websocketSincronia.readyState === WebSocket.OPEN || websocketSincronia.readyState === WebSocket.CONNECTING)) return;
   const url = urlDaSincroniaTempoReal();
-  const token = tokenDaSessao();
+  const token = tokenDaSincronia();
   if (!url || !token) return;
   try {
     const socket = new WebSocket(url);
@@ -415,7 +421,7 @@ function conectarTempoReal() {
       socket.send(JSON.stringify({ tipo: "autenticar", token }));
     });
     socket.addEventListener("message", (evento) => {
-      if (websocketSincronia !== socket || tokenDaSessao() !== token) return;
+      if (websocketSincronia !== socket || tokenDaSincronia() !== token) return;
       let mensagem: unknown;
       try {
         mensagem = JSON.parse(String(evento.data));
@@ -477,7 +483,7 @@ function enviarPendentes(manterViva = false): Promise<void> {
   envioEmAndamento = (async () => {
     while (pendentes.size > 0 && mesmaSessaoDoArmazenamento()) {
       const itens = Object.fromEntries(pendentes);
-      definirSituacaoSincronia(tokenDaSessao() ? "sincronizando" : "local", Object.keys(itens).length);
+      definirSituacaoSincronia(tokenDaSincronia() ? "sincronizando" : "local", Object.keys(itens).length);
       pendentes.clear();
       for (const [k, v] of Object.entries(itens)) emEnvio.set(k, v);
       persistirFilaSincronia();
@@ -513,7 +519,7 @@ function enviarPendentes(manterViva = false): Promise<void> {
         if (!mesmaSessaoDoArmazenamento()) return;
         for (const [k, v] of Object.entries(itens)) if (!pendentes.has(k) && (cache.get(k) ?? null) === v) pendentes.set(k, v);
         persistirFilaSincronia();
-        definirSituacaoSincronia(tokenDaSessao() ? "offline" : "local", pendentes.size);
+        definirSituacaoSincronia(tokenDaSincronia() ? "offline" : "local", pendentes.size);
         window.dispatchEvent(new CustomEvent("niko:armazenamento-falhou"));
         const atraso = Math.min(4000 * (2 ** Math.min(tentativasSincronia, 4)), 60000);
         tentativasSincronia = Math.min(tentativasSincronia + 1, 4);
@@ -528,7 +534,7 @@ function enviarPendentes(manterViva = false): Promise<void> {
   })().finally(() => {
     envioEmAndamento = null;
     if (pendentes.size === 0 && situacaoSincronia.estado === "sincronizando") {
-      definirSituacaoSincronia(tokenDaSessao() ? "conectado" : "local", 0, tokenDaSessao() ? Date.now() : situacaoSincronia.ultimaSincronia);
+      definirSituacaoSincronia(tokenDaSincronia() ? "conectado" : "local", 0, tokenDaSincronia() ? Date.now() : situacaoSincronia.ultimaSincronia);
     }
   });
   return envioEmAndamento;
@@ -550,7 +556,7 @@ const armazenamentoSeguro: StateStorage = {
       cache.set(nome, valor);
       pendentes.set(nome, valor);
       persistirFilaSincronia();
-      definirSituacaoSincronia(tokenDaSessao() ? "pendente" : "local", pendentes.size);
+      definirSituacaoSincronia(tokenDaSincronia() ? "pendente" : "local", pendentes.size);
       agendar();
       avisarOutrasJanelas(nome, valor);
       return;
@@ -561,7 +567,7 @@ const armazenamentoSeguro: StateStorage = {
       cache.set(nome, valor);
       window.dispatchEvent(new CustomEvent("niko:armazenamento-cheio"));
     }
-    if (tokenDoArmazenamento) {
+    if (tokenDaSincronia()) {
       cache.set(nome, valor);
       pendentes.set(nome, valor);
       persistirFilaSincronia();
@@ -576,14 +582,14 @@ const armazenamentoSeguro: StateStorage = {
       cache.delete(nome);
       pendentes.set(nome, null);
       persistirFilaSincronia();
-      definirSituacaoSincronia(tokenDaSessao() ? "pendente" : "local", pendentes.size);
+      definirSituacaoSincronia(tokenDaSincronia() ? "pendente" : "local", pendentes.size);
       agendar();
       avisarOutrasJanelas(nome, null);
       return;
     }
     localSeguro(() => localStorage.removeItem(chaveLocal(nome)), undefined);
     cache.delete(nome);
-    if (tokenDoArmazenamento) {
+    if (tokenDaSincronia()) {
       pendentes.set(nome, null);
       persistirFilaSincronia();
       agendar();
@@ -602,7 +608,7 @@ export function modoArmazenamento(): ModoArmazenamento {
 }
 
 export async function buscarHistoricoSincronia(limite = 30): Promise<RegistroHistoricoSincronia[]> {
-  if (!tokenDaSessao()) return [];
+  if (!tokenDaSincronia()) return [];
   const limiteSeguro = Math.max(1, Math.min(100, Math.floor(Number(limite) || 30)));
   const r = await fetch(`${endpointDosDados()}?acao=historico&limite=${limiteSeguro}`, { headers: cabecalhosDosDados(), signal: AbortSignal.timeout(8000) });
   if (!r.ok) throw new Error(`http_${r.status}`);
@@ -621,7 +627,7 @@ export async function buscarHistoricoSincronia(limite = 30): Promise<RegistroHis
 }
 
 export async function buscarBackupsSincronia(limite = 30): Promise<RegistroBackupSincronia[]> {
-  if (!tokenDaSessao()) return [];
+  if (!tokenDaSincronia()) return [];
   const limiteSeguro = Math.max(1, Math.min(30, Math.floor(Number(limite) || 30)));
   const r = await fetch(`${endpointDosDados()}?acao=backups&limite=${limiteSeguro}`, { headers: cabecalhosDosDados(), signal: AbortSignal.timeout(8000) });
   if (!r.ok) throw new Error(`http_${r.status}`);
@@ -640,7 +646,7 @@ export async function buscarBackupsSincronia(limite = 30): Promise<RegistroBacku
 }
 
 export async function restaurarBackupSincronia(id: number): Promise<void> {
-  if (!tokenDaSessao()) throw new Error("nao_autenticado");
+  if (!tokenDaSincronia()) throw new Error("nao_autenticado");
   await salvarAgora();
   const r = await fetch(`${endpointDosDados()}?acao=restaurar`, {
     method: "POST",
@@ -697,7 +703,7 @@ export async function iniciarArmazenamento(): Promise<ModoArmazenamento> {
   tokenDoArmazenamento = tokenDaSessao();
   usuarioDoArmazenamento = idDoUsuarioLocal();
   try {
-    const remoto = Boolean(tokenDaSessao());
+    const remoto = Boolean(tokenDaSincronia());
     const usuarioId = idDoUsuarioLocal();
     // As chaves antigas do localStorage não têm dono: em uma troca de conta
     // elas podem ser do administrador. Só o usuário 1 pode migrá-las; os
@@ -832,8 +838,9 @@ export async function zerarTudo(apagarChaves: boolean): Promise<void> {
   try {
     if (modo === "banco") {
       await salvarAgora();
-      const endpoint = endpointDosDados();
-      const r = await fetch(`${endpoint}?acao=zerar`, { method: "POST", headers: cabecalhosDosDados(), signal: AbortSignal.timeout(8000), body: JSON.stringify({ confirmacao: "APAGAR", chaves: apagarChaves, versao: versaoBaseLocal ?? versaoRemota }) });
+      const remoto = Boolean(tokenDaSincronia());
+      const endpoint = remoto ? `${endpointDosDados()}?acao=zerar` : "/ponte/dados/zerar";
+      const r = await fetch(endpoint, { method: "POST", headers: cabecalhosDosDados(), signal: AbortSignal.timeout(8000), body: JSON.stringify({ confirmacao: "APAGAR", chaves: apagarChaves && !emDesenvolvimento, versao: versaoBaseLocal ?? versaoRemota }) });
       if (!r.ok) throw new Error(`http_${r.status}`);
       const resposta: unknown = await jsonDaResposta(r);
       if (objeto(resposta) && typeof resposta.versao === "string") versaoRemota = resposta.versao;
@@ -841,7 +848,7 @@ export async function zerarTudo(apagarChaves: boolean): Promise<void> {
       cache.clear();
       snapshotRemoto.clear();
       persistirFilaSincronia();
-      definirSituacaoSincronia(tokenDaSessao() ? "conectado" : "local", 0, tokenDaSessao() ? Date.now() : null);
+      definirSituacaoSincronia(remoto ? "conectado" : "local", 0, remoto ? Date.now() : null);
     }
     pendentes.clear();
     filaPersistidaNestaJanela.clear();
