@@ -1,7 +1,7 @@
 {
     "name": "kyro",
     "private": true,
-    "version": "0.2.49",
+    "version": "0.2.50",
     "type": "module",
     "license": "SEE LICENSE IN LICENSE.md",
     "scripts": {

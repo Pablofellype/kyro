@@ -210,6 +210,18 @@ test("robô separa alertas amarelos e vermelhos pelos limiares", () => {
   assert.match(resultado.texto, /CRÍTICO/);
 });
 
+test("robô ordena cada seção do maior atraso para o menor", () => {
+  const resultado = construirMensagem(planilha({ redThreshold: 3, yellowThreshold: 1 }), [
+    { texto: "3", area: "Borracharia", predio: "", cor: "vermelho" },
+    { texto: "17", area: "Lava Jato", predio: "", cor: "vermelho" },
+    { texto: "3", area: "Pátio Principal", predio: "", cor: "vermelho" },
+    { texto: "1", area: "Sala A", predio: "", cor: "amarelo" },
+    { texto: "2", area: "Sala B", predio: "", cor: "amarelo" },
+  ]);
+  assert.match(resultado.texto, /CRÍTICO\*\n\*17d\* ➜ LAVA JATO\n\*3d\* ➜ BORRACHARIA\n\*3d\* ➜ PÁTIO PRINCIPAL/);
+  assert.match(resultado.texto, /ATENÇÃO\*\n\*2d\* ➜ SALA B\n\*1d\* ➜ SALA A/);
+});
+
 test("modo somente print não cria alertas", () => {
   const resultado = construirMensagem(planilha({ soPrint: true }), [{ texto: "9", area: "Sala", predio: "P1", cor: "vermelho" }]);
   assert.equal(resultado.alertas, 0);

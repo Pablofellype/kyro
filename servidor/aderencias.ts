@@ -394,6 +394,9 @@ export function construirMensagem(planilha: PlanilhaAderencia, celulas: CelulaAd
     else if (planilha.yellowEnabled && dias >= planilha.yellowThreshold) alertas.push(celula);
   }
   if (!urgentes.length && !alertas.length) return { texto: `🚨 *ALERTA DE LIMPEZA · ${nome}*\n\n✅ *Tudo em dia!*`, alertas: 0, urgentes: 0 };
+  const porMaiorAtraso = (a: CelulaAderencia, b: CelulaAderencia) => Number.parseInt(b.texto, 10) - Number.parseInt(a.texto, 10);
+  urgentes.sort(porMaiorAtraso);
+  alertas.sort(porMaiorAtraso);
   const linha = (c: CelulaAderencia) => `*${Number.parseInt(c.texto, 10) || c.texto}d* ➜ ${(c.predio ? `${c.predio} - ${c.area}` : c.area).trim().toUpperCase()}`;
   const partes = [`🚨 *ALERTA DE LIMPEZA · ${nome}*`];
   if (urgentes.length) partes.push(`\n🔴 *CRÍTICO*\n${urgentes.map(linha).join("\n")}`);
