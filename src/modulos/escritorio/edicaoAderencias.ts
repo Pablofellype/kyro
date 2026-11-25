@@ -4,8 +4,6 @@ export interface RascunhoAderencias {
   grupo: GrupoAderencia;
   novo: boolean;
   excluir: boolean;
-  destinoJid: string;
-  destinoNome: string;
   destinoInicial: string;
 }
 
@@ -27,7 +25,7 @@ export function criarRascunhoAderencias(config: ConfiguracaoAderencias, grupo?: 
     copia.ultimoResultado = null;
     copia.planilhas = copiarPlanilhasAderencias(copia.planilhas);
   }
-  return { grupo: copia, novo: !grupo || duplicar, excluir: false, destinoJid: config.destinoJid, destinoNome: config.destinoNome, destinoInicial: config.destinoJid };
+  return { grupo: copia, novo: !grupo || duplicar, excluir: false, destinoInicial: copia.destinoJid };
 }
 
 // Aplica somente a rotina editada à configuração mais recente. Resultados e
@@ -39,18 +37,21 @@ export function aplicarRascunhoAderencias(config: ConfiguracaoAderencias, rascun
     const grupos = config.grupos.filter((grupo) => grupo.id !== rascunho.grupo.id);
     // Sem rotinas, limpa também o espelho legado lido pelo worker. Caso
     // contrário, a última rotina removida continuaria disponível nesse espelho.
-    return configuracaoAderenciasValida({ ...(grupos.length ? config : CONFIGURACAO_ADERENCIAS_PADRAO), destinoJid: config.destinoJid, destinoNome: config.destinoNome, grupos });
+    return configuracaoAderenciasValida({ ...(grupos.length ? config : CONFIGURACAO_ADERENCIAS_PADRAO), grupos });
   }
   if (!rascunho.grupo.nome.trim()) throw new Error("Informe o nome da rotina.");
   if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(rascunho.grupo.hora)) throw new Error("Informe um horário válido.");
   if (rascunho.grupo.frequencia === "semanal" && !rascunho.grupo.diasSemana.length) throw new Error("Escolha pelo menos um dia da semana.");
   if (rascunho.grupo.planilhas.length > 30) throw new Error("Cada rotina pode ter até 30 planilhas.");
   if (rascunho.novo && config.grupos.length >= 30) throw new Error("Você já tem 30 rotinas. Exclua uma antes de criar outra.");
-  const grupo = grupoAderenciaValido({ ...rascunho.grupo, ultimoAgendamento: existente?.ultimoAgendamento ?? "", ultimoResultado: existente?.ultimoResultado ?? null });
+  const destinoAtualizado = existente && rascunho.grupo.destinoJid === rascunho.destinoInicial
+    ? { destinoJid: existente.destinoJid, destinoNome: existente.destinoNome }
+    : {};
+  const grupo = grupoAderenciaValido({
+    ...rascunho.grupo, ...destinoAtualizado, ultimoAgendamento: existente?.ultimoAgendamento ?? "", ultimoResultado: existente?.ultimoResultado ?? null,
+  });
   return configuracaoAderenciasValida({
     ...config,
-    destinoJid: rascunho.destinoJid !== rascunho.destinoInicial ? rascunho.destinoJid : config.destinoJid,
-    destinoNome: rascunho.destinoJid !== rascunho.destinoInicial ? rascunho.destinoNome : config.destinoNome,
     grupos: rascunho.novo ? [...config.grupos, grupo] : config.grupos.map((atual) => atual.id === grupo.id ? grupo : atual),
   });
 }

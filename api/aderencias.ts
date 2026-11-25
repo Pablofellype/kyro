@@ -2,7 +2,7 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { validarSessao } from "../src/servicos/autenticacao.js";
 import { configurarCors } from "./cors.js";
 
-const ACOES = new Set(["estado", "testar", "enviar", "executar", "configuracao", "mensagens-automaticas"]);
+const ACOES = new Set(["estado", "testar", "enviar", "executar", "configuracao", "salvar-rotina", "registrar-resultado", "mensagens-automaticas"]);
 
 function tokenDaRequisicao(req: VercelRequest): string {
   const valor = req.headers.authorization;

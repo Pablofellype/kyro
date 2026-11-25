@@ -3,7 +3,7 @@ import type { UsuarioAutenticado } from "../estado/autenticacao";
 
 export type PapelOrganizacional = UsuarioAutenticado["perfil"];
 
-export const ROTAS_DA_EMPRESA: Rota[] = ["escritorio", "appsEmpresa", "calendario", "conexoes", "whatsapp", "configuracoes", "atualizacao"];
+export const ROTAS_DA_EMPRESA: Rota[] = ["escritorio", "appsEmpresa", "powerBi", "sults", "calendario", "conexoes", "whatsapp", "configuracoes", "atualizacao"];
 
 const CONFIGURACOES_PESSOAIS = new Set([
   "geral", "aparencia", "ilha", "dock", "assistive", "pomodoro", "sons", "tela", "atalhos", "privacidade", "sobre",

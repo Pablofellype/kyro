@@ -192,7 +192,7 @@ export const useInterface = create<EstadoInterface>()((set, get) => ({
     const parametros = rota === rotaPedida ? parametrosPedidos : {};
     const atual = get();
     const areaDoCalendario = parametros.area === "pessoal" || parametros.area === "empresa" ? parametros.area : undefined;
-    const area = rota === "appsEmpresa" ? "empresa"
+    const area = rota === "appsEmpresa" || rota === "powerBi" || rota === "sults" ? "empresa"
       : rota === "importados" && useAuth.getState().usuario?.perfil === "dono" ? "pessoal"
       : rota === "calendario" && areaDoCalendario && podeAcessarArea(useAuth.getState().usuario, areaDoCalendario) ? areaDoCalendario
       : atual.area;

@@ -1,7 +1,10 @@
-import { useEffect, useState, type FormEvent } from "react";
-import { CalendarClock, MessageSquare, RefreshCw } from "lucide-react";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { CalendarClock, MessageSquare, RefreshCw, Search } from "lucide-react";
 import { AvisoFaixa, Botao, Campo, Cartao } from "../../componentes/basicos";
 import { aderenciasPonte, type FrequenciaMensagemAderencia, type MensagensAutomaticasAderencia } from "../../ponte/aderencias";
+import { normalizarTexto } from "../../utilitarios/basicos";
+import { SeletorConversaWhatsapp } from "./SeletorConversaWhatsapp";
+import "../escritorio/aderencias.css";
 
 const DIAS = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
 const FREQUENCIAS: Record<FrequenciaMensagemAderencia, string> = { once: "Uma vez", daily: "Todos os dias", weekly: "Dias da semana" };
@@ -36,7 +39,11 @@ function dataDoEnvio(valor: string, fuso: string) {
   } catch { return data.toLocaleString("pt-BR"); }
 }
 
-export function AbaMensagensAutomaticasAderencia({ conectado }: { conectado: boolean }) {
+export function MensagensAutomaticas({ conectado, revisaoDaConversa, outrosEnvios }: {
+  conectado: boolean;
+  revisaoDaConversa: number;
+  outrosEnvios: (idsExibidos: Set<string>) => ReactNode;
+}) {
   const [dados, setDados] = useState<MensagensAutomaticasAderencia | null>(null);
   const [revisao, setRevisao] = useState(0);
   const [carregando, setCarregando] = useState(true);
@@ -49,11 +56,16 @@ export function AbaMensagensAutomaticasAderencia({ conectado }: { conectado: boo
   const [mencao, setMencao] = useState("nenhuma");
   const [numeros, setNumeros] = useState<string[]>([]);
   const [participantes, setParticipantes] = useState<Array<{ numero: string; nome: string }> | null>(null);
+  const [buscaParticipante, setBuscaParticipante] = useState("");
   const [erroParticipantes, setErroParticipantes] = useState("");
   const [ocupado, setOcupado] = useState(false);
   const [erroAcao, setErroAcao] = useState("");
   const [confirmacao, setConfirmacao] = useState("");
   const fuso = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  const grupoSelecionado = dados?.grupos.some((grupo) => grupo.jid === jid);
+  const formularioDesativado = ocupado || carregando || Boolean(erroLista) || !dados?.grupos.length;
+  const termo = normalizarTexto(buscaParticipante);
+  const participantesVisiveis = participantes?.filter(({ nome }) => normalizarTexto(nome).includes(termo)) ?? [];
 
   useEffect(() => {
     const controle = new AbortController();
@@ -64,7 +76,7 @@ export function AbaMensagensAutomaticasAderencia({ conectado }: { conectado: boo
       .catch((erro) => { if (!controle.signal.aborted) setErroLista(erroDaMensagem(erro, "Não foi possível carregar os grupos e agendamentos.")); })
       .finally(() => { if (!controle.signal.aborted) setCarregando(false); });
     return () => controle.abort();
-  }, [conectado, revisao]);
+  }, [conectado, revisao, revisaoDaConversa]);
 
   useEffect(() => {
     if (!jid || mencao !== "pessoas") return;
@@ -83,7 +95,7 @@ export function AbaMensagensAutomaticasAderencia({ conectado }: { conectado: boo
 
   async function agendar(evento: FormEvent) {
     evento.preventDefault();
-    if (ocupado || erroLista || !dados?.grupos.some((grupo) => grupo.jid === jid)) return;
+    if (formularioDesativado || !grupoSelecionado) return;
     const primeiroEnvio = new Date(quando);
     setConfirmacao("");
     if (!(primeiroEnvio.getTime() >= Date.now() + 60_000)) {
@@ -127,12 +139,13 @@ export function AbaMensagensAutomaticasAderencia({ conectado }: { conectado: boo
     {confirmacao && <AvisoFaixa><span role="status">{confirmacao}</span></AvisoFaixa>}
     <Cartao titulo="Agendar mensagem" icone={<MessageSquare size={16} />}>
       <form className="formulario aderencias-formulario" onSubmit={(evento) => void agendar(evento)}>
-        <fieldset className="aderencias-campos-agendamento" disabled={ocupado || carregando || Boolean(erroLista) || !dados?.grupos.length}>
+        <fieldset className="aderencias-campos-agendamento" disabled={formularioDesativado}>
           <Campo id="aderencia-mensagem-grupo" rotulo="Grupo do WhatsApp" obrigatorio>
-            <select id="aderencia-mensagem-grupo" className="seletor" required value={jid} onChange={(evento) => { setJid(evento.target.value); setNumeros([]); }}>
-              <option value="">{carregando ? "Carregando grupos…" : "Escolha um grupo"}</option>
-              {dados?.grupos.map((grupo) => <option key={grupo.jid} value={grupo.jid}>{grupo.nome}</option>)}
-            </select>
+            <SeletorConversaWhatsapp id="aderencia-mensagem-grupo" somenteGrupos valor={jid}
+              conversas={dados?.grupos.map(({ jid, nome }) => ({ id: jid, nome, grupo: true })) ?? []}
+              carregando={carregando} desativado={formularioDesativado}
+              aoMudar={(grupo) => { setJid(grupo); setNumeros([]); setBuscaParticipante(""); }}
+            />
           </Campo>
           <Campo id="aderencia-mensagem-texto" rotulo="Mensagem" obrigatorio>
             <textarea id="aderencia-mensagem-texto" className="campo" rows={4} required maxLength={4096} value={texto} onChange={(evento) => setTexto(evento.target.value)} />
@@ -151,22 +164,29 @@ export function AbaMensagensAutomaticasAderencia({ conectado }: { conectado: boo
             {DIAS.map((nome, dia) => <button key={nome} type="button" aria-label={nome} aria-pressed={dias.includes(dia)} onClick={() => setDias((atuais) => atuais.includes(dia) ? atuais.filter((d) => d !== dia) : [...atuais, dia])}>{nome.slice(0, 3)}</button>)}
           </div>}
           <Campo id="aderencia-mensagem-mencao" rotulo="Menções">
-            <select id="aderencia-mensagem-mencao" className="seletor" value={mencao} onChange={(evento) => { setMencao(evento.target.value); setNumeros([]); }}>
+            <select id="aderencia-mensagem-mencao" className="seletor" value={mencao} onChange={(evento) => { setMencao(evento.target.value); setNumeros([]); setBuscaParticipante(""); }}>
               <option value="nenhuma">Sem menções</option>
               <option value="pessoas">Escolher participantes</option>
               <option value="todos">@todos · Mencionar todo o grupo</option>
             </select>
           </Campo>
-          {mencao === "pessoas" && jid && <div className="aderencias-copia-lista" aria-label="Participantes do grupo">
+          {mencao === "pessoas" && jid && <>
+            {Boolean(participantes?.length) && <label className="wpp-busca wpp-busca-participantes">
+              <Search size={14} aria-hidden="true" />
+              <input aria-label="Buscar participante pelo nome" placeholder="Buscar participante pelo nome" value={buscaParticipante} onChange={(evento) => setBuscaParticipante(evento.target.value)} />
+            </label>}
+            <div className="aderencias-copia-lista" aria-label="Participantes do grupo">
             {erroParticipantes ? <span role="alert">{erroParticipantes}</span> : !participantes ? <span role="status">Carregando participantes…</span>
               : participantes.length === 0 ? <span>Nenhum participante disponível para menção individual.</span>
-                : participantes.map(({ numero, nome }) => <label key={numero} className="aderencias-check">
+                : participantesVisiveis.length === 0 ? <span role="status">Nenhum participante encontrado.</span>
+                : participantesVisiveis.map(({ numero, nome }) => <label key={numero} className="aderencias-check">
                   <input type="checkbox" checked={numeros.includes(numero)} onChange={(evento) => setNumeros((atuais) => evento.target.checked ? [...atuais, numero] : atuais.filter((n) => n !== numero))} />
                   <span>{nome}{nome !== `+${numero}` && <small>+${numero}</small>}</span>
                 </label>)}
-          </div>}
+            </div>
+          </>}
           <div className="aderencias-acoes">
-            <Botao type="submit" variante="primario" disabled={!texto.trim() || (mencao === "pessoas" && (!participantes || !numeros.length))} icone={<CalendarClock size={14} />}>{ocupado ? "Salvando…" : "Agendar mensagem"}</Botao>
+            <Botao type="submit" variante="primario" disabled={!grupoSelecionado || !texto.trim() || (mencao === "pessoas" && (!participantes || !numeros.length))} icone={<CalendarClock size={14} />}>{ocupado ? "Salvando…" : "Agendar mensagem"}</Botao>
           </div>
         </fieldset>
         {dados?.grupos.length === 0 && <p className="campo-dica">A conta conectada ainda não retornou nenhum grupo.</p>}
@@ -186,5 +206,6 @@ export function AbaMensagensAutomaticasAderencia({ conectado }: { conectado: boo
         </article>)}
       </div>
     </Cartao>
+    {(!carregando || dados) && outrosEnvios(new Set(dados?.agendadas.map((agenda) => agenda.id)))}
   </section>;
 }

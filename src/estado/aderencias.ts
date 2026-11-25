@@ -45,7 +45,10 @@ export const useAderencias = create<EstadoAderencias>()(persist((set) => ({
     return id;
   },
   atualizarGrupo: (id, parcial) => set((atual) => normalizarComGrupos(atual, atual.grupos.map((g) => g.id === id ? grupoAderenciaValido({ ...g, ...parcial }, id) : g))),
-  removerGrupo: (id) => set((atual) => normalizarComGrupos(atual, atual.grupos.filter((g) => g.id !== id))),
+  removerGrupo: (id) => set((atual) => {
+    const grupos = atual.grupos.filter((g) => g.id !== id);
+    return grupos.length ? normalizarComGrupos(atual, grupos) : CONFIGURACAO_ADERENCIAS_PADRAO;
+  }),
   adicionarPlanilha: (grupoId, planilha) => set((atual) => normalizarComGrupos(atual, atual.grupos.map((g) => g.id === grupoId ? { ...g, planilhas: [...g.planilhas, planilhaAderenciaValida(planilha, planilha.id)].slice(0, 30) } : g))),
   atualizarPlanilha: (grupoId, id, parcial) => set((atual) => normalizarComGrupos(atual, atual.grupos.map((g) => g.id === grupoId ? { ...g, planilhas: g.planilhas.map((p) => p.id === id ? planilhaAderenciaValida({ ...p, ...parcial }, id) : p) } : g))),
   removerPlanilha: (grupoId, id) => set((atual) => normalizarComGrupos(atual, atual.grupos.map((g) => g.id === grupoId ? { ...g, planilhas: g.planilhas.filter((p) => p.id !== id) } : g))),

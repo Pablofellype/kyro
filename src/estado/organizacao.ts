@@ -3,16 +3,27 @@ import { persist } from "zustand/middleware";
 import { armazenamento, chave } from "../ponte/armazenamento";
 import type { CartaoVisao, Evento, Meta, Pilar } from "../tipos";
 import { gerarId } from "../utilitarios/basicos";
-import { hojeISO } from "../utilitarios/datas";
+import { dataValida, hojeISO } from "../utilitarios/datas";
 import { validarEvento } from "../utilitarios/validacoes";
 
 export const PILARES_PADRAO = ["Saúde", "Carreira", "Relacionamentos", "Crescimento", "Finanças"];
+
+export const TIPOS_REGISTRO_OPERACAO = { aviso: "Aviso", ocorrencia: "Ocorrência", atualizacao: "Atualização" } as const;
+
+export interface RegistroOperacao {
+  id: string;
+  titulo: string;
+  detalhes: string;
+  data: string;
+  tipo: keyof typeof TIPOS_REGISTRO_OPERACAO;
+}
 
 export interface DadosOrganizacao {
   pilares: Pilar[];
   metas: Meta[];
   visao: CartaoVisao[];
   eventos: Evento[];
+  registrosOperacao: RegistroOperacao[];
 }
 
 interface EstadoOrganizacao extends DadosOrganizacao {
@@ -32,6 +43,8 @@ interface EstadoOrganizacao extends DadosOrganizacao {
   marcarEventoFeito: (id: string, data: string, feito: boolean) => void;
   excluirEvento: (id: string) => Evento | undefined;
   restaurarEvento: (e: Evento) => void;
+  salvarRegistroOperacao: (dados: Omit<RegistroOperacao, "id">, id?: string) => boolean;
+  excluirRegistroOperacao: (id: string) => void;
   substituir: (dados: Partial<DadosOrganizacao>) => void;
 }
 
@@ -42,6 +55,7 @@ export const useOrganizacao = create<EstadoOrganizacao>()(
       metas: [],
       visao: [],
       eventos: [],
+      registrosOperacao: [],
       garantirPilares: () => {
         if (get().pilares.length > 0) return;
         set({ pilares: PILARES_PADRAO.map((nome) => ({ id: gerarId(), nome, nota: 7 })) });
@@ -93,8 +107,26 @@ export const useOrganizacao = create<EstadoOrganizacao>()(
         validarEvento(e);
         set((s) => ({ eventos: s.eventos.some((x) => x.id === e.id) ? s.eventos : [...s.eventos, e] }));
       },
+      salvarRegistroOperacao: (dados, id) => {
+        const titulo = dados.titulo.trim().slice(0, 120);
+        const detalhes = dados.detalhes.trim().slice(0, 600);
+        if (!titulo || !dataValida(dados.data) || !Object.hasOwn(TIPOS_REGISTRO_OPERACAO, dados.tipo)) return false;
+        const registros = get().registrosOperacao;
+        if (id && !registros.some((registro) => registro.id === id)) return false;
+        const registro = { id: id ?? gerarId(), titulo, detalhes, data: dados.data, tipo: dados.tipo };
+        set({ registrosOperacao: id ? registros.map((item) => item.id === id ? registro : item) : [registro, ...registros] });
+        return true;
+      },
+      excluirRegistroOperacao: (id) => set((s) => ({ registrosOperacao: s.registrosOperacao.filter((registro) => registro.id !== id) })),
       substituir: (dados) => set(dados),
     }),
-    { name: chave("organizacao"), storage: armazenamento },
+    {
+      name: chave("organizacao"),
+      storage: armazenamento,
+      merge: (salvo, atual) => {
+        const dados = salvo as Partial<DadosOrganizacao> | undefined;
+        return { ...atual, ...dados, registrosOperacao: dados?.registrosOperacao ?? [] };
+      },
+    },
   ),
 );

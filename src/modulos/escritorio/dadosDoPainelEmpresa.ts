@@ -1,4 +1,4 @@
-import { addDays } from "date-fns";
+import { addDays, startOfWeek } from "date-fns";
 import type { Evento, Tarefa } from "../../tipos";
 import type { UsuarioAutenticado } from "../../estado/autenticacao";
 import { cabecalhosNiko, urlApi } from "../../estado/autenticacao";
@@ -78,6 +78,7 @@ export function resumirPainelEmpresa(eventos: Evento[], tarefas: Tarefa[], agora
   const hoje = paraISO(agora);
   const horario = `${String(agora.getHours()).padStart(2, "0")}:${String(agora.getMinutes()).padStart(2, "0")}`;
   const limiteAgenda = paraISO(addDays(agora, 30));
+  const inicioSemana = startOfWeek(agora, { weekStartsOn: 1 }).getTime();
   const daEmpresa = tarefas.filter((tarefa) => tarefa.area === "empresa");
   const estaAtrasada = (tarefa: Tarefa) => Boolean(tarefa.data && (tarefa.data < hoje || (tarefa.data === hoje && tarefa.hora && tarefa.hora < horario)));
   const abertas = daEmpresa.filter(tarefaPendente).sort((a, b) => Number(estaAtrasada(b)) - Number(estaAtrasada(a)) || (a.data ?? "9999").localeCompare(b.data ?? "9999") || (a.hora ?? "99:99").localeCompare(b.hora ?? "99:99") || Number(b.prioridade === "alta") - Number(a.prioridade === "alta") || a.ordem - b.ordem);
@@ -92,8 +93,13 @@ export function resumirPainelEmpresa(eventos: Evento[], tarefas: Tarefa[], agora
   ];
   const historico: RegistroDoPainel[] = [
     ...daEmpresa.filter((tarefa) => tarefa.status === "concluida" && tarefa.concluidaEm).map((tarefa) => ({ id: `tarefa-${tarefa.id}`, tipo: "tarefa" as const, titulo: `Atividade concluída: ${tarefa.titulo}`, detalhe: "Atividade da empresa", data: tarefa.concluidaEm! })),
-  ].filter((registro) => Number.isFinite(Date.parse(registro.data)) && Date.parse(registro.data) <= agora.getTime()).sort((a, b) => Date.parse(b.data) - Date.parse(a.data)).slice(0, 5);
-  return { hoje, limiteAgenda, abertas, atrasadas, paraHoje: abertas.filter((tarefa) => tarefa.data === hoje), agenda, prioridades, historico };
+  ].filter((registro) => Date.parse(registro.data) <= agora.getTime()).sort((a, b) => Date.parse(b.data) - Date.parse(a.data));
+  return {
+    hoje, limiteAgenda, abertas, atrasadas, paraHoje: abertas.filter((tarefa) => tarefa.data === hoje),
+    agenda, agendaHoje: agenda.filter((evento) => evento.data === hoje).length, prioridades,
+    concluidasNaSemana: historico.filter((registro) => Date.parse(registro.data) >= inicioSemana).length,
+    historico: historico.slice(0, 5),
+  };
 }
 
 export type ResumoDoPainelEmpresa = ReturnType<typeof resumirPainelEmpresa>;

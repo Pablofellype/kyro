@@ -41,6 +41,8 @@ test("painel da empresa isola dados pessoais, ordena atrasos e usa ocorrências 
     { ...tarefa, id: "hora-vencida", titulo: "Prazo de hoje vencido", data: "2026-11-15", hora: "09:00" },
     { ...tarefa, id: "privada", titulo: "Atividade pessoal privada", data: "2026-11-13", area: "pessoal" },
     { ...tarefa, id: "finalizada", titulo: "Atividade concluída", status: "concluida", concluidaEm: new Date(2026, 10, 15, 8, 0).toISOString() },
+    { ...tarefa, id: "semana-passada", titulo: "Atividade concluída na semana passada", status: "concluida", concluidaEm: new Date(2026, 10, 8, 8, 0).toISOString() },
+    { ...tarefa, id: "conclusao-pessoal", titulo: "Conclusão pessoal privada", area: "pessoal", status: "concluida", concluidaEm: new Date(2026, 10, 15, 8, 0).toISOString() },
     { ...tarefa, id: "conclusao-futura", titulo: "Conclusão no futuro", status: "concluida", concluidaEm: new Date(2026, 10, 15, 11, 0).toISOString() },
     { ...tarefa, id: "cancelada", titulo: "Atividade cancelada", status: "cancelada", data: "2026-11-14" },
   ];
@@ -51,6 +53,8 @@ test("painel da empresa isola dados pessoais, ordena atrasos e usa ocorrências 
   assert.equal(resumo.prioridades[0].tarefa.id, "atrasada");
   assert.equal(resumo.prioridades[2].tarefa.id, "hoje");
   assert.equal(resumo.agenda[0].titulo, "Reunião da empresa");
+  assert.equal(resumo.agendaHoje, 1);
+  assert.equal(resumo.concluidasNaSemana, 1);
   assert.ok(resumo.agenda.some((item) => item.id === "repetido:2026-11-17"));
   assert.ok(!resumo.agenda.some((item) => item.id === "repetido:2026-11-16"));
   assert.doesNotMatch(JSON.stringify(resumo), /pessoal privado|pessoal privada|Horário anterior|Compromisso já concluído|Atividade cancelada/);
@@ -86,6 +90,39 @@ test("consulta do escritório busca apenas a equipe do dono e preserva falhas", 
   const invalido = await carregarDadosDoPainel("dono", "token-teste", sinal, async () => ({ ok: true, json: async () => ({ usuarios: "inválido" }) }));
   assert.equal(invalido.membros, null);
   assert.equal(invalido.erroMembros, true);
+});
+
+test("registros da operação sobrevivem à reidratação e ao backup sem aparecer em um armazenamento antigo", async () => {
+  const { useOrganizacao } = await vite.ssrLoadModule("/src/estado/organizacao.ts");
+  const persist = useOrganizacao.persist;
+  const opcoesOriginais = persist.getOptions();
+  const anteriores = useOrganizacao.getState();
+  let salvo;
+  persist.setOptions({ storage: { getItem: () => salvo, setItem: (_, dados) => { salvo = structuredClone(dados); }, removeItem: () => { salvo = undefined; } }, partialize: (estado) => ({ registrosOperacao: estado.registrosOperacao }) });
+  try {
+    useOrganizacao.setState({ registrosOperacao: [] });
+    const novo = { titulo: "  Reposição do almoxarifado  ", detalhes: " Material separado ", tipo: "atualizacao", data: "2026-11-24" };
+    assert.equal(useOrganizacao.getState().salvarRegistroOperacao({ ...novo, data: "invalida" }), false);
+    assert.equal(useOrganizacao.getState().salvarRegistroOperacao(novo), true);
+    const [registro] = salvo.state.registrosOperacao;
+    assert.equal(registro.titulo, "Reposição do almoxarifado");
+    const backup = validarBackup({ tipo: "niko-backup", versao: 1, dados: { "niko:organizacao": JSON.stringify(salvo) } });
+    assert.deepEqual(JSON.parse(backup["niko:organizacao"]).state.registrosOperacao, [registro]);
+    salvo = { state: { eventos: [] } };
+    await persist.rehydrate();
+    assert.deepEqual(useOrganizacao.getState().registrosOperacao, []);
+    salvo = JSON.parse(backup["niko:organizacao"]);
+    await persist.rehydrate();
+    assert.deepEqual(useOrganizacao.getState().registrosOperacao, [registro]);
+    assert.equal(useOrganizacao.getState().salvarRegistroOperacao({ ...novo, titulo: "Reposição concluída" }, registro.id), true);
+    assert.deepEqual(salvo.state.registrosOperacao.map(({ id, titulo }) => ({ id, titulo })), [{ id: registro.id, titulo: "Reposição concluída" }]);
+    useOrganizacao.getState().excluirRegistroOperacao(registro.id);
+    assert.deepEqual(salvo.state.registrosOperacao, []);
+    assert.equal(useOrganizacao.getState().salvarRegistroOperacao(novo, registro.id), false);
+  } finally {
+    useOrganizacao.setState(anteriores);
+    persist.setOptions(opcoesOriginais);
+  }
 });
 
 test("concluir pelo escritório afeta apenas a atividade da empresa e permite desfazer sem sobrescrever mudanças posteriores", async () => {

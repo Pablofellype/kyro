@@ -54,12 +54,12 @@ function Destaque({ texto, busca }: { texto: string; busca: string }) {
   );
 }
 
-function Painel({ id, opcoes, valor, textoDaBusca, textoSemResultado, aoEscolher, aoFechar }: { id: string; opcoes: OpcaoDeEscolha[]; valor: string; textoDaBusca: string; textoSemResultado: string; aoEscolher: (v: string) => void; aoFechar: () => void }) {
-  const [busca, setBusca] = useState("");
+function Painel({ id, opcoes, valor, buscaInicial, textoDaBusca, textoSemResultado, aoEscolher, aoFechar }: { id: string; opcoes: OpcaoDeEscolha[]; valor: string; buscaInicial: string; textoDaBusca: string; textoSemResultado: string; aoEscolher: (v: string) => void; aoFechar: () => void }) {
+  const [busca, setBusca] = useState(buscaInicial);
   const itens = useMemo(() => filtrarOpcoes(opcoes, busca), [opcoes, busca]);
   const [ativo, setAtivo] = useState(() => {
-    const i = opcoes.findIndex((o) => o.valor === valor);
-    return i >= 0 ? i : primeiraLivre(opcoes);
+    const i = buscaInicial ? -1 : itens.findIndex((o) => o.valor === valor);
+    return i >= 0 ? i : primeiraLivre(itens);
   });
   const [faixa, setFaixa] = useState<{ y: number; h: number } | null>(null);
   const campo = useRef<HTMLInputElement>(null);
@@ -106,6 +106,7 @@ function Painel({ id, opcoes, valor, textoDaBusca, textoSemResultado, aoEscolher
           ref={campo}
           value={busca}
           placeholder={textoDaBusca}
+          aria-label={textoDaBusca}
           role="combobox"
           aria-expanded
           aria-controls={id}
@@ -114,6 +115,7 @@ function Painel({ id, opcoes, valor, textoDaBusca, textoSemResultado, aoEscolher
           onChange={(e) => {
             setBusca(e.target.value);
             setAtivo(primeiraLivre(filtrarOpcoes(opcoes, e.target.value)));
+            if (rolagem.current) rolagem.current.scrollTop = 0;
           }}
           onKeyDown={(e) => {
             if (e.key === "ArrowDown" || e.key === "ArrowUp") {
@@ -151,7 +153,7 @@ function Painel({ id, opcoes, valor, textoDaBusca, textoSemResultado, aoEscolher
             >
               {o.icone && <span className="escolha-icone">{o.icone}</span>}
               <span className="escolha-textos">
-                <span className="escolha-rotulo"><Destaque texto={o.rotulo} busca={busca} /></span>
+                <span className="escolha-rotulo" title={o.rotulo}><Destaque texto={o.rotulo} busca={busca} /></span>
                 {o.descricao && <span className="escolha-descricao">{o.descricao}</span>}
               </span>
               {o.valor === valor && (
@@ -170,11 +172,16 @@ function Painel({ id, opcoes, valor, textoDaBusca, textoSemResultado, aoEscolher
 
 export function CaixaDeEscolha({ id, opcoes, valor, aoMudar, placeholder, textoDaBusca, textoSemResultado, rotuloAcessivel, desativada, invalida }: Props) {
   const [aberta, setAberta] = useState(false);
-  const [posicao, setPosicao] = useState<{ x: number; y: number; largura: number; acima: boolean } | null>(null);
+  const [buscaInicial, setBuscaInicial] = useState("");
+  const [posicao, setPosicao] = useState<{ x: number; y: number; largura: number; altura: number; acima: boolean } | null>(null);
   const gatilho = useRef<HTMLButtonElement>(null);
   const painel = useRef<HTMLDivElement>(null);
   const idDaLista = useId();
   const atual = opcoes.find((o) => o.valor === valor);
+
+  useEffect(() => {
+    if (desativada) setAberta(false);
+  }, [desativada]);
 
   useLayoutEffect(() => {
     if (!aberta) return;
@@ -184,7 +191,14 @@ export function CaixaDeEscolha({ id, opcoes, valor, aoMudar, placeholder, textoD
       const abaixo = window.innerHeight - r.bottom;
       const alturaEstimada = Math.min(ALTURA_DA_LISTA, 64 + Math.max(1, opcoes.length) * 40);
       const acima = abaixo < alturaEstimada && r.top > abaixo;
-      setPosicao({ x: Math.min(r.left, window.innerWidth - Math.max(r.width, LARGURA_MINIMA) - 8), y: acima ? r.top - 6 : r.bottom + 6, largura: Math.max(r.width, LARGURA_MINIMA), acima });
+      const largura = Math.min(Math.max(r.width, LARGURA_MINIMA), window.innerWidth - 16);
+      setPosicao({
+        x: Math.max(8, Math.min(r.left, window.innerWidth - largura - 8)),
+        y: acima ? r.top - 6 : r.bottom + 6,
+        largura,
+        altura: Math.max(44, (acima ? r.top : abaixo) - 14),
+        acima,
+      });
     };
     posicionar();
     window.addEventListener("resize", posicionar);
@@ -227,10 +241,15 @@ export function CaixaDeEscolha({ id, opcoes, valor, aoMudar, placeholder, textoD
         aria-invalid={invalida || undefined}
         disabled={desativada}
         data-aberta={aberta || undefined}
-        onClick={() => setAberta((a) => !a)}
+        onClick={() => { setBuscaInicial(""); setAberta((a) => !a); }}
         onKeyDown={(e) => {
           if (e.key === "ArrowDown" || e.key === "ArrowUp") {
             e.preventDefault();
+            setBuscaInicial("");
+            setAberta(true);
+          } else if (e.key.length === 1 && e.key !== " " && !e.ctrlKey && !e.metaKey && !e.altKey) {
+            e.preventDefault();
+            setBuscaInicial(e.key);
             setAberta(true);
           }
         }}
@@ -245,7 +264,7 @@ export function CaixaDeEscolha({ id, opcoes, valor, aoMudar, placeholder, textoD
             <motion.div
               ref={painel}
               className={`escolha-painel${destino === document.body ? " estilo-sistema" : ""}`}
-              style={{ left: posicao.x, top: posicao.y, width: posicao.largura, transformOrigin: posicao.acima ? "bottom left" : "top left", translateY: posicao.acima ? "-100%" : 0 }}
+              style={{ left: posicao.x, top: posicao.y, width: posicao.largura, maxHeight: posicao.altura, transformOrigin: posicao.acima ? "bottom left" : "top left", translateY: posicao.acima ? "-100%" : 0 }}
               initial={{ opacity: 0, scale: 0.96 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.97, transition: { duration: 0.1 } }}
@@ -255,6 +274,7 @@ export function CaixaDeEscolha({ id, opcoes, valor, aoMudar, placeholder, textoD
                 id={idDaLista}
                 opcoes={opcoes}
                 valor={valor}
+                buscaInicial={buscaInicial}
                 textoDaBusca={textoDaBusca}
                 textoSemResultado={textoSemResultado}
                 aoFechar={fechar}

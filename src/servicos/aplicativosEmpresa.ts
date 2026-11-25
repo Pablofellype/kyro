@@ -179,6 +179,19 @@ async function acompanharNotificacoes(usuarioId: number, fonte: Fonte) {
 
 type Resposta = { status: number; dados: unknown };
 
+function urlDoRelatorioPowerBi(): string | null {
+  const endereco = process.env.KYRO_POWER_BI_REPORT_URL?.trim();
+  if (!endereco) return null;
+  try {
+    const url = new URL(endereco);
+    if (url.origin !== "https://app.powerbi.com" || url.pathname !== "/reportEmbed" || url.username || url.password) return null;
+    const relatorio = url.searchParams.get("reportId") ?? "";
+    return /^[a-f\d]{8}(?:-[a-f\d]{4}){3}-[a-f\d]{12}$/i.test(relatorio) ? url.href : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function tratarAplicativosEmpresa(
   metodo: string | undefined, acao: string | null, token: string, lerCorpo: () => Promise<Record<string, unknown>>,
 ): Promise<Resposta> {
@@ -202,6 +215,11 @@ export async function tratarAplicativosEmpresa(
     if (!usuario) return responder(401, { erro: "nao_autenticado" });
     if (!interno) return responder(403, { erro: "permissao_negada" });
 
+    if (acao === "power-bi") {
+      if (metodo !== "GET") return responder(405, { erro: "metodo_nao_permitido" });
+      const url = urlDoRelatorioPowerBi();
+      return url ? responder(200, { url }) : responder(503, { erro: "power_bi_nao_configurado" });
+    }
     if (acao === "historico-inventario" && metodo === "GET") {
       await garantirTabelas();
       const [historico, atual] = await Promise.all([

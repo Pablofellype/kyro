@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, ArrowLeft, ArrowRight, CheckCircle2, Clock3, Copy, Eye, FileImage, FileSpreadsheet, Image, LoaderCircle, MessageSquare, Pencil, Play, Plus, RefreshCw, Save, Send, Settings2, Trash2, X } from "lucide-react";
+import { arrayMove } from "@dnd-kit/sortable";
+import { AlertTriangle, ArrowLeft, ArrowRight, CheckCircle2, Clock3, Copy, Eye, FileImage, FileSpreadsheet, Image, LoaderCircle, Pencil, Play, Plus, RefreshCw, Save, Send, Settings2, Trash2, X } from "lucide-react";
 import { AvisoFaixa, Botao, Cartao, Campo, LinhaAlternador, Modal } from "../../componentes/basicos";
 import { CabecalhoAba } from "../../componentes/CabecalhoAba";
 import { useWhatsapp } from "../../estado/whatsapp";
 import { useAuth } from "../../estado/autenticacao";
 import { aderenciasPonte, aderenciasRemotas, type PreviaAderencia } from "../../ponte/aderencias";
 import { novaPlanilhaAderencia, useAderencias } from "../../estado/aderencias";
-import { configuracaoAderenciasValida, type GrupoAderencia, type PlanilhaAderencia, type ResultadoAderencia } from "./aderenciasTipos";
+import type { GrupoAderencia, PlanilhaAderencia, ResultadoAderencia } from "./aderenciasTipos";
 import { aplicarRascunhoAderencias, copiarPlanilhasAderencias, criarRascunhoAderencias, type RascunhoAderencias } from "./edicaoAderencias";
-import { AbaMensagensAutomaticasAderencia } from "./MensagensAutomaticasAderencia";
+import { SeletorConversaWhatsapp } from "../whatsapp/SeletorConversaWhatsapp";
 import "./aderencias.css";
 
 const DIAS = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
@@ -63,7 +64,6 @@ function FormularioPlanilha({ aberto, planilha, aoFechar, aoSalvar }: { aberto: 
 
 export function Aderencias() {
   const usuario = useAuth((s) => s.usuario);
-  const [aba, setAba] = useState<"rotinas" | "mensagens">("rotinas");
   const EXECUCAO_REMOTA = aderenciasRemotas(usuario);
   const config = useAderencias((s) => s);
   const whatsapp = useWhatsapp((s) => s.estado);
@@ -130,6 +130,9 @@ export function Aderencias() {
   const ocupado = salvando || processando !== null;
   const podeConfigurar = remotoPronto && !ocupado;
   const origem = config.grupos.find((item) => item.id === origemId);
+  const destinosDaRotina = grupo?.destinoJid && !destinos.some((conversa) => conversa.id === grupo.destinoJid)
+    ? [{ id: grupo.destinoJid, nome: grupo.destinoNome.replace(/^(Grupo|Contato) · /, "") || "Destino salvo", grupo: grupo.destinoJid.endsWith("@g.us") }, ...destinos]
+    : destinos;
 
   const pedirSaida = (acao: () => void) => {
     if (alterado) setNavegacaoPendente(() => acao);
@@ -143,6 +146,13 @@ export function Aderencias() {
     setErro(""); setPrevias([]);
   };
   const mudarGrupo = (parcial: Partial<GrupoAderencia>) => setRascunho((atual) => atual ? { ...atual, grupo: { ...atual.grupo, ...parcial } } : atual);
+  const moverPlanilha = (id: string, destino: number) => setRascunho((atual) => {
+    if (!atual) return atual;
+    const { planilhas } = atual.grupo;
+    const origem = planilhas.findIndex((item) => item.id === id);
+    if (origem < 0 || origem === destino || destino < 0 || destino >= planilhas.length) return atual;
+    return { ...atual, grupo: { ...atual.grupo, planilhas: arrayMove(planilhas, origem, destino) } };
+  });
   const cancelar = () => pedirSaida(() => { setRascunho(null); if (rascunho?.novo) setGrupoId(null); setErro(""); });
 
   const salvar = async () => {
@@ -150,12 +160,9 @@ export function Aderencias() {
     const atual = sessao.current;
     setSincronia("salvando"); setErro("");
     try {
-      // Releitura preserva resultados e horários já consumidos pelo VPS enquanto
-      // o usuário estava no formulário. O rascunho nunca entra no armazenamento.
-      const base = EXECUCAO_REMOTA ? (await aderenciasPonte.configuracao()).configuracao : useAderencias.getState();
-      if (sessao.current !== atual) return;
-      const proxima = aplicarRascunhoAderencias(base, rascunho);
-      const salva = EXECUCAO_REMOTA ? (await aderenciasPonte.salvarConfiguracao(proxima)).configuracao : proxima;
+      const salva = EXECUCAO_REMOTA
+        ? (await aderenciasPonte.salvarRotina(rascunho)).configuracao
+        : aplicarRascunhoAderencias(useAderencias.getState(), rascunho);
       if (sessao.current !== atual) return;
       useAderencias.getState().definir(salva);
       setGrupoId(rascunho.excluir ? null : rascunho.grupo.id);
@@ -179,10 +186,7 @@ export function Aderencias() {
     useAderencias.getState().registrarResultado(id, resultado);
     if (!EXECUCAO_REMOTA) return;
     try {
-      const { configuracao: base } = await aderenciasPonte.configuracao();
-      if (sessao.current !== atual || !base.grupos.some((g) => g.id === id)) return;
-      const proxima = configuracaoAderenciasValida({ ...base, grupos: base.grupos.map((g) => g.id === id ? { ...g, ultimoResultado: resultado } : g) });
-      const { configuracao: salva } = await aderenciasPonte.salvarConfiguracao(proxima);
+      const { configuracao: salva } = await aderenciasPonte.registrarResultado(id, resultado);
       if (sessao.current === atual) useAderencias.getState().definir(salva);
     } catch {
       if (sessao.current === atual) setErro("O envio foi concluído, mas não foi possível atualizar o histórico no servidor.");
@@ -191,11 +195,14 @@ export function Aderencias() {
 
   const enviar = async (planilha?: PlanilhaAderencia) => {
     if (!grupoSalvo || rascunho) return;
-    if (!config.destinoJid || !grupoSalvo.planilhas.length) { setErro("Escolha uma rotina com destino e pelo menos uma planilha."); return; }
+    if (!grupoSalvo.destinoJid || !grupoSalvo.planilhas.length) { setErro("Escolha uma rotina com destino e pelo menos uma planilha."); return; }
     const atual = sessao.current;
     setErro(""); setProcessando(planilha ? `envio:${planilha.id}` : "execucao");
     try {
-      const resposta = planilha ? await aderenciasPonte.enviar(config, planilha) : await aderenciasPonte.executar(config, grupoSalvo.id);
+      const configuracaoLocal = EXECUCAO_REMOTA ? undefined : config;
+      const resposta = planilha
+        ? await aderenciasPonte.enviar(grupoSalvo.id, planilha, configuracaoLocal)
+        : await aderenciasPonte.executar(grupoSalvo.id, configuracaoLocal);
       if (sessao.current !== atual) return;
       setPrevias("previa" in resposta ? [resposta.previa] : resposta.previas);
       await registrarResultado(grupoSalvo.id, resposta.resultado, atual);
@@ -224,14 +231,7 @@ export function Aderencias() {
 
   return (
     <section className="aderencias" aria-label="Robô de Aderências">
-      <CabecalhoAba titulo="Robô de Aderências" subtitulo={aba === "rotinas"
-        ? "Organize planilhas em rotinas de manhã, tarde ou noite e envie cada grupo no seu horário."
-        : "Agende mensagens de texto para os grupos do WhatsApp conectado."} />
-      <div className="aderencias-acoes" role="group" aria-label="Seções do Robô de Aderências">
-        <Botao pequeno aria-pressed={aba === "rotinas"} variante={aba === "rotinas" ? "primario" : "secundario"} icone={<FileSpreadsheet size={14} />} onClick={() => setAba("rotinas")}>Rotinas de print</Botao>
-        <Botao pequeno aria-pressed={aba === "mensagens"} variante={aba === "mensagens" ? "primario" : "secundario"} icone={<MessageSquare size={14} />} onClick={() => setAba("mensagens")}>Mensagens automáticas</Botao>
-      </div>
-      {aba === "mensagens" ? <AbaMensagensAutomaticasAderencia key={usuario?.id} conectado={conectado} /> : <>
+      <CabecalhoAba titulo="Robô de Aderências" subtitulo="Organize planilhas em rotinas de manhã, tarde ou noite e envie cada grupo no seu horário." />
       {!conectado
         ? <AvisoFaixa tipo="alerta"><span>{EXECUCAO_REMOTA ? "O servidor ainda não confirmou o WhatsApp conectado. Atualize o estado para conferir." : <>Conecte o WhatsApp em <strong>Conexões</strong> para testar e enviar os resultados.</>}</span><Botao pequeno soIcone aria-label="Atualizar estado do WhatsApp" onClick={() => void carregarWhatsapp()} icone={<RefreshCw size={13} />} /></AvisoFaixa>
         : <AvisoFaixa><span><strong>WhatsApp conectado.</strong> As rotinas salvas continuam sendo executadas {EXECUCAO_REMOTA ? "no servidor" : "pelo Kyro neste computador"} mesmo com esta tela fechada.</span></AvisoFaixa>}
@@ -252,7 +252,7 @@ export function Aderencias() {
         <div className="aderencias-detalhe-topo"><Botao pequeno disabled={ocupado} icone={<ArrowLeft size={14} />} onClick={voltar}>Todas as rotinas</Botao><span className="campo-dica">{rascunho ? "Edição da rotina" : "Visualização da rotina"}</span></div>
         <div className="aderencias-resumo">
           <Cartao titulo="Planilhas nesta rotina" icone={<FileSpreadsheet size={15} />}><strong>{grupo.planilhas.length}</strong><span>{grupo.nome}</span></Cartao>
-          <Cartao titulo="Destino" icone={<Send size={15} />}><strong>{(rascunho?.destinoNome ?? config.destinoNome) || "Não escolhido"}</strong><span>{conectado ? "WhatsApp conectado" : "Aguardando conexão"}</span></Cartao>
+          <Cartao titulo="Destino" icone={<Send size={15} />}><strong>{grupo.destinoNome || (grupo.destinoJid ? "Destino salvo" : "Não escolhido")}</strong><span>{conectado ? "WhatsApp conectado" : "Aguardando conexão"}</span></Cartao>
           <Cartao titulo="Último resultado" icone={<Clock3 size={15} />}><strong>{ultimoResultado ? `${ultimoResultado.planilhasEnviadas} enviadas` : "Ainda não executado"}</strong><span>{ultimoResultado?.executadoEm ? new Date(ultimoResultado.executadoEm).toLocaleString("pt-BR") : "Os resultados aparecem após o envio"}</span></Cartao>
         </div>
         <Cartao titulo={grupo.nome} icone={<Clock3 size={15} />} acoes={!rascunho && <><Botao pequeno disabled={!podeConfigurar || config.grupos.length >= 30} icone={<Copy size={13} />} onClick={() => iniciarEdicao(grupo, true)}>Duplicar rotina</Botao><Botao pequeno variante="primario" disabled={!podeConfigurar} icone={<Pencil size={13} />} onClick={() => iniciarEdicao(grupo)}>Editar rotina</Botao></>}>
@@ -261,8 +261,15 @@ export function Aderencias() {
             <fieldset className="aderencias-edicao-campos" disabled={salvando || rascunho.excluir}>
               <Campo id="aderencia-rotina-nome" rotulo="Nome da rotina" obrigatorio><input id="aderencia-rotina-nome" className="campo" required maxLength={100} value={grupo.nome} onChange={(e) => mudarGrupo({ nome: e.target.value })} /></Campo>
               <LinhaAlternador rotulo="Ativar esta rotina" dica="O envio automático respeita o horário e os dias escolhidos." ligado={grupo.ativo} desativado={salvando || rascunho.excluir} aoMudar={(ativo) => mudarGrupo({ ativo })} />
-              <Campo id="aderencia-destino" rotulo="Destino do WhatsApp" dica="Destino compartilhado: esta mudança vale para todas as rotinas.">
-                <select id="aderencia-destino" className="seletor" value={rascunho.destinoJid} onChange={(e) => { const jid = e.target.value; const conversa = destinos.find((c) => c.id === jid); setRascunho({ ...rascunho, destinoJid: jid, destinoNome: conversa ? nomeDoDestino(conversa.nome, conversa.grupo) : "" }); }}><option value="">Selecione um contato ou grupo</option>{rascunho.destinoJid && !destinos.some((c) => c.id === rascunho.destinoJid) && <option value={rascunho.destinoJid}>{rascunho.destinoNome || "Destino salvo"}</option>}{destinos.map((c) => <option key={c.id} value={c.id}>{nomeDoDestino(c.nome, c.grupo)}</option>)}</select>
+              <Campo id="aderencia-destino" rotulo="Destino do WhatsApp" dica="Os prints desta rotina serão enviados para este contato ou grupo.">
+                <SeletorConversaWhatsapp id="aderencia-destino" valor={grupo.destinoJid} conversas={destinosDaRotina}
+                  desativado={salvando || rascunho.excluir}
+                  aoMudar={(jid) => {
+                    if (jid === grupo.destinoJid) return;
+                    const conversa = destinos.find((item) => item.id === jid);
+                    mudarGrupo({ destinoJid: jid, destinoNome: conversa ? nomeDoDestino(conversa.nome, conversa.grupo) : "" });
+                  }}
+                />
               </Campo>
               <div className="aderencias-grade-2">
                 <Campo id="aderencia-frequencia" rotulo="Frequência"><select id="aderencia-frequencia" className="seletor" value={grupo.frequencia} onChange={(e) => mudarGrupo({ frequencia: e.target.value as GrupoAderencia["frequencia"] })}><option value="manual">Somente manual</option><option value="diaria">Todos os dias</option><option value="semanal">Semanal</option></select></Campo>
@@ -279,8 +286,14 @@ export function Aderencias() {
 
         {!rascunho?.excluir && <Cartao titulo={`Planilhas · ${grupo.planilhas.length} configurada(s)`} icone={<FileSpreadsheet size={15} />} acoes={rascunho && <><Botao pequeno disabled={salvando || grupo.planilhas.length >= 30 || !config.grupos.some((g) => g.id !== grupo.id && g.planilhas.length)} icone={<Copy size={13} />} onClick={abrirCopia}>Copiar de outra rotina</Botao><Botao pequeno disabled={salvando || grupo.planilhas.length >= 30} icone={<Plus size={13} />} onClick={() => setEditando(novaPlanilhaAderencia())}>Adicionar planilha</Botao></>}>
           <div className="aderencias-cartao-corpo">
-            {grupo.planilhas.length === 0 ? <div className="aderencias-vazio"><FileSpreadsheet size={22} /><strong>Nenhuma planilha nesta rotina</strong><span>{rascunho ? "Adicione uma planilha ou copie as já configuradas em outra rotina." : "Clique no lápis para adicionar ou copiar planilhas."}</span></div> : grupo.planilhas.map((p) => <article key={p.id} className="aderencias-planilha">
-              <div className="aderencias-planilha-icone"><FileImage size={17} /></div><div className="aderencias-planilha-texto"><strong>{p.nome}</strong><span>{p.colStart}{p.rowStart}:{p.colEnd}{p.rowEnd} · {p.soPrint ? "somente print" : `amarelo ${p.yellowThreshold}d · vermelho ${p.redThreshold}d`}</span></div>
+            {grupo.planilhas.length === 0 ? <div className="aderencias-vazio"><FileSpreadsheet size={22} /><strong>Nenhuma planilha nesta rotina</strong><span>{rascunho ? "Adicione uma planilha ou copie as já configuradas em outra rotina." : "Clique no lápis para adicionar ou copiar planilhas."}</span></div> : grupo.planilhas.map((p, indice) => <article key={p.id} className="aderencias-planilha">
+              <div className="aderencias-planilha-icone"><FileImage size={17} /></div><div className="aderencias-planilha-texto"><strong>{p.nome}</strong><span>{indice + 1}º envio · {p.colStart}{p.rowStart}:{p.colEnd}{p.rowEnd} · {p.soPrint ? "somente print" : `amarelo ${p.yellowThreshold}d · vermelho ${p.redThreshold}d`}</span></div>
+              {rascunho && grupo.planilhas.length > 1 && <label className="aderencias-planilha-ordem">
+                Posição
+                <select className="seletor" aria-label={`Posição de envio de ${p.nome}`} value={indice} disabled={ocupado} onChange={(e) => moverPlanilha(p.id, Number(e.target.value))}>
+                  {grupo.planilhas.map((item, posicao) => <option key={item.id} value={posicao}>{posicao + 1}º</option>)}
+                </select>
+              </label>}
               <div className="aderencias-planilha-acoes"><Botao pequeno soIcone aria-label={`Prévia ${p.nome}`} title="Gerar prévia sem enviar" disabled={!conectado || ocupado} icone={processando === `teste:${p.id}` ? <LoaderCircle size={13} className="girando" /> : <Eye size={13} />} onClick={() => void testar(p)} />{rascunho ? <><Botao pequeno soIcone disabled={ocupado} aria-label={`Editar ${p.nome}`} title="Editar planilha" icone={<Pencil size={13} />} onClick={() => setEditando(p)} /><Botao pequeno soIcone variante="perigo" disabled={ocupado} aria-label={`Remover ${p.nome}`} title="Remover da rotina" icone={<Trash2 size={13} />} onClick={() => mudarGrupo({ planilhas: grupo.planilhas.filter((item) => item.id !== p.id) })} /></> : <Botao pequeno soIcone variante="primario" aria-label={`Enviar somente ${p.nome}`} title="Enviar somente esta planilha" disabled={!conectado || ocupado || !remotoPronto} icone={processando === `envio:${p.id}` ? <LoaderCircle size={13} className="girando" /> : <Send size={13} />} onClick={() => void enviar(p)} />}</div>
             </article>)}
           </div>
@@ -296,7 +309,6 @@ export function Aderencias() {
         </div>
       </Modal>
       <Modal aberto={navegacaoPendente !== null} titulo="Descartar alterações?" aoFechar={() => setNavegacaoPendente(null)}><p>Você tem alterações que ainda não foram salvas. Ao sair, esse rascunho será descartado.</p><div className="formulario-acoes"><Botao onClick={() => setNavegacaoPendente(null)}>Continuar editando</Botao><Botao variante="perigo" onClick={() => { navegacaoPendente?.(); setNavegacaoPendente(null); }}>Descartar alterações</Botao></div></Modal>
-      </>}
     </section>
   );
 }

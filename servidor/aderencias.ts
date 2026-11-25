@@ -5,10 +5,10 @@ import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { WebSocket } from "ws";
 import { lerTudo, gravar } from "./banco.ts";
-import { comWhatsappUsuario, enviarImagemNoWhatsapp, estadoDoWhatsapp, iniciarWhatsapp } from "./whatsapp/whatsapp.ts";
+import { comWhatsappUsuario, enviarPrintNoWhatsapp, estadoDoWhatsapp, iniciarWhatsapp } from "./whatsapp/whatsapp.ts";
 import { pastaDados } from "./ia.ts";
 import { configuracaoAderenciasValida, planilhaAderenciaValida, type ConfiguracaoAderencias, type PlanilhaAderencia, type ResultadoAderencia } from "../src/modulos/escritorio/aderenciasTipos.ts";
-import { criarFilaDeCapturas, escalasDaCaptura, TELA_DA_CAPTURA } from "./capturaAderencias.ts";
+import { criarFilaDeCapturas, escalasDaCaptura, TELA_DA_CAPTURA, type AreaDaCaptura } from "./capturaAderencias.ts";
 
 interface CelulaAderencia {
   texto: string;
@@ -18,7 +18,8 @@ interface CelulaAderencia {
 }
 
 interface CapturaAderencia {
-  bytes: Buffer;
+  previa: Buffer;
+  original: Buffer;
   celulas: CelulaAderencia[];
 }
 
@@ -314,11 +315,22 @@ const SCRIPT_DA_TABELA = (planilha: PlanilhaAderencia) => `(() => {
   return { clip, celulas };
 })()`;
 
-function capturar(planilha: PlanilhaAderencia): Promise<CapturaAderencia> {
-  return naFilaDeCapturas(() => capturarPlanilha(planilha));
+function capturar(planilha: PlanilhaAderencia, paraEnvio = false): Promise<CapturaAderencia> {
+  return naFilaDeCapturas(() => capturarPlanilha(planilha, paraEnvio));
 }
 
-async function capturarPlanilha(planilha: PlanilhaAderencia): Promise<CapturaAderencia> {
+async function capturarPng(cliente: ClienteCdp, clip: AreaDaCaptura, escalas: number[]) {
+  for (const scale of escalas) {
+    const imagem = await cliente.comando("Page.captureScreenshot", {
+      format: "png", fromSurface: true, captureBeyondViewport: true, clip: { ...clip, scale },
+    }, 30_000);
+    const bytes = Buffer.from(String(imagem.result?.data ?? ""), "base64");
+    if (bytes.length > 0 && bytes.length <= LIMITE_IMAGEM) return { bytes, escala: scale };
+  }
+  return null;
+}
+
+async function capturarPlanilha(planilha: PlanilhaAderencia, paraEnvio: boolean): Promise<CapturaAderencia> {
   const navegador = await iniciarNavegador();
   let expirou = false;
   const prazo = setTimeout(() => {
@@ -352,18 +364,15 @@ async function capturarPlanilha(planilha: PlanilhaAderencia): Promise<CapturaAde
       return true;
     })()`);
     await esperar(500);
-    const dados = await navegador.cliente.avaliar<{ clip: { x: number; y: number; width: number; height: number; scale: number } | null; celulas: CelulaAderencia[] }>(SCRIPT_DA_TABELA(planilha));
+    const dados = await navegador.cliente.avaliar<{ clip: AreaDaCaptura | null; celulas: CelulaAderencia[] }>(SCRIPT_DA_TABELA(planilha));
     if (!dados.clip) throw new Error("Não foi possível localizar o intervalo configurado na planilha para gerar o print.");
-    for (const escala of escalasDaCaptura(dados.clip)) {
-      const parametros = { format: "png", fromSurface: true, captureBeyondViewport: true, clip: { ...dados.clip, scale: escala } };
-      const imagem = await navegador.cliente.comando("Page.captureScreenshot", parametros, 30_000);
-      const base64 = (imagem.result?.data as string | undefined) ?? "";
-      const bytes = Buffer.from(base64, "base64");
-      if (bytes.length > 0 && bytes.length <= LIMITE_IMAGEM) {
-        return { bytes, celulas: Array.isArray(dados.celulas) ? dados.celulas : [] };
-      }
-    }
-    throw new Error("print_invalido");
+    const previa = await capturarPng(navegador.cliente, dados.clip, escalasDaCaptura(dados.clip));
+    if (!previa) throw new Error("print_invalido");
+    // A captura já obtida também serve se o Chrome não conseguir renderizar em resolução maior.
+    const original = paraEnvio
+      ? await capturarPng(navegador.cliente, dados.clip, escalasDaCaptura(dados.clip, true).filter((escala) => escala > previa.escala)).catch(() => null)
+      : null;
+    return { previa: previa.bytes, original: original?.bytes ?? previa.bytes, celulas: Array.isArray(dados.celulas) ? dados.celulas : [] };
   } catch (erro) {
     if (expirou) throw new Error("A captura da planilha excedeu um minuto e foi interrompida. Confira o intervalo e tente uma planilha por vez.");
     throw erro;
@@ -394,7 +403,7 @@ export function construirMensagem(planilha: PlanilhaAderencia, celulas: CelulaAd
 
 function previa(planilha: PlanilhaAderencia, captura: CapturaAderencia) {
   const mensagem = construirMensagem(planilha, captura.celulas);
-  return { imagem: `data:image/png;base64,${captura.bytes.toString("base64")}`, texto: mensagem.texto, alertas: mensagem.alertas, urgentes: mensagem.urgentes };
+  return { imagem: `data:image/png;base64,${captura.previa.toString("base64")}`, texto: mensagem.texto, alertas: mensagem.alertas, urgentes: mensagem.urgentes };
 }
 
 export function navegadorDeAderenciasDisponivel() {
@@ -406,13 +415,21 @@ export async function testarAderencia(valor: unknown) {
   return previa(planilha, await capturar(planilha));
 }
 
-export async function enviarAderencia(configuracaoValor: unknown, planilhaValor: unknown) {
+export async function enviarAderencia(configuracaoValor: unknown, planilhaValor: unknown, grupoId?: string) {
   const configuracao = configuracaoAderenciasValida(configuracaoValor);
-  if (!configuracao.destinoJid) throw new Error("destino_do_whatsapp_obrigatorio");
-  const planilha = validarPlanilha(planilhaValor);
-  const captura = await capturar(planilha);
+  const pedido = planilhaAderenciaValida(planilhaValor);
+  const candidatas = grupoId
+    ? configuracao.grupos.filter((grupo) => grupo.id === grupoId)
+    : configuracao.grupos.filter((grupo) => grupo.planilhas.some((planilha) => planilha.id === pedido.id));
+  const grupo = candidatas.length === 1 ? candidatas[0] : undefined;
+  if (!grupo) throw new Error("rotina_da_planilha_nao_identificada");
+  if (!grupo.destinoJid) throw new Error("destino_do_whatsapp_obrigatorio");
+  const planilhaSalva = grupo.planilhas.find((planilha) => planilha.id === pedido.id);
+  if (!planilhaSalva) throw new Error("planilha_nao_encontrada_na_rotina");
+  const planilha = validarPlanilha(planilhaSalva);
+  const captura = await capturar(planilha, true);
   const resultado = previa(planilha, captura);
-  await enviarImagemNoWhatsapp(configuracao.destinoJid, captura.bytes, `aderencia-${planilha.id}.png`, resultado.texto, { altaQualidade: true });
+  await enviarPrintNoWhatsapp(grupo.destinoJid, captura.original, `aderencia-${planilha.nome}.png`, resultado.texto);
   return {
     previa: resultado,
     resultado: { executadoEm: new Date().toISOString(), planilhasEnviadas: 1, alertas: resultado.alertas, urgentes: resultado.urgentes, erros: [] },
@@ -426,9 +443,9 @@ async function executarLista(destinoJid: string, itens: PlanilhaAderencia[]) {
   for (const item of itens.slice(0, MAXIMO_PLANILHAS)) {
     try {
       const planilha = validarPlanilha(item);
-      const captura = await capturar(planilha);
+      const captura = await capturar(planilha, true);
       const resultado = previa(planilha, captura);
-      await enviarImagemNoWhatsapp(destinoJid, captura.bytes, `aderencia-${planilha.id}.png`, resultado.texto, { altaQualidade: true });
+      await enviarPrintNoWhatsapp(destinoJid, captura.original, `aderencia-${planilha.nome}.png`, resultado.texto);
       previas.push(resultado); alertas += resultado.alertas; urgentes += resultado.urgentes; enviadas++;
     } catch (erro) {
       erros.push(`${item.nome || "Planilha"}: ${(erro as Error).message}`);
@@ -439,15 +456,18 @@ async function executarLista(destinoJid: string, itens: PlanilhaAderencia[]) {
 
 export async function executarAderencias(valor: unknown, grupoId?: string) {
   const configuracao = configuracaoAderenciasValida(valor);
-  if (!configuracao.destinoJid) throw new Error("destino_do_whatsapp_obrigatorio");
-  const grupos = configuracao.grupos.length
-    ? (grupoId ? configuracao.grupos.filter((grupo) => grupo.id === grupoId) : configuracao.grupos)
-    : [{ planilhas: configuracao.planilhas }];
-  const listas = grupos.map((grupo) => grupo.planilhas).filter((planilhas) => planilhas.length > 0);
-  if (!listas.length) throw new Error("nenhuma_planilha_configurada");
+  const grupos = (grupoId ? configuracao.grupos.filter((grupo) => grupo.id === grupoId) : configuracao.grupos)
+    .filter((grupo) => grupo.planilhas.length > 0);
+  if (!grupos.length) throw new Error("nenhuma_planilha_configurada");
+  if (!grupos.some((grupo) => grupo.destinoJid)) throw new Error("destino_do_whatsapp_obrigatorio");
   const resultados = [];
-  for (const lista of listas) {
-    resultados.push(await executarLista(configuracao.destinoJid, lista));
+  const semDestino: string[] = [];
+  for (const grupo of grupos) {
+    if (!grupo.destinoJid) {
+      semDestino.push(`${grupo.nome}: destino_do_whatsapp_obrigatorio`);
+      continue;
+    }
+    resultados.push(await executarLista(grupo.destinoJid, grupo.planilhas));
   }
   return {
     resultado: {
@@ -455,7 +475,7 @@ export async function executarAderencias(valor: unknown, grupoId?: string) {
       planilhasEnviadas: resultados.reduce((total, item) => total + item.resultado.planilhasEnviadas, 0),
       alertas: resultados.reduce((total, item) => total + item.resultado.alertas, 0),
       urgentes: resultados.reduce((total, item) => total + item.resultado.urgentes, 0),
-      erros: resultados.flatMap((item) => item.resultado.erros),
+      erros: [...resultados.flatMap((item) => item.resultado.erros), ...semDestino],
     },
     previas: resultados.flatMap((item) => item.previas),
   };
@@ -487,10 +507,14 @@ export function salvarConfiguracaoAderencias(valor: unknown, usuarioId?: number 
   return configuracao;
 }
 
-function atualizarConfiguracaoSalva(parcial: Partial<ConfiguracaoAderencias>, usuarioId?: number | string) {
+function atualizarConfiguracaoSalva(
+  atualizar: (atual: ConfiguracaoAderencias) => Partial<ConfiguracaoAderencias> | null,
+  usuarioId?: number | string,
+) {
   try {
     const atual = configuracaoSalva(usuarioId);
-    salvarConfiguracaoAderencias({ ...atual, ...parcial }, usuarioId);
+    const parcial = atualizar(atual);
+    if (parcial) salvarConfiguracaoAderencias({ ...atual, ...parcial }, usuarioId);
   } catch {
     return;
   }
@@ -528,12 +552,11 @@ async function verificarAgendamento(usuarioId = "local") {
   return await comWhatsappUsuario(usuarioId, async () => {
   const config = configuracaoSalva(usuarioId);
   const agora = dataHoraBrasilia();
-  const grupos = config.grupos.length ? config.grupos : (config.planilhas.length ? [{ id: "grupo-1", ativo: config.ativo, frequencia: config.frequencia, hora: config.hora, diasSemana: config.diasSemana, planilhas: config.planilhas, ultimoAgendamento: config.ultimoAgendamento }] : []);
-  const devidosNovos = grupos
+  const devidosNovos = config.grupos.filter((grupo) => grupo.destinoJid)
     .map((grupo) => ({ grupo, slot: slotAderenciaDevido(grupo, agora) }))
     .filter((item) => Boolean(item.slot) && item.grupo.ultimoAgendamento !== item.slot && !slotsExecutados.has(`${usuarioId}:${item.slot!}`))
     .map((item) => ({ grupo: item.grupo, slot: item.slot! }));
-  if (!config.destinoJid || !devidosNovos.length) return;
+  if (!devidosNovos.length) return;
   // Reserva a sessão antes de aguardar a reconexão. O intervalo pode disparar
   // novamente enquanto o primeiro ciclo ainda está carregando o histórico.
   execucoesAgendadas.add(chaveUsuario);
@@ -548,31 +571,28 @@ async function verificarAgendamento(usuarioId = "local") {
   for (const item of devidosNovos) slotsExecutados.add(`${usuarioId}:${item.slot}`);
     for (const item of devidosNovos) {
       try {
-        const resposta = await executarAderencias(config, item.grupo.id);
+        const atual = configuracaoSalva(usuarioId);
+        const grupoAtual = atual.grupos.find((grupo) => grupo.id === item.grupo.id);
+        if (!grupoAtual?.destinoJid || slotAderenciaDevido(grupoAtual, agora) !== item.slot || grupoAtual.ultimoAgendamento === item.slot) {
+          slotsExecutados.delete(`${usuarioId}:${item.slot}`);
+          continue;
+        }
+        const resposta = await executarAderencias(atual, grupoAtual.id);
         if (resposta.resultado.planilhasEnviadas === 0 && resposta.resultado.erros.length > 0) {
           throw new Error(resposta.resultado.erros.join(" | "));
         }
-        const gruposAtualizados = config.grupos.length
-          ? config.grupos.map((grupo) => grupo.id === item.grupo.id ? { ...grupo, ultimoAgendamento: item.slot, ultimoResultado: resposta.resultado } : grupo)
-          : [{
-            id: item.grupo.id,
-            nome: "Rotina principal",
-            ativo: item.grupo.ativo,
-            frequencia: item.grupo.frequencia as "manual" | "diaria" | "semanal",
-            hora: item.grupo.hora,
-            diasSemana: item.grupo.diasSemana,
-            planilhas: item.grupo.planilhas,
-            ultimoAgendamento: item.slot,
-            ultimoResultado: resposta.resultado,
-          }];
-        atualizarConfiguracaoSalva({ grupos: gruposAtualizados, ultimoAgendamento: item.slot, ultimoResultado: resposta.resultado }, usuarioId);
+        atualizarConfiguracaoSalva((atual) => {
+          const historico = { ultimoAgendamento: item.slot, ultimoResultado: resposta.resultado };
+          if (!atual.grupos.some((grupo) => grupo.id === item.grupo.id)) return null;
+          return { ...historico, grupos: atual.grupos.map((grupo) => grupo.id === item.grupo.id ? { ...grupo, ...historico } : grupo) };
+        }, usuarioId);
       } catch (erro) {
         // Uma falha de captura ou envio não pode consumir o horário. A próxima
         // varredura tenta novamente dentro da janela de recuperação.
         slotsExecutados.delete(`${usuarioId}:${item.slot}`);
         const mensagem = (erro as Error).message || "falha_na_execucao";
         const resultado: ResultadoAderencia = { executadoEm: new Date().toISOString(), planilhasEnviadas: 0, alertas: 0, urgentes: 0, erros: [mensagem] };
-        atualizarConfiguracaoSalva({ ultimoResultado: resultado }, usuarioId);
+        atualizarConfiguracaoSalva(() => ({ ultimoResultado: resultado }), usuarioId);
         process.stderr.write(`${new Date().toISOString()} falha no agendamento de aderências (${usuarioId}/${item.grupo.id}): ${mensagem}\n`);
       }
     }

@@ -103,7 +103,7 @@
 }
 
 /* Páginas e controles. */
-.estilo-sistema .sistema .pagina { max-width: 1480px; gap: 26px; }
+.estilo-sistema .sistema .pagina:not([data-rota="whatsapp"]) { max-width: 1480px; gap: 26px; }
 .estilo-sistema .sistema .titulo-pagina { letter-spacing: -0.055em; line-height: 1.08; }
 .estilo-sistema .sistema .botao { border-radius: 9px; font-weight: 500; }
 .estilo-sistema .sistema .botao-secundario { background: var(--superficie); border-color: var(--borda); }
@@ -226,7 +226,7 @@
 .ilha-pops :focus-visible { outline: 2px solid var(--i-tinta); outline-offset: 2px; }
 
 @media (max-width: 768px), (pointer: coarse) and (max-width: 1024px) {
-  .estilo-sistema .sistema .pagina { gap: 18px; }
+  .estilo-sistema .sistema .pagina:not([data-rota="whatsapp"]) { gap: 18px; }
   .estilo-sistema .sistema .inicio-painel { gap: 16px; }
   .estilo-sistema .sistema .inicio-abertura { padding: 24px 20px; border-radius: 16px; }
   .estilo-sistema .sistema .inicio-abertura .cabecalho-aba { gap: 22px; }

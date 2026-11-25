@@ -19,7 +19,7 @@ const ICONES: Record<string, LucideIcon> = {
   [GERENCIAR_APLICATIVOS]: Settings2,
 };
 
-export function AppsEmpresaNoMenu({ recolhida, nome = "Aplicativos", aoNavegar }: { recolhida: boolean; nome?: string; aoNavegar?: () => void }) {
+export function AppsEmpresaNoMenu({ recolhida, nome = "Sistemas", aoNavegar }: { recolhida: boolean; nome?: string; aoNavegar?: () => void }) {
   const rota = useInterface((s) => s.rota);
   const appId = useInterface((s) => s.parametros.app ?? "");
   const irPara = useInterface((s) => s.irPara);
@@ -120,14 +120,14 @@ export function AppsEmpresaNoMenu({ recolhida, nome = "Aplicativos", aoNavegar }
       else setAberto((atual) => !atual);
     }}>
       <LayoutGrid size={17} />
-      <span className="barra-item-texto cortar">{recolhida ? "Apps" : nome}</span>
+      <span className="barra-item-texto cortar">{nome}</span>
       {!recolhida && <><span className="barra-apps-quantidade">{quantidade}</span><ChevronDown size={12} className="barra-apps-seta" /></>}
     </button>
-    {!recolhida && <div id="barra-apps-lista" className="barra-apps-lista" role="group" aria-label="Aplicativos da empresa" hidden={!aberto}>{lista(false)}</div>}
-    {recolhida && painelAberto && createPortal(<div ref={painel} id="barra-apps-painel" className="barra-apps-painel" role="dialog" aria-label="Aplicativos da empresa" style={{ visibility: "hidden" }}>
+    {!recolhida && <div id="barra-apps-lista" className="barra-apps-lista" role="group" aria-label="Sistemas da empresa" hidden={!aberto}>{lista(false)}</div>}
+    {recolhida && painelAberto && createPortal(<div ref={painel} id="barra-apps-painel" className="barra-apps-painel" role="dialog" aria-label="Sistemas da empresa" style={{ visibility: "hidden" }}>
       <div className="barra-apps-painel-cabecalho">
-        <div><strong>Aplicativos</strong><span>Empresa · {quantidade} disponíveis</span></div>
-        <button type="button" className="barra-apps-fechar" aria-label="Fechar aplicativos" onClick={() => { setPainelAberto(false); botao.current?.focus(); }}><X size={16} /></button>
+        <div><strong>{nome}</strong><span>Empresa · {quantidade} disponíveis</span></div>
+        <button type="button" className="barra-apps-fechar" aria-label="Fechar sistemas" onClick={() => { setPainelAberto(false); botao.current?.focus(); }}><X size={16} /></button>
       </div>
       <div className="barra-apps-painel-lista">{lista(true)}</div>
     </div>, document.body)}

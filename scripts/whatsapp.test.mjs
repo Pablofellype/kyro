@@ -50,7 +50,7 @@ function conexaoIsolada(t, responder, configuracoes = {}) {
   });
   const codigo = stripTypeScriptTypes(fs.readFileSync("servidor/whatsapp/whatsapp.ts", "utf8"))
     .replace(/^import[\s\S]*?from ["'][^"']+["'];\r?\n/gm, "").replace(/^export /gm, "");
-  vm.runInContext(`${codigo}\nglobalThis.api = { comWhatsappUsuario, ligarWhatsapp, iniciarWhatsapp, estadoDoWhatsapp, passo, enviarMensagem, enviarImagemNoWhatsapp, definirFiltrosDoWhatsapp, ignorarConversa, nomesDeGruposDoGateway, criarMensagemAutomatica, listarMensagensAutomaticas, cancelarMensagemAutomatica };`, contexto);
+  vm.runInContext(`${codigo}\nglobalThis.api = { comWhatsappUsuario, ligarWhatsapp, iniciarWhatsapp, estadoDoWhatsapp, passo, enviarMensagem, enviarPrintNoWhatsapp, definirFiltrosDoWhatsapp, ignorarConversa, nomesDeGruposDoGateway, criarMensagemAutomatica, listarMensagensAutomaticas, cancelarMensagemAutomatica };`, contexto);
   const api = contexto.api;
   return {
     chamadas,
@@ -205,23 +205,21 @@ const configPreservada = (extra = {}) => ({ ligado: true, silenciarGrupos: false
 const JID_TESTE = "5511888880000@s.whatsapp.net";
 const GRUPO_TESTE = "120363@g.us";
 
-test("aderências solicitam HD sem compressão e preservam destinatário, PNG e legenda", async (t) => {
+test("aderências enviam o PNG original como documento com destinatário e legenda", async (t) => {
   const normal = gatewayDeConversas();
-  const conexao = conexaoIsolada(t, (url, opcoes) => url.pathname === "/send/image" ? respostaJson({ results: { message_id: "imagem-teste" } }) : normal(url, opcoes), { "7": configPreservada() });
+  const conexao = conexaoIsolada(t, (url, opcoes) => url.pathname === "/send/file" ? respostaJson({ results: { message_id: "documento-teste" } }) : normal(url, opcoes), { "7": configPreservada() });
   await conexao.ligar("7");
   const png = Buffer.from("89504e470d0a1a0a0000000d49484452", "hex");
-  await conexao.api.comWhatsappUsuario("7", () => conexao.api.enviarImagemNoWhatsapp(GRUPO_TESTE, png, "aderencia.png", "Legenda de teste", { altaQualidade: true }));
-  const pedido = conexao.chamadas.find((c) => c.caminho === "/send/image");
+  await conexao.api.comWhatsappUsuario("7", () => conexao.api.enviarPrintNoWhatsapp(GRUPO_TESTE, png, "aderencia.png", "Legenda de teste"));
+  const pedido = conexao.chamadas.find((c) => c.caminho === "/send/file");
   assert.equal(pedido.dispositivo, "niko-user-7");
   assert.equal(pedido.corpo.get("phone"), GRUPO_TESTE);
   assert.equal(pedido.corpo.get("caption"), "Legenda de teste");
-  assert.equal(pedido.corpo.get("hd"), "true");
-  assert.equal(pedido.corpo.get("compress"), "false");
-  assert.deepEqual(Buffer.from(await pedido.corpo.get("image").arrayBuffer()), png);
-  await conexao.api.comWhatsappUsuario("7", () => conexao.api.enviarImagemNoWhatsapp(GRUPO_TESTE, png));
-  const comum = conexao.chamadas.filter((c) => c.caminho === "/send/image")[1];
-  assert.equal(comum.corpo.get("hd"), null);
-  assert.equal(comum.corpo.get("compress"), null);
+  const arquivo = pedido.corpo.get("file");
+  assert.equal(arquivo.name, "aderencia.png");
+  assert.equal(arquivo.type, "image/png");
+  assert.deepEqual(Buffer.from(await arquivo.arrayBuffer()), png);
+  assert.equal(conexao.chamadas.filter((c) => c.caminho.startsWith("/send/")).length, 1);
 });
 
 function gatewayDeConversas({ conversas, mensagens, grupos, enviar } = {}) {
@@ -478,7 +476,8 @@ test("filtros da lista separam grupos e preservam a lista original", async () =>
   const { filtrarConversas, naoLidasDasConversas } = await vite.ssrLoadModule("/src/utilitarios/conversasWhatsapp.ts");
   const conversas = [{ id: "1", nome: "Juliana", grupo: false, naoLidas: 2 }, { id: "2", nome: "Família", grupo: true, naoLidas: 7 }, { id: "3", nome: "Marcos", grupo: false, naoLidas: 0 }];
   assert.deepEqual(filtrarConversas(conversas, "todas", "").map((c) => c.id), ["1", "3"]);
-  assert.deepEqual(filtrarConversas(conversas, "grupos", "FAMÍ").map((c) => c.id), ["2"]);
+  assert.deepEqual(filtrarConversas(conversas, "grupos", "FAMI").map((c) => c.id), ["2"]);
+  assert.deepEqual(filtrarConversas(conversas, "todas", "j").map((c) => c.id), ["1"]);
   assert.deepEqual(filtrarConversas(conversas, "naoLidas", "").map((c) => c.id), ["1"]);
   assert.equal(naoLidasDasConversas(conversas), 2);
   assert.equal(conversas.length, 3);

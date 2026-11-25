@@ -27,6 +27,8 @@ export interface ResultadoAderencia {
 export interface GrupoAderencia {
   id: string;
   nome: string;
+  destinoJid: string;
+  destinoNome: string;
   ativo: boolean;
   frequencia: FrequenciaAderencia;
   hora: string;
@@ -123,9 +125,12 @@ export function grupoAderenciaValido(valor: unknown, idReserva = "grupo-1"): Gru
   const planilhas = Array.isArray(bruto.planilhas)
     ? bruto.planilhas.slice(0, 30).map((p, i) => planilhaAderenciaValida(p, `planilha-${i + 1}`)).filter((p) => p.sheetUrl || p.nome !== "Planilha sem nome")
     : [];
+  const destinoJid = texto(bruto.destinoJid, "", 160);
   return {
     id: texto(bruto.id, idReserva, 80),
     nome: texto(bruto.nome, "Nova rotina", 100),
+    destinoJid,
+    destinoNome: destinoJid ? texto(bruto.destinoNome, "", 120) : "",
     ativo: bruto.ativo === true,
     frequencia: bruto.frequencia === "diaria" || bruto.frequencia === "semanal" ? bruto.frequencia : "manual",
     hora: /^\d{2}:\d{2}$/.test(String(bruto.hora ?? "")) ? String(bruto.hora) : "08:00",
@@ -141,13 +146,17 @@ export function configuracaoAderenciasValida(valor: unknown): ConfiguracaoAderen
   const planilhasLegadas = Array.isArray(bruto.planilhas)
     ? bruto.planilhas.slice(0, 30).map((p, i) => planilhaAderenciaValida(p, `planilha-${i + 1}`)).filter((p) => p.sheetUrl || p.nome !== "Planilha sem nome")
     : [];
-  const possuiGrupos = Array.isArray(bruto.grupos);
-  const grupos = possuiGrupos
-    ? bruto.grupos!.slice(0, 30).map((g, i) => grupoAderenciaValido(g, `grupo-${i + 1}`))
+  const destinoLegado = { destinoJid: texto(bruto.destinoJid, "", 160), destinoNome: texto(bruto.destinoNome, "", 120) };
+  // Um destino vazio na rotina é uma escolha explícita. Só rotinas antigas herdam o destino geral.
+  const grupos = Array.isArray(bruto.grupos) && (bruto.grupos.length > 0 || !planilhasLegadas.length)
+    ? bruto.grupos.slice(0, 30).map((g, i) => grupoAderenciaValido(
+      typeof g?.destinoJid === "string" ? g : { ...g, ...destinoLegado }, `grupo-${i + 1}`,
+    ))
     : Object.keys(bruto).length > 0
       ? [grupoAderenciaValido({
         id: "grupo-1",
         nome: "Rotina principal",
+        ...destinoLegado,
         ativo: bruto.ativo,
         frequencia: bruto.frequencia,
         hora: bruto.hora,
@@ -160,8 +169,8 @@ export function configuracaoAderenciasValida(valor: unknown): ConfiguracaoAderen
   const primeiroGrupo = grupos[0];
   return {
     ativo: primeiroGrupo?.ativo ?? bruto.ativo === true,
-    destinoJid: texto(bruto.destinoJid, "", 160),
-    destinoNome: texto(bruto.destinoNome, "", 120),
+    destinoJid: primeiroGrupo?.destinoJid ?? destinoLegado.destinoJid,
+    destinoNome: primeiroGrupo?.destinoNome ?? destinoLegado.destinoNome,
     frequencia: primeiroGrupo?.frequencia ?? (bruto.frequencia === "diaria" || bruto.frequencia === "semanal" ? bruto.frequencia : "manual"),
     hora: primeiroGrupo?.hora ?? (/^\d{2}:\d{2}$/.test(String(bruto.hora ?? "")) ? String(bruto.hora) : "08:00"),
     diasSemana: primeiroGrupo?.diasSemana ?? (Array.isArray(bruto.diasSemana) ? bruto.diasSemana.filter((d): d is number => Number.isInteger(d) && d >= 0 && d <= 6).slice(0, 7) : [1, 2, 3, 4, 5]),

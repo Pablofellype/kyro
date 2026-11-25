@@ -1,6 +1,8 @@
-.estilo-sistema .pagina:has(> .wpp-tela) {
+.estilo-sistema .sistema .pagina[data-rota="whatsapp"] {
+  width: 100%;
   max-width: none;
   height: 100%;
+  margin: 0;
   padding: 0;
   gap: 0;
 }
@@ -31,6 +33,7 @@
 }
 
 .estilo-sistema .wpp-tela {
+  --wpp-largura-painel: 420px;
   --wpp-verde: #25d366;
   --wpp-verde-texto: #06301a;
   --wpp-lida: #4fb6ec;
@@ -38,7 +41,7 @@
   --wpp-minha-borda: color-mix(in srgb, var(--destaque) 30%, var(--borda-suave));
   position: relative;
   display: grid;
-  grid-template-columns: minmax(268px, 330px) minmax(0, 1fr) 320px;
+  grid-template-columns: minmax(268px, 330px) minmax(0, 1fr) var(--wpp-largura-painel);
   height: 100%;
   min-height: 0;
   overflow: hidden;
@@ -178,7 +181,7 @@
 
 .estilo-sistema .wpp-resumo {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
   gap: 6px;
   padding: 0 14px 12px;
 }
@@ -220,6 +223,28 @@
 
 .estilo-sistema .wpp-resumo-item[data-ativo] svg {
   color: var(--destaque-claro);
+}
+
+.estilo-sistema .wpp-resumo-automacao {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.estilo-sistema .wpp-resumo-automacao svg {
+  flex: none;
+}
+
+.estilo-sistema .wpp-resumo-automacao span {
+  margin-top: 0;
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: none;
+}
+
+.estilo-sistema .wpp-resumo-automacao[aria-expanded="true"] {
+  color: var(--texto);
+  border-color: var(--borda-forte);
 }
 
 .estilo-sistema .wpp-busca {
@@ -1427,41 +1452,14 @@
   border-bottom: 1px solid var(--borda-suave);
 }
 
-.estilo-sistema .wpp-painel-abas {
+.estilo-sistema .wpp-painel-topo h2 {
   display: flex;
   flex: 1;
-  gap: 2px;
-  padding: 3px;
-  border-radius: 11px;
-  background: var(--superficie);
-  border: 1px solid var(--borda-suave);
-}
-
-.estilo-sistema .wpp-painel-aba {
-  display: inline-flex;
-  flex: 1;
-  justify-content: center;
   align-items: center;
-  gap: 5px;
-  height: 28px;
-  border-radius: 8px;
-  color: var(--texto-3);
-  font-size: 12px;
-  transition: background 0.15s, color 0.15s;
-}
-
-.estilo-sistema .wpp-painel-aba:hover:not(:disabled) {
-  color: var(--texto);
-}
-
-.estilo-sistema .wpp-painel-aba[aria-selected="true"] {
-  background: var(--superficie-2);
-  color: var(--texto);
-  font-weight: 500;
-}
-
-.estilo-sistema .wpp-painel-aba:disabled {
-  opacity: 0.4;
+  gap: 8px;
+  margin: 0;
+  padding-left: 2px;
+  font-size: 14px;
 }
 
 .estilo-sistema .wpp-painel-corpo {
@@ -1470,6 +1468,18 @@
   overflow-y: auto;
   padding: 14px;
   animation: wpp-surgir 0.25s ease-out;
+}
+
+.estilo-sistema .wpp-painel-corpo .aderencias-grade-2 {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.estilo-sistema .wpp-painel-corpo .aderencias .cartao-acoes {
+  flex-wrap: wrap;
+}
+
+.estilo-sistema .wpp-painel-corpo .wpp-busca-participantes {
+  margin: 0;
 }
 
 .estilo-sistema .wpp-contato,
@@ -1827,7 +1837,7 @@
     top: 0;
     right: 0;
     bottom: 0;
-    width: min(320px, 92%);
+    width: min(var(--wpp-largura-painel), 100%);
     z-index: 5;
     box-shadow: -24px 0 48px -24px rgba(0, 0, 0, 0.55);
   }

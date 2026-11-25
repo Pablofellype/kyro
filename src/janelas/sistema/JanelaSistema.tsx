@@ -1,6 +1,6 @@
 import { TourDoNiko } from "./TourDoNiko";
 import { EstilosDaMidia } from "../ilha/midia/EstilosDaMidia";
-import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useInterface, type Geometria } from "../../estado/interface";
 import { useConfig } from "../../estado/configuracoes";
 import { Janela, areaUtil } from "../Janela";
@@ -43,6 +43,7 @@ export function JanelaSistema({ mobile = false }: { mobile?: boolean } = {}) {
   useSincronizarCatalogoAppsEmpresa();
   const { aplicativos } = useCatalogoAppsEmpresa();
   const appAberto = rota === "appsEmpresa" && itensDoMenuAppsEmpresa(usuario, aplicativos).some((app) => app.id === appEmpresa && app.disponivel);
+  const recolherBarraAoEntrar = appAberto || rota === "whatsapp" || rota === "powerBi";
   const geometriaSalva = useInterface((s) => s.geometria);
   const maximizada = useInterface((s) => s.sistemaMaximizado);
   const definirSistema = useInterface((s) => s.definirSistema);
@@ -67,9 +68,9 @@ export function JanelaSistema({ mobile = false }: { mobile?: boolean } = {}) {
     conteudo.current?.scrollTo({ top: 0 });
   }, [chavePagina]);
 
-  useEffect(() => {
-    useInterface.getState().definirBarraAppsRecolhida(appAberto ? true : null);
-  }, [appAberto, appEmpresa]);
+  useLayoutEffect(() => {
+    useInterface.getState().definirBarraAppsRecolhida(recolherBarraAoEntrar ? true : null);
+  }, [recolherBarraAoEntrar, rota, appEmpresa]);
 
   useEffect(() => {
     if (!areaValida) useInterface.getState().definirArea("empresa");
@@ -79,7 +80,7 @@ export function JanelaSistema({ mobile = false }: { mobile?: boolean } = {}) {
   const aoMudarGeometria = useCallback((g: Geometria) => definirSistema({ geometria: g }), [definirSistema]);
 
   const Pagina = PAGINA_ROTA[rota];
-  const recolhida = !mobile && (appAberto ? barraAppsRecolhida ?? true : recolhidaManual || largura < 1100);
+  const recolhida = !mobile && (recolherBarraAoEntrar ? barraAppsRecolhida ?? true : recolhidaManual || largura < 1100);
 
   const conteudoSistema = (
     <>
@@ -88,7 +89,7 @@ export function JanelaSistema({ mobile = false }: { mobile?: boolean } = {}) {
         <main className="sistema-conteudo" ref={conteudo}>
           <LimiteDeErro key={chavePagina} aoVoltar={() => useInterface.getState().irPara("inicio")}>
             <Suspense fallback={<div className="carregando-pagina" aria-busy="true" />}>
-              <div className="pagina" key={chavePagina}>
+              <div className="pagina" data-rota={rota} key={chavePagina}>
                 <Pagina mobile={mobile} />
               </div>
             </Suspense>

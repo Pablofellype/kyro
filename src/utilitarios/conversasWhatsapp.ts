@@ -1,10 +1,11 @@
 import type { ConversaWhatsapp } from "../ponte/whatsapp";
+import { normalizarTexto } from "./basicos.ts";
 
 export type FiltroDaLista = "todas" | "naoLidas" | "grupos";
 
 export function filtrarConversas(conversas: ConversaWhatsapp[], filtro: FiltroDaLista, busca: string): ConversaWhatsapp[] {
-  const termo = busca.trim().toLocaleLowerCase("pt-BR");
-  return conversas.filter((c) => (filtro === "grupos" ? c.grupo : !c.grupo && (filtro === "todas" || c.naoLidas > 0)) && (!termo || c.nome.toLocaleLowerCase("pt-BR").includes(termo)));
+  const termo = normalizarTexto(busca);
+  return conversas.filter((c) => (filtro === "grupos" ? c.grupo : !c.grupo && (filtro === "todas" || c.naoLidas > 0)) && (!termo || normalizarTexto(c.nome).includes(termo)));
 }
 
 export function naoLidasDasConversas(conversas: ConversaWhatsapp[]): number {

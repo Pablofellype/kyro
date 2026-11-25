@@ -459,7 +459,7 @@ test("CSP do HTML deriva da política nativa com permissões para PDF, mídia e 
   const { APLICATIVOS_EMPRESA } = await import("../src/modulos/escritorio/aplicativosEmpresaConfig.ts");
   const origens = [...new Set(APLICATIVOS_EMPRESA.filter((app) => app.status === "disponivel" && app.url).map((app) => new URL(app.url).origin))];
   const fontes = politica.split(";").find((diretiva) => diretiva.trim().startsWith("frame-src ")).trim().split(/\s+/).slice(1);
-  assert.deepEqual(fontes.sort(), ["'self'", "blob:", ...origens].sort(), "Somente os sistemas cadastrados devem ser liberados para exibição interna");
+  assert.deepEqual(fontes.sort(), ["'self'", "blob:", ...origens, "https://app.powerbi.com"].sort(), "Somente as origens dos sistemas aprovados e do Power BI devem ser liberadas");
 });
 
 test("consulta de credenciais nativas tem prazo e não instala ponte sem token válido", async () => {

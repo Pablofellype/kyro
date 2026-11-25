@@ -26,6 +26,7 @@
 .escritorio-empresa .ee-abertura h1 { margin: 7px 0 8px; font-family: var(--fonte-titulo); font-size: clamp(26px, 3.5cqw, 36px); font-weight: 650; line-height: 1.15; letter-spacing: -.045em; overflow-wrap: anywhere; }
 .escritorio-empresa .ee-abertura p { max-width: 62ch; margin: 0; color: var(--texto-2); font-size: 13px; line-height: 1.6; }
 .escritorio-empresa .ee-abertura-acoes { display: flex; flex-shrink: 0; align-items: flex-end; flex-direction: column; gap: 10px; }
+.escritorio-empresa .ee-acoes-do-painel { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 7px; }
 .escritorio-empresa .ee-abertura-acoes time { display: inline-flex; align-items: center; gap: 7px; color: var(--texto-3); font-size: 11px; text-transform: capitalize; }
 .escritorio-empresa .ee-botao { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 38px; padding: 9px 13px; border: 1px solid var(--borda); border-radius: 9px; background: var(--superficie); color: var(--texto); font-size: 12px; font-weight: 550; line-height: 1.4; transition: border-color .15s, background .15s; }
 .escritorio-empresa .ee-botao:hover:not(:disabled) { border-color: var(--destaque); background: var(--superficie-2); }
@@ -38,7 +39,7 @@
 .escritorio-empresa .ee-link:disabled { color: var(--texto-3); }
 .escritorio-empresa :focus-visible { outline: 2px solid var(--destaque); outline-offset: 3px; }
 
-.escritorio-empresa .ee-resumo { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.escritorio-empresa .ee-resumo { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
 .escritorio-empresa .ee-metrica { position: relative; display: flex; align-items: flex-start; gap: 12px; min-width: 0; padding: 18px; border: 1px solid var(--borda-suave); border-radius: 14px; background: var(--superficie); color: var(--texto); text-align: left; transition: border-color .15s; }
 .escritorio-empresa .ee-metrica:hover { border-color: var(--destaque); }
 .escritorio-empresa .ee-icone { display: grid; place-items: center; flex: 0 0 40px; width: 40px; height: 40px; border-radius: 11px; background: color-mix(in srgb, var(--ee-cor, var(--ee-verde)) 11%, var(--superficie)); color: var(--ee-cor, var(--ee-verde)); }
@@ -49,6 +50,7 @@
 .escritorio-empresa .ee-metrica-seta { position: absolute; top: 16px; right: 13px; color: var(--texto-3); }
 
 .escritorio-empresa .ee-grade-principal { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(255px, 1fr); gap: 18px; align-items: start; }
+.escritorio-empresa .ee-coluna-lateral { display: grid; gap: 18px; min-width: 0; }
 .escritorio-empresa .ee-cartao { min-width: 0; padding: 22px; border: 1px solid var(--borda-suave); border-radius: 16px; background: var(--superficie); }
 .escritorio-empresa .ee-prioridades { border-top: 3px solid var(--destaque); padding-top: 20px; }
 .escritorio-empresa .ee-cabecalho-secao { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 17px; }
@@ -62,6 +64,12 @@
 .escritorio-empresa .ee-filtros button { min-height: 32px; padding: 7px 11px; border: 1px solid transparent; border-radius: 8px; color: var(--texto-3); font-size: 11px; font-weight: 500; }
 .escritorio-empresa .ee-filtros button:hover { background: var(--superficie-2); color: var(--texto); }
 .escritorio-empresa .ee-filtros button[aria-pressed="true"] { background: var(--destaque-suave); color: var(--destaque-claro); border-color: var(--destaque-borda); }
+.escritorio-empresa .ee-filtros button span { margin-left: 5px; font-variant-numeric: tabular-nums; }
+.escritorio-empresa .ee-contadores-rotinas { display: flex; flex-wrap: wrap; gap: 14px 32px; margin: 0 0 12px; }
+.escritorio-empresa .ee-contadores-rotinas div { display: flex; flex-direction: column-reverse; gap: 3px; }
+.escritorio-empresa .ee-contadores-rotinas dt { color: var(--texto-2); font-size: 11px; }
+.escritorio-empresa .ee-contadores-rotinas dd { margin: 0; color: var(--texto); font-family: var(--fonte-titulo); font-size: 25px; line-height: 1; }
+.escritorio-empresa .ee-aderencias-painel > .ee-link { margin-top: 8px; }
 .escritorio-empresa .ee-consulta { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; padding: 10px; margin-block: 12px; border-radius: 8px; background: var(--superficie-2); color: var(--texto-2); font-size: 11px; line-height: 1.5; }
 .escritorio-empresa .ee-consulta button { color: var(--destaque-claro); font-weight: 550; text-decoration: underline; text-underline-offset: 3px; min-height: 26px; }
 .escritorio-empresa .ee-lista-prioridades { list-style: none; margin: 0; padding: 0; }
@@ -75,6 +83,49 @@
 .escritorio-empresa .ee-badge { display: inline-flex; padding: 3px 6px; border-radius: 5px; color: var(--ee-cor, var(--ee-verde)); background: color-mix(in srgb, var(--ee-cor, var(--ee-verde)) 10%, var(--superficie)); font-size: 9px; font-weight: 550; line-height: 1.3; }
 .escritorio-empresa .ee-acao-linha { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; gap: 5px; min-height: 34px; padding: 7px 9px; border: 1px solid var(--borda); border-radius: 8px; background: var(--superficie); color: var(--destaque-claro); font-size: 10px; font-weight: 550; }
 .escritorio-empresa .ee-acao-linha:hover { background: var(--destaque-suave); border-color: var(--destaque); }
+.escritorio-empresa .ee-acoes-atividade { display: flex; gap: 6px; }
+.escritorio-empresa .ee-acoes-registros { display: flex; flex-wrap: wrap; gap: 8px; }
+.escritorio-empresa .ee-formulario-registro {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 16px;
+  padding: 16px;
+  border: 1px solid var(--borda-suave);
+  border-radius: 12px;
+  background: var(--superficie-2);
+}
+.escritorio-empresa .ee-formulario-registro > h3 { grid-column: 1 / -1; margin: 0; font-size: 14px; font-weight: 600; }
+.escritorio-empresa .ee-campo { display: flex; flex-direction: column; gap: 6px; min-width: 0; color: var(--texto-2); font-size: 12px; font-weight: 550; }
+.escritorio-empresa .ee-campo-inteiro { grid-column: 1 / -1; }
+.escritorio-empresa .ee-campo :is(input, textarea) {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  min-height: 39px;
+  padding: 8px 10px;
+  border: 1px solid var(--borda);
+  border-radius: 8px;
+  background: var(--superficie);
+  color: var(--texto);
+  font: inherit;
+  font-weight: 400;
+}
+.escritorio-empresa .ee-campo textarea { resize: vertical; }
+.escritorio-empresa .ee-campo input:disabled { opacity: .6; }
+.escritorio-empresa .ee-erro-registro { margin: 0; color: var(--ee-areia); font-size: 12px; }
+.escritorio-empresa .ee-rodape-formulario { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; }
+.escritorio-empresa .ee-lista-registros { list-style: none; margin: 14px 0 0; padding: 0; }
+.escritorio-empresa .ee-lista-registros li { display: flex; align-items: flex-start; gap: 10px; padding: 13px 0; border-top: 1px solid var(--borda-suave); }
+.escritorio-empresa .ee-lista-registros li:last-child { padding-bottom: 0; }
+.escritorio-empresa .ee-registro-texto { flex: 1; min-width: 0; }
+.escritorio-empresa .ee-registro-meta { display: flex; align-items: center; gap: 8px; }
+.escritorio-empresa .ee-registro-meta time { color: var(--texto-3); font-size: 11px; }
+.escritorio-empresa .ee-registro-texto h3 { margin: 6px 0 0; font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
+.escritorio-empresa .ee-registro-texto p { margin: 4px 0 0; color: var(--texto-2); font-size: 12px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+.escritorio-empresa .ee-acoes-registro { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+.escritorio-empresa .ee-acoes-registro .ee-botao { min-height: 34px; padding: 7px 9px; }
+.escritorio-empresa .ee-registros > .ee-link { margin-top: 8px; }
 .escritorio-empresa .ee-rodape-secao { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--borda-suave); }
 .escritorio-empresa .ee-vazio { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; min-height: 165px; padding: 22px 10px; text-align: center; }
 .escritorio-empresa .ee-vazio > span { display: grid; place-items: center; width: 48px; height: 48px; margin-bottom: 2px; border-radius: 14px; background: var(--superficie-2); color: var(--destaque-claro); }
@@ -140,6 +191,7 @@
   .escritorio-empresa .ee-compromisso { height: 100%; }
   .escritorio-empresa .ee-sistemas-grade { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .escritorio-empresa .ee-metrica { flex-direction: column; padding: 15px; gap: 10px; }
+  .escritorio-empresa .ee-resumo { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .escritorio-empresa .ee-grade-secundaria { grid-template-columns: minmax(0, 1fr); }
 }
 
@@ -155,7 +207,11 @@
   .escritorio-empresa .ee-cartao { padding: 17px; border-radius: 13px; }
   .escritorio-empresa .ee-prioridade { display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 8px 10px; }
   .escritorio-empresa .ee-prioridade > .ee-icone { width: 30px; height: 30px; }
-  .escritorio-empresa .ee-prioridade > .ee-acao-linha { grid-column: 2; justify-self: start; min-height: 40px; padding-inline: 12px; font-size: 11px; }
+  .escritorio-empresa .ee-acoes-atividade { grid-column: 2; justify-self: start; }
+  .escritorio-empresa .ee-acoes-atividade .ee-acao-linha { min-height: 40px; padding-inline: 12px; font-size: 11px; }
+  .escritorio-empresa .ee-formulario-registro { grid-template-columns: minmax(0, 1fr); }
+  .escritorio-empresa .ee-lista-registros li { flex-direction: column; align-items: stretch; }
+  .escritorio-empresa .ee-acoes-registro { justify-content: flex-start; }
   .escritorio-empresa .ee-filtros button { min-height: 40px; }
   .escritorio-empresa .ee-agenda-lista { grid-template-columns: minmax(0, 1fr); }
   .escritorio-empresa .ee-sistema { padding: 14px; }

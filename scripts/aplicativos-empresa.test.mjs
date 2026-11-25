@@ -57,6 +57,7 @@ test("permissões do catálogo e notificações do inventário são aplicadas po
   const bancoAnterior = process.env.DATABASE_URL;
   const fetchAnterior = neonConfig.fetchFunction;
   const inventarioAnterior = process.env.INVENTARIO_INTEGRACAO_TOKEN;
+  const relatorioAnterior = process.env.KYRO_POWER_BI_REPORT_URL;
   process.env.DATABASE_URL = "postgresql://teste:teste@neon.example/kyro";
   process.env.INVENTARIO_INTEGRACAO_TOKEN = "token-de-teste";
   t.after(() => {
@@ -65,6 +66,8 @@ test("permissões do catálogo e notificações do inventário são aplicadas po
     else process.env.DATABASE_URL = bancoAnterior;
     if (inventarioAnterior === undefined) delete process.env.INVENTARIO_INTEGRACAO_TOKEN;
     else process.env.INVENTARIO_INTEGRACAO_TOKEN = inventarioAnterior;
+    if (relatorioAnterior === undefined) delete process.env.KYRO_POWER_BI_REPORT_URL;
+    else process.env.KYRO_POWER_BI_REPORT_URL = relatorioAnterior;
   });
 
   const persistidos = new Map();
@@ -135,6 +138,14 @@ test("permissões do catálogo e notificações do inventário são aplicadas po
   };
 
   const lerCatalogo = (token = "") => tratarAplicativosEmpresa("GET", "catalogo", token, async () => ({}));
+  const lerPowerBi = (token) => tratarAplicativosEmpresa("GET", "power-bi", token, async () => ({}));
+  const relatorio = "https://app.powerbi.com/reportEmbed?reportId=11111111-2222-4333-a444-555555555555&autoAuth=true";
+  process.env.KYRO_POWER_BI_REPORT_URL = relatorio;
+  assert.equal((await lerPowerBi("")).status, 401);
+  assert.equal((await lerPowerBi("visitante")).status, 403);
+  assert.deepEqual(await lerPowerBi("gerencia"), { status: 200, dados: { url: relatorio } });
+  process.env.KYRO_POWER_BI_REPORT_URL = "https://app.powerbi.com/view?r=publico";
+  assert.deepEqual(await lerPowerBi("dono"), { status: 503, dados: { erro: "power_bi_nao_configurado" } });
   const salvar = (token, corpo) => tratarAplicativosEmpresa("POST", "catalogo", token, async () => corpo);
   const materiais = { id: "materiais", nome: "Materiais internos", descricao: "", url: "https://novo.example/", status: "disponivel", publico: false };
   assert.equal((await salvar("gerencia", materiais)).status, 403);

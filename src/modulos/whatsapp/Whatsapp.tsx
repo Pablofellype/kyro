@@ -1,9 +1,9 @@
-import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
   ArrowDown, ArrowRight, AtSign, BellDot, CalendarClock, Check, CheckCheck, CircleAlert, Clock, Copy, EyeOff, Forward, Ghost, History, LoaderCircle, MessagesSquare,
-  PanelRightClose, PanelRightOpen, Paperclip, PencilLine, RotateCw, Search, Send, Settings2, Trash2, UserRound, Users, X, type LucideIcon,
+  Paperclip, PencilLine, RotateCw, Search, Send, Settings2, Trash2, Users, X, type LucideIcon,
 } from "lucide-react";
 import { T } from "../../textos/textos";
 import { useWhatsapp } from "../../estado/whatsapp";
@@ -11,7 +11,7 @@ import { useAuth } from "../../estado/autenticacao";
 import { useInterface } from "../../estado/interface";
 import { tocarSom } from "../../ponte/sons";
 import { Marca } from "../../marcas/Marca";
-import { Botao, ConfirmarModal, Modal } from "../../componentes/basicos";
+import { Botao, Cartao, ConfirmarModal, Modal } from "../../componentes/basicos";
 import { ConfigWhatsapp, mensagemDoWhatsapp } from "../conexoes/ConexaoWhatsapp";
 import {
   corDoNome, numeroDoJid, whatsappPonte, type AgendadaWhatsapp, type ConversaWhatsapp, type EstadoWhatsapp, type MensagemWhatsapp, type RastroWhatsapp,
@@ -21,6 +21,7 @@ import { filtrarConversas, naoLidasDasConversas, type FiltroDaLista } from "../.
 import { horarioRelativo } from "../../utilitarios/datas";
 import { arquivosColados, formatarTamanho } from "../../utilitarios/anexos";
 import { Avatar, MidiaDaMensagem, Previa, PreviaDoArquivo, agruparReacoes, diaDaMensagem, horaDaMensagem, rotuloDaMidia } from "./pecasDoWhatsapp";
+import { MensagensAutomaticas } from "./MensagensAutomaticas";
 
 const W = T.whatsapp;
 const P = W.pagina;
@@ -30,7 +31,7 @@ const EDITAVEL_MS = 15 * 60_000;
 const APAGAVEL_MS = 48 * 3600_000;
 const PERTO_DO_FIM_PX = 120;
 
-type AbaDoPainel = "contato" | "rastros" | "agendadas";
+const ROTULO_MENSAGENS_AUTOMATICAS = "Mensagens automáticas";
 
 function usarVisivel(): boolean {
   const [visivel, setVisivel] = useState(() => document.visibilityState === "visible");
@@ -59,15 +60,16 @@ export default function Whatsapp() {
   const definir = useWhatsapp((s) => s.definir);
   const usuario = useAuth((s) => s.usuario);
   const remoto = whatsappRemotoAtivo(usuario);
+  const podeAgendarEmGrupos = usuario?.perfil === "dono" || (usuario?.perfil === "gerencia" && usuario.roboAderencias === true);
   const visivel = usarVisivel();
   const [abertaId, setAbertaId] = useState<string | null>(null);
   const [abertaBase, setAbertaBase] = useState<ConversaWhatsapp | null>(null);
-  const [painelAberto, setPainelAberto] = useState(true);
-  const [aba, setAba] = useState<AbaDoPainel>("rastros");
+  const [painelAberto, setPainelAberto] = useState(false);
   const [config, setConfig] = useState(false);
   const [filtro, setFiltro] = useState<FiltroDaLista>("todas");
   const [rastros, setRastros] = useState<RastroWhatsapp[]>([]);
   const [agendadas, setAgendadas] = useState<AgendadaWhatsapp[]>([]);
+  const [revisaoDaConversa, setRevisaoDaConversa] = useState(0);
   const abertaRef = useRef<string | null>(null);
   const conectado = Boolean(estado?.ligado && estado.vinculo === "conectado");
   const totalDeRastros = estado?.rastros ?? 0;
@@ -120,7 +122,6 @@ export default function Whatsapp() {
     if (abertaRef.current && abertaRef.current !== id) void whatsappPonte.fechar(abertaRef.current).catch(() => undefined);
     abertaRef.current = id;
     setAbertaId(id);
-    setAba((a) => (a === "rastros" || a === "agendadas" ? a : "contato"));
     const completa = await whatsappPonte.abrir(id).catch(() => null);
     if (completa && abertaRef.current === id) setAbertaBase(completa);
     void carregar();
@@ -132,11 +133,6 @@ export default function Whatsapp() {
     setAbertaId(null);
     setAbertaBase(null);
     if (fechada) void whatsappPonte.fechar(fechada).catch(() => undefined);
-  };
-
-  const mostrarNoPainel = (a: AbaDoPainel) => {
-    setAba(a);
-    setPainelAberto(true);
   };
 
   if (!estado) {
@@ -173,28 +169,14 @@ export default function Whatsapp() {
   const fantasma = !estado.filtros.lerAoAbrir;
 
   const alternarFantasma = () => void whatsappPonte.filtros({ lerAoAbrir: fantasma }).then(definir).catch(() => undefined);
-
-  const painel = (mensagens: MensagemWhatsapp[]) =>
-    painelAberto ? (
-      <PainelLateral
-        aba={aba}
-        aoAba={setAba}
-        aoFechar={() => setPainelAberto(false)}
-        conversa={aberta}
-        mensagens={mensagens}
-        rastros={rastros}
-        agendadas={agendadas}
-        aoAbrir={(id) => void abrir(id)}
-        aoLimparRastros={() => void whatsappPonte.limparRastros().then((r) => setRastros(r.rastros)).then(() => carregar())}
-        aoCancelarAgendada={(id) => whatsappPonte.cancelarAgendada(id).then((r) => setAgendadas(r.agendadas))}
-        fantasma={fantasma}
-        aoFantasma={alternarFantasma}
-        aoEsconder={(id) => {
-          void whatsappPonte.ignorar(id, true).then(definir);
-          fechar();
-        }}
-      />
-    ) : null;
+  const alternarPainel = () => setPainelAberto((aberto) => !aberto);
+  const enviosDaConversa = (idsExibidos?: Set<string>) => {
+    const lista = idsExibidos ? agendadas.filter((item) => !idsExibidos.has(item.id)) : agendadas;
+    if (idsExibidos && !lista.length) return null;
+    return <Cartao titulo={idsExibidos ? "Outros envios agendados" : "Mensagens agendadas"}>
+      <PainelDeAgendadas agendadas={lista} aoAbrir={(id) => void abrir(id)} aoCancelar={(id) => whatsappPonte.cancelarAgendada(id).then((r) => setAgendadas(r.agendadas))} />
+    </Cartao>;
+  };
 
   return (
     <div className="wpp-tela" data-painel={painelAberto ? "aberto" : "fechado"} data-conversa={aberta ? "aberta" : "nenhuma"}>
@@ -206,8 +188,8 @@ export default function Whatsapp() {
         aoAbrir={(c) => void abrir(c.id)}
         aoConfigurar={() => setConfig(true)}
         rastrosPorConversa={rastrosPorConversa}
-        agendadas={agendadas.filter((a) => a.situacao === "active" || a.situacao === "paused").length}
-        aoMostrar={mostrarNoPainel}
+        painelAberto={painelAberto}
+        aoAlternarPainel={alternarPainel}
       />
       {aberta ? (
         <Conversa
@@ -216,17 +198,25 @@ export default function Whatsapp() {
           digitando={digitando[aberta.id]}
           fantasma={fantasma}
           painelAberto={painelAberto}
-          aoAlternarPainel={() => setPainelAberto((v) => !v)}
+          aoAlternarPainel={alternarPainel}
           aoVoltar={fechar}
-          aoAgendou={setAgendadas}
-          painel={painel}
+          aoAgendou={(lista) => { setAgendadas(lista); setRevisaoDaConversa((valor) => valor + 1); }}
+          aoEsconder={() => { void whatsappPonte.ignorar(aberta.id, true).then(definir); fechar(); }}
         />
       ) : (
-        <>
-          <BoasVindas fantasma={fantasma} aoFantasma={alternarFantasma} rastros={rastros.length} aoMostrar={mostrarNoPainel} painelAberto={painelAberto} aoAlternarPainel={() => setPainelAberto((v) => !v)} />
-          {painel([])}
-        </>
+        <BoasVindas fantasma={fantasma} aoFantasma={alternarFantasma} painelAberto={painelAberto} aoAlternarPainel={alternarPainel} />
       )}
+      {painelAberto && <aside id="wpp-mensagens-automaticas" className="wpp-painel" aria-label={ROTULO_MENSAGENS_AUTOMATICAS}>
+        <header className="wpp-painel-topo">
+          <h2><CalendarClock size={16} /> {ROTULO_MENSAGENS_AUTOMATICAS}</h2>
+          <button type="button" className="wpp-icone" aria-label={P.fecharPainel} title={P.fecharPainel} onClick={alternarPainel}><X size={15} /></button>
+        </header>
+        <div className="wpp-painel-corpo">
+          {podeAgendarEmGrupos
+            ? <MensagensAutomaticas key={usuario?.id} conectado={conectado} revisaoDaConversa={revisaoDaConversa} outrosEnvios={enviosDaConversa} />
+            : enviosDaConversa()}
+        </div>
+      </aside>}
       <ConfigWhatsapp aberto={config} aoFechar={() => setConfig(false)} />
     </div>
   );
@@ -239,7 +229,7 @@ const FILTROS: { id: FiltroDaLista; icone: LucideIcon }[] = [
 ];
 
 function ListaDeConversas({
-  estado, abertaId, filtro, aoFiltro, aoAbrir, aoConfigurar, rastrosPorConversa, agendadas, aoMostrar,
+  estado, abertaId, filtro, aoFiltro, aoAbrir, aoConfigurar, rastrosPorConversa, painelAberto, aoAlternarPainel,
 }: {
   estado: EstadoWhatsapp;
   abertaId: string | null;
@@ -248,8 +238,8 @@ function ListaDeConversas({
   aoAbrir: (c: ConversaWhatsapp) => void;
   aoConfigurar: () => void;
   rastrosPorConversa: Record<string, number>;
-  agendadas: number;
-  aoMostrar: (a: AbaDoPainel) => void;
+  painelAberto: boolean;
+  aoAlternarPainel: () => void;
 }) {
   const [busca, setBusca] = useState("");
   const visiveis = useMemo(() => filtrarConversas(estado.conversas, filtro, busca), [estado.conversas, filtro, busca]);
@@ -272,15 +262,9 @@ function ListaDeConversas({
           <b className="numero">{naoLidas}</b>
           <span>{P.resumo.naoLidas}</span>
         </button>
-        <button type="button" className="wpp-resumo-item" data-ativo={(estado.rastros ?? 0) > 0 || undefined} onClick={() => aoMostrar("rastros")}>
-          <History size={14} />
-          <b className="numero">{estado.rastros ?? 0}</b>
-          <span>{P.resumo.rastros}</span>
-        </button>
-        <button type="button" className="wpp-resumo-item" data-ativo={agendadas > 0 || undefined} onClick={() => aoMostrar("agendadas")}>
+        <button type="button" className="wpp-resumo-item wpp-resumo-automacao" aria-expanded={painelAberto} aria-controls="wpp-mensagens-automaticas" onClick={aoAlternarPainel}>
           <CalendarClock size={14} />
-          <b className="numero">{agendadas}</b>
-          <span>{P.resumo.agendadas}</span>
+          <span>{ROTULO_MENSAGENS_AUTOMATICAS}</span>
         </button>
       </div>
       <label className="wpp-busca">
@@ -337,21 +321,19 @@ function ListaDeConversas({
   );
 }
 
-const TRUQUES: { id: "apagadas" | "edicoes" | "fantasma" | "agendar" | "entrega"; icone: LucideIcon }[] = [
-  { id: "apagadas", icone: Trash2 },
-  { id: "edicoes", icone: PencilLine },
+const TRUQUES: { id: "fantasma" | "agendar" | "entrega"; icone: LucideIcon }[] = [
   { id: "fantasma", icone: Ghost },
   { id: "agendar", icone: CalendarClock },
   { id: "entrega", icone: CheckCheck },
 ];
 
-function BoasVindas({ fantasma, aoFantasma, rastros, aoMostrar, painelAberto, aoAlternarPainel }: { fantasma: boolean; aoFantasma: () => void; rastros: number; aoMostrar: (a: AbaDoPainel) => void; painelAberto: boolean; aoAlternarPainel: () => void }) {
+function BoasVindas({ fantasma, aoFantasma, painelAberto, aoAlternarPainel }: { fantasma: boolean; aoFantasma: () => void; painelAberto: boolean; aoAlternarPainel: () => void }) {
   return (
     <section className="wpp-conversa wpp-boas-vindas">
       <div className="wpp-conversa-topo wpp-boas-vindas-topo">
         <span />
-        <button type="button" className="wpp-icone" aria-label={painelAberto ? P.fecharPainel : P.abrirPainel} title={painelAberto ? P.fecharPainel : P.abrirPainel} onClick={aoAlternarPainel}>
-          {painelAberto ? <PanelRightClose size={16} /> : <PanelRightOpen size={16} />}
+        <button type="button" className="wpp-icone" aria-expanded={painelAberto} aria-label={ROTULO_MENSAGENS_AUTOMATICAS} title={ROTULO_MENSAGENS_AUTOMATICAS} onClick={aoAlternarPainel}>
+          <CalendarClock size={16} />
         </button>
       </div>
       <div className="wpp-boas-vindas-corpo">
@@ -362,7 +344,7 @@ function BoasVindas({ fantasma, aoFantasma, rastros, aoMostrar, painelAberto, ao
           {TRUQUES.map(({ id, icone: Icone }, i) => {
             const t = P.truques[id];
             const ligado = id === "fantasma" ? fantasma : undefined;
-            const acao = id === "fantasma" ? aoFantasma : id === "apagadas" || id === "edicoes" ? () => aoMostrar("rastros") : id === "agendar" ? () => aoMostrar("agendadas") : undefined;
+            const acao = id === "fantasma" ? aoFantasma : id === "agendar" ? aoAlternarPainel : undefined;
             const conteudo = (
               <>
                 <span className="wpp-truque-icone"><Icone size={16} /></span>
@@ -371,7 +353,6 @@ function BoasVindas({ fantasma, aoFantasma, rastros, aoMostrar, painelAberto, ao
                   <span>{t.texto}</span>
                 </span>
                 {ligado !== undefined && <span className="wpp-truque-estado" data-ligado={ligado || undefined}>{ligado ? P.ligado : P.desligado}</span>}
-                {id === "apagadas" && rastros > 0 && <span className="wpp-truque-estado" data-ligado>{rastros}</span>}
               </>
             );
             return acao ? (
@@ -402,7 +383,7 @@ function mesclarMensagens(antigas: MensagemWhatsapp[], vivas: MensagemWhatsapp[]
 }
 
 function Conversa({
-  conversa, digitando, fantasma, painelAberto, aoAlternarPainel, aoVoltar, aoAgendou, painel,
+  conversa, digitando, fantasma, painelAberto, aoAlternarPainel, aoVoltar, aoAgendou, aoEsconder,
 }: {
   conversa: ConversaWhatsapp;
   digitando?: { nome: string; audio: boolean };
@@ -411,7 +392,7 @@ function Conversa({
   aoAlternarPainel: () => void;
   aoVoltar: () => void;
   aoAgendou: (a: AgendadaWhatsapp[]) => void;
-  painel: (mensagens: MensagemWhatsapp[]) => ReactNode;
+  aoEsconder: () => void;
 }) {
   const avisar = useInterface((s) => s.avisar);
   const [antigas, setAntigas] = useState<MensagemWhatsapp[]>([]);
@@ -688,8 +669,9 @@ function Conversa({
           </span>
           {fantasma && <span className="wpp-etiqueta-fantasma" title={P.fantasmaDica}><Ghost size={12} /> {P.fantasma}</span>}
           <button type="button" className="wpp-icone" aria-pressed={buscando} aria-label={P.buscarNaConversa} title={P.buscarNaConversa} onClick={() => setBuscando((b) => !b)}><Search size={16} /></button>
-          <button type="button" className="wpp-icone" aria-label={painelAberto ? P.fecharPainel : P.abrirPainel} title={painelAberto ? P.fecharPainel : P.abrirPainel} onClick={aoAlternarPainel}>
-            {painelAberto ? <PanelRightClose size={16} /> : <PanelRightOpen size={16} />}
+          <button type="button" className="wpp-icone" aria-label={W.ignorar} title={W.ignorar} onClick={aoEsconder}><EyeOff size={16} /></button>
+          <button type="button" className="wpp-icone" aria-expanded={painelAberto} aria-label={ROTULO_MENSAGENS_AUTOMATICAS} title={ROTULO_MENSAGENS_AUTOMATICAS} onClick={aoAlternarPainel}>
+            <CalendarClock size={16} />
           </button>
         </header>
         {buscando && (
@@ -872,7 +854,6 @@ function Conversa({
           {ampliada && <img className="wpp-imagem-ampliada" src={ampliada} alt={W.midias.imagem} />}
         </Modal>
       </section>
-      {painel(mensagens)}
     </>
   );
 }
@@ -937,177 +918,6 @@ function Bolha({
           {podeApagar && <button type="button" data-perigo aria-label={P.apagarParaTodos} title={P.apagarParaTodos} onClick={aoApagar}><Trash2 size={13} /></button>}
         </div>
       )}
-    </div>
-  );
-}
-
-const ABAS_DO_PAINEL: { id: AbaDoPainel; icone: LucideIcon }[] = [
-  { id: "contato", icone: UserRound },
-  { id: "rastros", icone: History },
-  { id: "agendadas", icone: CalendarClock },
-];
-
-function PainelLateral({
-  aba, aoAba, aoFechar, conversa, mensagens, rastros, agendadas, aoAbrir, aoLimparRastros, aoCancelarAgendada, fantasma, aoFantasma, aoEsconder,
-}: {
-  aba: AbaDoPainel;
-  aoAba: (a: AbaDoPainel) => void;
-  aoFechar: () => void;
-  conversa: ConversaWhatsapp | null;
-  mensagens: MensagemWhatsapp[];
-  rastros: RastroWhatsapp[];
-  agendadas: AgendadaWhatsapp[];
-  aoAbrir: (id: string) => void;
-  aoLimparRastros: () => void;
-  aoCancelarAgendada: (id: string) => Promise<void>;
-  fantasma: boolean;
-  aoFantasma: () => void;
-  aoEsconder: (id: string) => void;
-}) {
-  const atual = aba === "contato" && !conversa ? "rastros" : aba;
-  return (
-    <aside className="wpp-painel" aria-label={P.painel}>
-      <header className="wpp-painel-topo">
-        <div className="wpp-painel-abas" role="tablist" aria-label={P.painel}>
-          {ABAS_DO_PAINEL.map(({ id, icone: Icone }) => (
-            <button key={id} type="button" role="tab" aria-selected={atual === id} disabled={id === "contato" && !conversa} className="wpp-painel-aba" onClick={() => aoAba(id)}>
-              <Icone size={13} /> {P.abas[id]}
-            </button>
-          ))}
-        </div>
-        <button type="button" className="wpp-icone" aria-label={P.fecharPainel} title={P.fecharPainel} onClick={aoFechar}><X size={15} /></button>
-      </header>
-      <div className="wpp-painel-corpo" key={atual}>
-        {atual === "contato" && conversa && <PainelDoContato conversa={conversa} mensagens={mensagens} rastros={rastros} fantasma={fantasma} aoFantasma={aoFantasma} aoEsconder={() => aoEsconder(conversa.id)} />}
-        {atual === "rastros" && <PainelDeRastros rastros={rastros} conversa={conversa} aoAbrir={aoAbrir} aoLimpar={aoLimparRastros} />}
-        {atual === "agendadas" && <PainelDeAgendadas agendadas={agendadas} aoAbrir={aoAbrir} aoCancelar={aoCancelarAgendada} />}
-      </div>
-    </aside>
-  );
-}
-
-function PainelDoContato({ conversa, mensagens, rastros, fantasma, aoFantasma, aoEsconder }: { conversa: ConversaWhatsapp; mensagens: MensagemWhatsapp[]; rastros: RastroWhatsapp[]; fantasma: boolean; aoFantasma: () => void; aoEsconder: () => void }) {
-  const numeros = useMemo(() => {
-    const porHora = Array.from({ length: 24 }, () => 0);
-    let minhas = 0;
-    let midias = 0;
-    for (const m of mensagens) {
-      porHora[new Date(m.data).getHours()] += 1;
-      if (m.minha) minhas += 1;
-      if (m.midia !== "nenhuma") midias += 1;
-    }
-    const maior = Math.max(1, ...porHora);
-    const pico = porHora.indexOf(Math.max(...porHora));
-    return { porHora, maior, pico, minhas, delas: mensagens.length - minhas, midias, desde: mensagens[0]?.data };
-  }, [mensagens]);
-  const daConversa = rastros.filter((r) => r.conversa === conversa.id);
-  const apagadas = daConversa.filter((r) => r.tipo === "apagada").length;
-  const editadas = daConversa.length - apagadas;
-  const total = mensagens.length;
-  const parteMinha = total ? Math.round((numeros.minhas / total) * 100) : 0;
-
-  return (
-    <div className="wpp-contato">
-      <div className="wpp-contato-cartao">
-        <Avatar nome={conversa.nome} foto={conversa.foto} tamanho={84} grupo={conversa.grupo} />
-        <b className="privado">{conversa.nome}</b>
-        <span className="privado">{conversa.grupo ? W.grupo : numeroDoJid(conversa.id)}</span>
-      </div>
-      <div className="wpp-numeros">
-        <div><b className="numero">{total}</b><span>{P.numeros.carregadas}</span></div>
-        <div><b className="numero">{numeros.midias}</b><span>{P.numeros.midias}</span></div>
-        <div><b className="numero">{apagadas}</b><span>{P.numeros.apagadas}</span></div>
-        <div><b className="numero">{editadas}</b><span>{P.numeros.editadas}</span></div>
-      </div>
-      {total > 0 && (
-        <section className="wpp-bloco">
-          <h3>{P.quemFalaMais}</h3>
-          <div className="wpp-balanca" role="img" aria-label={P.balanca(parteMinha)}>
-            <span style={{ width: `${parteMinha}%` }} />
-          </div>
-          <div className="wpp-balanca-legenda">
-            <span>{W.voce} <b className="numero">{numeros.minhas}</b></span>
-            <span>{conversa.grupo ? P.outros : conversa.nome.split(" ")[0]} <b className="numero">{numeros.delas}</b></span>
-          </div>
-        </section>
-      )}
-      {total > 0 && (
-        <section className="wpp-bloco">
-          <h3>{P.horarios}</h3>
-          <div className="wpp-horas" role="img" aria-label={P.picoAs(numeros.pico)}>
-            {numeros.porHora.map((n, h) => (
-              <span key={h} data-pico={h === numeros.pico || undefined} title={P.mensagensAs(n, h)} style={{ height: `${Math.max(4, (n / numeros.maior) * 100)}%` }} />
-            ))}
-          </div>
-          <div className="wpp-horas-legenda"><span>0h</span><span>12h</span><span>23h</span></div>
-          <p className="wpp-nota">{P.picoAs(numeros.pico)}{numeros.desde ? `. ${P.desde(dataCompleta(numeros.desde))}` : ""}</p>
-        </section>
-      )}
-      <section className="wpp-bloco">
-        <button type="button" className="wpp-linha-acao" role="switch" aria-checked={fantasma} onClick={aoFantasma}>
-          <Ghost size={15} />
-          <span className="coluna" style={{ gap: 1, flex: 1, minWidth: 0 }}>
-            <b>{P.truques.fantasma.titulo}</b>
-            <span>{P.fantasmaDica}</span>
-          </span>
-          <span className="wpp-truque-estado" data-ligado={fantasma || undefined}>{fantasma ? P.ligado : P.desligado}</span>
-        </button>
-        <button type="button" className="wpp-linha-acao" onClick={aoEsconder}>
-          <EyeOff size={15} />
-          <span className="coluna" style={{ gap: 1, flex: 1, minWidth: 0 }}>
-            <b>{W.ignorar}</b>
-            <span>{W.ignorarDica}</span>
-          </span>
-        </button>
-      </section>
-    </div>
-  );
-}
-
-function PainelDeRastros({ rastros, conversa, aoAbrir, aoLimpar }: { rastros: RastroWhatsapp[]; conversa: ConversaWhatsapp | null; aoAbrir: (id: string) => void; aoLimpar: () => void }) {
-  const [soDestaConversa, setSoDestaConversa] = useState(false);
-  const [tipo, setTipo] = useState<"todos" | RastroWhatsapp["tipo"]>("todos");
-  const [limpando, setLimpando] = useState(false);
-  const lista = rastros.filter((r) => (tipo === "todos" || r.tipo === tipo) && (!soDestaConversa || r.conversa === conversa?.id));
-
-  return (
-    <div className="wpp-rastros">
-      <p className="wpp-nota">{P.rastrosExplicacao}</p>
-      <div className="wpp-filtros">
-        {(["todos", "apagada", "editada"] as const).map((t) => (
-          <button key={t} type="button" className="wpp-filtro" aria-pressed={tipo === t} onClick={() => setTipo(t)}>{P.tiposDeRastro[t]}</button>
-        ))}
-        {conversa && <button type="button" className="wpp-filtro" aria-pressed={soDestaConversa} onClick={() => setSoDestaConversa((v) => !v)}>{P.soDestaConversa}</button>}
-      </div>
-      {lista.length === 0 ? (
-        <div className="wpp-painel-vazio">
-          <History size={22} />
-          <b>{P.semRastros}</b>
-          <span>{P.semRastrosDica}</span>
-        </div>
-      ) : (
-        <div className="wpp-rastros-lista">
-          {lista.map((r, i) => (
-            <article key={`${r.tipo}-${r.id}-${r.quando}`} className="wpp-rastro" data-tipo={r.tipo} style={{ ["--ordem" as string]: Math.min(i, 10) }}>
-              <header>
-                {r.tipo === "apagada" ? <Trash2 size={12} /> : <PencilLine size={12} />}
-                <b>{P.tiposDeRastro[r.tipo]}</b>
-                <span className="numero">{horarioRelativo(r.quando)}</span>
-              </header>
-              <button type="button" className="wpp-rastro-conversa privado" onClick={() => aoAbrir(r.conversa)}>
-                {r.nomeDaConversa}
-                {r.grupo && r.nomeRemetente ? ` · ${r.nomeRemetente}` : ""}
-                <ArrowRight size={11} />
-              </button>
-              <p className="wpp-rastro-texto privado">{r.texto || rotuloDaMidia(r)}</p>
-              {r.textoNovo !== undefined && <p className="wpp-rastro-novo privado"><ArrowRight size={11} /> {r.textoNovo}</p>}
-              <footer>{P.enviadaEm(dataCompleta(r.data))}</footer>
-            </article>
-          ))}
-        </div>
-      )}
-      {rastros.length > 0 && <Botao pequeno variante="fantasma" icone={<Trash2 size={13} />} onClick={() => setLimpando(true)}>{P.limparRastros}</Botao>}
-      <ConfirmarModal aberto={limpando} titulo={P.limparRastros} texto={P.limparRastrosConfirmar} rotuloConfirmar={P.limparRastros} aoFechar={() => setLimpando(false)} aoConfirmar={aoLimpar} />
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import type { ConfiguracaoAderencias, PlanilhaAderencia, ResultadoAderencia } from "../modulos/escritorio/aderenciasTipos";
+import type { RascunhoAderencias } from "../modulos/escritorio/edicaoAderencias";
 import { cabecalhosNiko, urlApi, useAuth, type UsuarioAutenticado } from "../estado/autenticacao";
 import type { AgendadaWhatsapp } from "./whatsapp";
 
@@ -72,11 +73,12 @@ async function pedir<T>(caminho: string, corpo?: unknown, signal?: AbortSignal):
 
 export const aderenciasPonte = {
   estado: () => pedir<{ disponivel: boolean; navegador: boolean }>("estado"),
-  configuracao: () => pedir<{ configuracao: ConfiguracaoAderencias }>("configuracao"),
-  salvarConfiguracao: (configuracao: ConfiguracaoAderencias) => pedir<{ configuracao: ConfiguracaoAderencias }>("configuracao", { configuracao }),
+  configuracao: (signal?: AbortSignal) => pedir<{ configuracao: ConfiguracaoAderencias }>("configuracao", undefined, signal),
+  salvarRotina: (rascunho: RascunhoAderencias) => pedir<{ configuracao: ConfiguracaoAderencias }>("salvar-rotina", { rascunho }),
+  registrarResultado: (grupoId: string, resultado: ResultadoAderencia) => pedir<{ configuracao: ConfiguracaoAderencias }>("registrar-resultado", { grupoId, resultado }),
   testar: (planilha: PlanilhaAderencia) => pedir<PreviaAderencia>("testar", { planilha }),
-  enviar: (configuracao: ConfiguracaoAderencias, planilha: PlanilhaAderencia) => pedir<ResultadoEnvioAderencia>("enviar", { configuracao, planilha }),
-  executar: (configuracao: ConfiguracaoAderencias, grupoId?: string) => pedir<{ resultado: ResultadoAderencia; previas: PreviaAderencia[] }>("executar", { configuracao, grupoId }),
+  enviar: (grupoId: string, planilha: PlanilhaAderencia, configuracao?: ConfiguracaoAderencias) => pedir<ResultadoEnvioAderencia>("enviar", { grupoId, configuracao, planilha }),
+  executar: (grupoId: string, configuracao?: ConfiguracaoAderencias) => pedir<{ resultado: ResultadoAderencia; previas: PreviaAderencia[] }>("executar", { grupoId, configuracao }),
   mensagensAutomaticas: (signal?: AbortSignal) => pedir<MensagensAutomaticasAderencia>("mensagens-automaticas", undefined, signal),
   participantes: (jid: string, signal?: AbortSignal) => pedir<{ participantes: Array<{ numero: string; nome: string }> }>("mensagens-automaticas", { operacao: "participantes", jid }, signal),
   agendarMensagem: (agenda: AgendamentoMensagemAderencia) => pedir<{ id: string }>("mensagens-automaticas", { operacao: "agendar", ...agenda }),

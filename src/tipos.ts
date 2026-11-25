@@ -15,6 +15,8 @@ export type Rota =
   | "chat"
   | "escritorio"
   | "appsEmpresa"
+  | "powerBi"
+  | "sults"
   | "conexoes"
   | "journal"
   | "estudos"

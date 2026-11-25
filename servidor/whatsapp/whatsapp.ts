@@ -1220,42 +1220,12 @@ export async function cancelarAgendada(idBruto: unknown) {
 
 const TAMANHO_MAXIMO_DO_ENVIO = 16 * 1024 * 1024;
 
-export async function enviarImagemNoWhatsapp(jid: unknown, bytes: Buffer, nome = "imagem.png", legenda = "", opcoes: { altaQualidade?: boolean } = {}) {
-  if (typeof jid !== "string") throw new Error("pedido_invalido");
-  const id = jidNormalizado(jid);
-  if (!jid.includes("@") || !caixa.conversas.has(id)) throw new Error("resposta_sem_conversa");
-  if (!Buffer.isBuffer(bytes) || bytes.length === 0) throw new Error("arquivo_vazio");
+export async function enviarPrintNoWhatsapp(jid: string, bytes: Buffer, nome: string, legenda: string) {
+  const id = conversaParaEnvioDeMidia(jid);
+  if (bytes.length === 0) throw new Error("arquivo_vazio");
   if (bytes.length > TAMANHO_MAXIMO_DO_ENVIO) throw new Error("arquivo_grande_demais");
-  if (!envios.permitir()) throw new Error("resposta_muitas");
-  if (!estado.porta) throw new Error("gateway_parado");
-  const tipo = tipoPelosBytes(bytes, "");
-  if (tipo !== "image/png" && tipo !== "image/jpeg") throw new Error("imagem_formato");
-  const arquivo = nome.replace(/[\\/:*?"<>|\u0000-\u001f]/g, "_").slice(0, 120) || "imagem.png";
-  const texto = legenda.trim().slice(0, 1024);
-  const formulario = new FormData();
-  formulario.set("phone", id);
-  if (texto) formulario.set("caption", texto);
-  if (opcoes.altaQualidade) {
-    formulario.set("hd", "true");
-    formulario.set("compress", "false");
-  }
-  formulario.set("image", new Blob([new Uint8Array(bytes)], { type: tipo }), arquivo);
-  const r = await fetch(urlDoGateway("/send/image"), {
-    method: "POST",
-    headers: { authorization: `Basic ${Buffer.from(estado.acesso).toString("base64")}`, "x-device-id": estado.dispositivo },
-    body: formulario,
-    signal: AbortSignal.timeout(120_000),
-  });
-  const corpo = (await r.json().catch(() => null)) as Record<string, unknown> | null;
-  if (!r.ok) throw new Error(codigoDeErro(corpo) || `gateway_${r.status}`);
-  const idDaMensagem = (corpo?.results as Record<string, unknown> | undefined)?.message_id;
-  const idFinal = typeof idDaMensagem === "string" ? idDaMensagem : `niko-${randomBytes(6).toString("hex")}`;
-  guardarMidia(`${id}/${idFinal}`, { tipo, bytes });
-  caixa.adicionar({ id: idFinal, conversa: id, remetente: estado.eu ?? id, nomeRemetente: "", texto, midia: "imagem", nomeDoArquivo: arquivo, tamanho: bytes.length, data: horarioDoEnvio(id), minha: true, mencionaMe: false, local: true }, estado.config);
-  confirmarHorariosDepois(id);
-  notificarMudancaWhatsapp();
-  const conversa = caixa.conversas.get(id);
-  return conversa ? resumoDaConversa(conversa) : null;
+  if (tipoPelosBytes(bytes, "") !== "image/png") throw new Error("imagem_formato");
+  return enviarMidiaNoWhatsapp(id, bytes, nome, legenda, ROTA_DOCUMENTO);
 }
 
 function lerBytes(req: IncomingMessage, limite: number): Promise<Buffer> {
@@ -1272,24 +1242,33 @@ function lerBytes(req: IncomingMessage, limite: number): Promise<Buffer> {
   });
 }
 
+const ROTA_DOCUMENTO = { caminho: "/send/file", campo: "file", midia: "documento" } as const;
+
 function rotaDoEnvio(bytes: Buffer): { caminho: string; campo: string; midia: MensagemWhatsapp["midia"] } {
   const tipo = tipoPelosBytes(bytes, "");
   if (tipo === "image/jpeg" || tipo === "image/png") return { caminho: "/send/image", campo: "image", midia: "imagem" };
   if (tipo === "video/mp4") return { caminho: "/send/video", campo: "video", midia: "video" };
-  return { caminho: "/send/file", campo: "file", midia: "documento" };
+  return ROTA_DOCUMENTO;
+}
+
+function conversaParaEnvioDeMidia(jid: string) {
+  const id = jidNormalizado(jid);
+  if (!jid.includes("@") || !caixa.conversas.has(id)) throw new Error("resposta_sem_conversa");
+  return id;
 }
 
 export async function enviarArquivoNoWhatsapp(req: IncomingMessage, consulta: URLSearchParams) {
-  const jid = consulta.get("jid") ?? "";
-  const nome = (consulta.get("nome") ?? "arquivo").replace(/[\\/:*?"<>|\u0000-\u001f]/g, "_").slice(0, 120) || "arquivo";
-  const legenda = (consulta.get("legenda") ?? "").trim().slice(0, 1024);
-  const id = jidNormalizado(jid);
-  if (!jid.includes("@") || !caixa.conversas.has(id)) throw new Error("resposta_sem_conversa");
+  const id = conversaParaEnvioDeMidia(consulta.get("jid") ?? "");
   const bytes = await lerBytes(req, TAMANHO_MAXIMO_DO_ENVIO);
   if (bytes.length === 0) throw new Error("arquivo_vazio");
+  return enviarMidiaNoWhatsapp(id, bytes, consulta.get("nome") ?? "arquivo", consulta.get("legenda") ?? "", rotaDoEnvio(bytes));
+}
+
+async function enviarMidiaNoWhatsapp(id: string, bytes: Buffer, nomeBruto: string, legendaBruta: string, rota: ReturnType<typeof rotaDoEnvio>) {
   if (!envios.permitir()) throw new Error("resposta_muitas");
   if (!estado.porta) throw new Error("gateway_parado");
-  const rota = rotaDoEnvio(bytes);
+  const nome = nomeBruto.replace(/[\\/:*?"<>|\u0000-\u001f]/g, "_").slice(0, 120) || "arquivo";
+  const legenda = legendaBruta.trim().slice(0, 1024);
   const tipoDoArquivo = tipoPelosBytes(bytes, rota.midia) ?? "application/octet-stream";
   const formulario = new FormData();
   formulario.set("phone", id);

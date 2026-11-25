@@ -28,6 +28,7 @@ import { listarArquivos, receberArquivo, enviarConteudo, excluirArquivo, excluir
 import { tipoDoComputador, estadoDoSistema, listarRedes, listarBluetooth, lerComputador, conectarRede, esquecerRede, desconectarRede, definirBrilho, definirRadio, abrirConfiguracoesDoSistema } from "./sistema.ts";
 import { instalarSincroniaTempoReal, notificarDadosUsuarioAlterados } from "./sincroniaTempoReal.ts";
 import { configuracaoSalva, executarAderencias, enviarAderencia, navegadorDeAderenciasDisponivel, salvarConfiguracaoAderencias, testarAderencia } from "./aderencias.ts";
+import { aplicarRascunhoAderencias, type RascunhoAderencias } from "../src/modulos/escritorio/edicaoAderencias.ts";
 import { comUsuarioLocal } from "./escopoUsuario.ts";
 import { tratarAplicativosEmpresa } from "../src/servicos/aplicativosEmpresa.ts";
 
@@ -150,7 +151,7 @@ function urlPublicaDaPonte(req: IncomingMessage): string {
   return urlPublicaDoAmbiente() || `http://${hostDaRequisicao(req)}`;
 }
 
-const ACOES_ADERENCIA = ["estado", "testar", "enviar", "executar", "configuracao", "mensagens-automaticas"] as const;
+const ACOES_ADERENCIA = ["estado", "testar", "enviar", "executar", "configuracao", "salvar-rotina", "registrar-resultado", "mensagens-automaticas"] as const;
 type AcaoAderencia = typeof ACOES_ADERENCIA[number];
 type AcaoWhatsappRemota = "estado" | "novidades" | "midia" | "enviar-arquivo" | "historico" | "abrir" | "fechar" | "enviar" | "editar" | "apagar" | "rastros" | "limpar-rastros" | "agendadas" | "agendar" | "cancelar-agendada" | "ligar" | "filtros" | "ignorar" | "desconectar" | "esquecer";
 
@@ -195,10 +196,25 @@ async function atenderAderencia(req: IncomingMessage, res: ServerResponse, acao:
     if (req.method !== "POST") return responder(res, 405, { erro: "metodo_nao_permitido" });
     const corpo = await lerCorpo(req);
     if (acao === "configuracao") return responder(res, 200, { configuracao: salvarConfiguracaoAderencias(corpo.configuracao, usuarioId) });
+    if (acao === "salvar-rotina") {
+      const rascunho = corpo.rascunho as RascunhoAderencias | undefined;
+      if (!rascunho?.grupo || typeof rascunho.grupo.id !== "string") return responder(res, 400, { erro: "rotina_invalida" });
+      const proxima = aplicarRascunhoAderencias(configuracaoSalva(usuarioId), rascunho);
+      return responder(res, 200, { configuracao: salvarConfiguracaoAderencias(proxima, usuarioId) });
+    }
+    const grupoId = typeof corpo.grupoId === "string" && corpo.grupoId ? corpo.grupoId : undefined;
+    if (acao === "registrar-resultado") {
+      if (!grupoId || !corpo.resultado || typeof corpo.resultado !== "object") return responder(res, 400, { erro: "resultado_invalido" });
+      const atual = configuracaoSalva(usuarioId);
+      if (!atual.grupos.some((grupo) => grupo.id === grupoId)) return responder(res, 200, { configuracao: atual });
+      const grupos = atual.grupos.map((grupo) => grupo.id === grupoId ? { ...grupo, ultimoResultado: corpo.resultado } : grupo);
+      return responder(res, 200, { configuracao: salvarConfiguracaoAderencias({ ...atual, grupos }, usuarioId) });
+    }
     if (acao === "testar") return responder(res, 200, await testarAderencia(corpo.planilha));
-    if (acao === "enviar") return responder(res, 200, await enviarAderencia(corpo.configuracao, corpo.planilha));
+    const configuracao = corpo.configuracao ?? (grupoId ? configuracaoSalva(usuarioId) : undefined);
+    if (acao === "enviar") return responder(res, 200, await enviarAderencia(configuracao, corpo.planilha, grupoId));
     await iniciarWhatsapp();
-    return responder(res, 200, await executarAderencias(corpo.configuracao, typeof corpo.grupoId === "string" ? corpo.grupoId : undefined));
+    return responder(res, 200, await executarAderencias(configuracao, grupoId));
   });
 }
 
@@ -580,7 +596,11 @@ export const rotas: Connect.NextHandleFunction = async (req, res, proximo) => {
     if (!esperado) return responder(res, 503, { erro: "gateway_remoto_nao_configurado" });
     if (!recebido || recebido !== esperado) return responder(res, 401, { erro: "gateway_nao_autorizado" });
     if (gatewayAderencia === "mensagens-automaticas" && !/^[1-9]\d*$/.test(usuarioDaAderencia(req) ?? "")) return responder(res, 400, { erro: "usuario_invalido" });
-    return await atenderAderencia(req, res, gatewayAderencia);
+    try {
+      return await atenderAderencia(req, res, gatewayAderencia);
+    } catch (erro) {
+      return responder(res, 400, { erro: (erro as Error).message });
+    }
   }
   const gatewayWhatsapp = new RegExp(`^/gateway/whatsapp/(${["estado", "novidades", "midia", "enviar-arquivo", "historico", "abrir", "fechar", "enviar", "editar", "apagar", "rastros", "limpar-rastros", "agendadas", "agendar", "cancelar-agendada", "ligar", "filtros", "ignorar", "desconectar", "esquecer"].join("|")})$`).exec(url.pathname);
   if (gatewayWhatsapp) {

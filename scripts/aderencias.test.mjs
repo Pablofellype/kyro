@@ -1,11 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { construirMensagem, slotAderenciaDevido } from "../servidor/aderencias.ts";
+import { construirMensagem, enviarAderencia, executarAderencias, slotAderenciaDevido } from "../servidor/aderencias.ts";
 import { configuracaoAderenciasValida, planilhaAderenciaValida } from "../src/modulos/escritorio/aderenciasTipos.ts";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { WebSocketServer } from "ws";
 import { ClienteCdp } from "../servidor/aderencias.ts";
-import { criarFilaDeCapturas, escalasDaCaptura, MAXIMO_PIXELS_DA_CAPTURA, TELA_DA_CAPTURA } from "../servidor/capturaAderencias.ts";
+import { criarFilaDeCapturas, escalasDaCaptura, MAXIMO_PIXELS_DA_CAPTURA, MAXIMO_PIXELS_DO_PNG_ORIGINAL, TELA_DA_CAPTURA } from "../servidor/capturaAderencias.ts";
 import { aplicarRascunhoAderencias, copiarPlanilhasAderencias, criarRascunhoAderencias } from "../src/modulos/escritorio/edicaoAderencias.ts";
 
 const planilha = (parcial = {}) => planilhaAderenciaValida({ nome: "P1", ...parcial }, "p1");
@@ -26,6 +26,7 @@ test("duplicação copia links, intervalos e alertas sem ativar ou alterar a rot
   assert.equal(copia.grupo.ativo, false);
   assert.equal(copia.grupo.ultimoAgendamento, "");
   assert.equal(copia.grupo.ultimoResultado, null);
+  assert.equal(copia.grupo.destinoJid, config.grupos[0].destinoJid);
   assert.notEqual(copia.grupo.planilhas[0].id, config.grupos[0].planilhas[0].id);
   assert.deepEqual({ ...copia.grupo.planilhas[0], id: "p1" }, config.grupos[0].planilhas[0]);
   copia.grupo.nome = "Tarde"; copia.grupo.hora = "14:00"; copia.grupo.diasSemana.push(6);
@@ -42,7 +43,7 @@ test("edição e remoção permanecem no rascunho até aplicar; preserva dados n
   const rascunho = criarRascunhoAderencias(config, config.grupos[0]);
   rascunho.grupo.hora = "09:00";
   rascunho.grupo.planilhas = [];
-  rascunho.destinoJid = "outro@g.us";
+  rascunho.grupo.destinoJid = "outro@g.us";
   assert.equal(config.grupos[0].hora, "07:00");
   assert.equal(config.grupos[0].planilhas.length, 1);
   assert.equal(config.destinoJid, "120363@g.us");
@@ -51,6 +52,7 @@ test("edição e remoção permanecem no rascunho até aplicar; preserva dados n
   const salva = aplicarRascunhoAderencias(config, rascunho);
   assert.equal(salva.grupos[0].hora, "09:00");
   assert.equal(salva.grupos[0].planilhas.length, 0);
+  assert.equal(salva.grupos[0].destinoJid, "outro@g.us");
   assert.equal(salva.grupos[0].ultimoAgendamento, "novo-slot");
   assert.equal(salva.grupos[0].ultimoResultado.planilhasEnviadas, 5);
   rascunho.excluir = true;
@@ -73,6 +75,7 @@ test("nova rotina reutiliza somente as planilhas escolhidas, com IDs independent
   const salva = aplicarRascunhoAderencias(config, nova);
   assert.equal(salva.grupos.length, 2);
   assert.equal(salva.grupos[1].ativo, false);
+  assert.equal(salva.grupos[1].destinoJid, "");
   assert.equal(salva.grupos[1].planilhas[0].nome, "Outro nome");
 });
 
@@ -89,16 +92,72 @@ test("salvamento rejeita excessos e rotina removida sem truncar as configuraçõ
   assert.throws(() => aplicarRascunhoAderencias(config, edicao), /horário/);
 });
 
-test("salvar uma rotina conserva as demais e um destino atualizado durante a edição", () => {
+test("salvar sem editar o destino mantém o destino mais recente da própria rotina", () => {
   const config = configuracaoDeEdicao();
   const edicao = criarRascunhoAderencias(config, config.grupos[0]);
   edicao.grupo.nome = "Manhã revisada";
-  const baseNova = configuracaoAderenciasValida({ ...config, destinoJid: "novo@g.us", destinoNome: "Novo destino", grupos: [...config.grupos, { id: "noite", nome: "Noite", hora: "21:00", ativo: true, frequencia: "diaria" }] });
+  const baseNova = configuracaoAderenciasValida({ ...config, grupos: [
+    { ...config.grupos[0], destinoJid: "novo@g.us", destinoNome: "Novo destino" },
+    { id: "noite", nome: "Noite", hora: "21:00", ativo: true, frequencia: "diaria", destinoJid: "noite@g.us" },
+  ] });
   const salva = aplicarRascunhoAderencias(baseNova, edicao);
-  assert.equal(salva.destinoJid, "novo@g.us");
-  assert.equal(salva.destinoNome, "Novo destino");
+  assert.equal(salva.grupos[0].destinoJid, "novo@g.us");
+  assert.equal(salva.grupos[0].destinoNome, "Novo destino");
   assert.deepEqual(salva.grupos[1], baseNova.grupos[1]);
   assert.equal(salva.grupos[0].nome, "Manhã revisada");
+});
+
+test("migrar e editar o destino de uma rotina mantém o grupo das demais", () => {
+  const antiga = configuracaoAderenciasValida({
+    destinoJid: "origem@g.us", destinoNome: "Grupo anterior",
+    grupos: [{ id: "manha", nome: "Manhã" }, { id: "tarde", nome: "Tarde" }],
+  });
+  assert.deepEqual(antiga.grupos.map((grupo) => grupo.destinoJid), ["origem@g.us", "origem@g.us"]);
+
+  const manha = criarRascunhoAderencias(antiga, antiga.grupos[0]);
+  const tarde = criarRascunhoAderencias(antiga, antiga.grupos[1]);
+  manha.grupo.destinoJid = "manha@g.us";
+  manha.grupo.destinoNome = "Grupo da manhã";
+  tarde.grupo.destinoJid = "tarde@g.us";
+  tarde.grupo.destinoNome = "Grupo da tarde";
+  const primeira = aplicarRascunhoAderencias(antiga, manha);
+  assert.equal(primeira.grupos[1].destinoJid, "origem@g.us");
+  const salva = aplicarRascunhoAderencias(primeira, tarde);
+  const reaberta = configuracaoAderenciasValida(JSON.parse(JSON.stringify(salva)));
+  assert.deepEqual(reaberta.grupos.map((grupo) => [grupo.destinoJid, grupo.destinoNome]), [
+    ["manha@g.us", "Grupo da manhã"], ["tarde@g.us", "Grupo da tarde"],
+  ]);
+});
+
+test("envio individual e execução usam apenas o destino da rotina escolhida", async () => {
+  const semDestino = planilha({ id: "p2", nome: "P2" });
+  const comDestino = planilha({ id: "p1", nome: "P1" });
+  const config = configuracaoAderenciasValida({ destinoJid: "legado@g.us", grupos: [
+    { id: "manha", destinoJid: "manha@g.us", planilhas: [comDestino] },
+    { id: "tarde", nome: "Tarde", destinoJid: "", planilhas: [semDestino] },
+  ] });
+  assert.equal(config.grupos[1].destinoJid, "");
+  await assert.rejects(enviarAderencia(config, semDestino, "tarde"), /destino_do_whatsapp_obrigatorio/);
+  await assert.rejects(enviarAderencia(config, semDestino, "manha"), /planilha_nao_encontrada_na_rotina/);
+  await assert.rejects(executarAderencias(config, "tarde"), /destino_do_whatsapp_obrigatorio/);
+  const { resultado } = await executarAderencias(config);
+  assert.deepEqual(resultado.erros, ["P1: link_da_planilha_invalido", "Tarde: destino_do_whatsapp_obrigatorio"]);
+});
+
+test("a ordem editada sobrevive ao salvamento e é seguida na execução da rotina", async () => {
+  const config = configuracaoDeEdicao();
+  const grupo = config.grupos[0];
+  grupo.planilhas = Array.from({ length: 5 }, (_, i) => planilha({ id: `p${i + 1}`, nome: `P${i + 1}` }));
+  const rascunho = criarRascunhoAderencias(config, grupo);
+  rascunho.grupo.planilhas = [grupo.planilhas[4], ...grupo.planilhas.slice(0, 4)];
+  const salva = aplicarRascunhoAderencias(config, rascunho);
+  const reaberta = configuracaoAderenciasValida(JSON.parse(JSON.stringify(salva)));
+  const ordem = ["P5", "P1", "P2", "P3", "P4"];
+  assert.deepEqual(reaberta.grupos[0].planilhas.map((item) => item.nome), ordem);
+  assert.deepEqual(grupo.planilhas.map((item) => item.nome), ["P1", "P2", "P3", "P4", "P5"]);
+  // Links vazios fazem a validação falhar em sequência, sem abrir o navegador ou enviar mensagens.
+  const { resultado } = await executarAderencias(reaberta, grupo.id);
+  assert.deepEqual(resultado.erros.map((erro) => erro.split(":")[0]), ordem);
 });
 
 test("configuração do robô normaliza planilhas e preserva o agendamento", () => {
@@ -169,6 +228,21 @@ test("captura usa densidade extra apenas no recorte e respeita o orçamento de p
     }
   }
   assert.equal(escalasDaCaptura({ x: 0, y: 0, width: 500, height: 600 })[0], 2);
+});
+
+test("o PNG enviado ganha resolução sem aumentar a captura da prévia", () => {
+  for (const [width, height] of [[500, 600], [1600, 1000], [4000, 1000], [8100, 480]]) {
+    const area = { x: 0, y: 0, width, height };
+    const escalas = escalasDaCaptura(area, true);
+    assert.ok(escalas[0] >= escalasDaCaptura(area)[0]);
+    assert.equal(escalas.at(-1), 1);
+    for (const escala of escalas) {
+      assert.ok(width * height * escala ** 2 <= MAXIMO_PIXELS_DO_PNG_ORIGINAL);
+      assert.ok(Math.max(width, height) * escala <= 8192);
+    }
+  }
+  assert.equal(escalasDaCaptura({ x: 0, y: 0, width: 500, height: 600 }, true)[0], 3);
+  assert.equal(escalasDaCaptura({ x: 0, y: 0, width: 1600, height: 1000 }, true)[0], 2.5);
 });
 
 test("intervalos excessivos ou inválidos falham antes de criar o bitmap, sem gerar print ilegível", () => {

@@ -222,8 +222,8 @@ test("menu e página de configurações da gerência mostram personalização e 
       assert.match(menu, /barra-item-texto cortar">WhatsApp<\/span>/);
       assert.match(menu, /barra-item-texto cortar">Escritório<\/span>/);
       if (recolhida) {
-        assert.match(menu, /aria-label="Aplicativos"[^>]*aria-haspopup="dialog"/);
-        assert.match(menu, /barra-item-texto cortar">Apps<\/span>/);
+        assert.match(menu, /aria-label="Sistemas"[^>]*aria-haspopup="dialog"/);
+        assert.match(menu, /barra-item-texto cortar">Sistemas<\/span>/);
         assert.doesNotMatch(menu, /data-app=/);
         assert.equal((menu.match(/aria-current="page"/g) ?? []).length, 1);
       } else {
@@ -571,7 +571,7 @@ test("painel da gerência recebe a pessoa pelo nome e oferece apenas atalhos per
     config.nome = "";
     const html = renderToStaticMarkup(createElement(PainelCoordenacao));
     assert.ok(html.includes(`${saudacao()}, Mariana!`));
-    for (const texto of ["Painel da gerência", "Personalizar meu espaço", "Precisa da sua atenção", "Na sua agenda", "Seus sistemas", "Registros de limpeza", "Sistema de requisições"]) assert.ok(html.includes(texto), texto);
+    for (const texto of ["Painel da gerência", "Personalizar meu espaço", "Precisa da sua atenção", "Na sua agenda", "Seus sistemas", "Registros de limpeza", "Sistema de requisições", "Power BI", "Nova atividade", "Novo compromisso", "Novo registro"]) assert.ok(html.includes(texto), texto);
     assert.doesNotMatch(html, /Abrir conversa|Administração|Provedores de IA|Gerenciar acessos|Equipe cadastrada|Robô de Aderências|Últimas atividades do Kyro|Membros cadastrados|Avisos e mensagens/);
     config.nome = "Mari";
     assert.ok(renderToStaticMarkup(createElement(PainelCoordenacao)).includes(`${saudacao()}, Mari!`));
@@ -595,9 +595,17 @@ test("escritório diferencia os acessos do dono e mantém falhas da equipe disti
   const falhou = renderToStaticMarkup(createElement(VisaoDoEscritorio, props));
   for (const texto of ["Escritório da empresa", "Equipe cadastrada", "Gerenciar acessos", "Robô de Aderências", "Não foi possível consultar a equipe agora."]) assert.ok(falhou.includes(texto), texto);
   assert.doesNotMatch(falhou, /Pedidos no Kyro|Solicitações recebidas|Ver solicitações|online|Nenhuma conta ativa nesta consulta/);
-  const carregado = renderToStaticMarkup(createElement(VisaoDoEscritorio, { ...props, resumo: resumirPainelEmpresa([], [], agora), remoto: { ...props.remoto, membros: [], erroMembros: false } }));
+  const rotinas = [{ id: "rotina-teste", nome: "Envio da manhã", ativo: true, frequencia: "diaria", ultimoResultado: { executadoEm: agora.toISOString(), planilhasEnviadas: 2, erros: ["falha de teste"] } }];
+  const carregado = renderToStaticMarkup(createElement(VisaoDoEscritorio, {
+    ...props, mensagens: 7,
+    remoto: { ...props.remoto, membros: [], erroMembros: false, aderencias: { situacao: "prontas", rotinas } },
+  }));
   assert.ok(carregado.includes("Nenhuma atividade pendente neste resumo"));
   assert.ok(carregado.includes("Nenhuma conta ativa nesta consulta"));
+  assert.equal((carregado.match(/class="ee-metrica"/g) ?? []).length, 4);
+  assert.match(carregado, /Mensagens não lidas<\/span><strong>7<\/strong>/);
+  assert.match(carregado, /Agendamentos ativos<\/dt><dd>1<\/dd>/);
+  assert.match(carregado, /Envio da manhã<\/strong><span>2 prints enviados · 1 falha/);
   assert.doesNotMatch(carregado, /Pedidos no Kyro|Solicitações recebidas|Ver solicitações/);
 });
 

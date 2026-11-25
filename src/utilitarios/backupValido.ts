@@ -37,6 +37,7 @@ const esquemas: Record<string, Record<string, Regra>> = {
   organizacao: {
     pilares: [{ id, nome: "s", nota: "n" }], metas: [{ id, nome: "s", pilarId: id, tipo: "habito|estudo|financeira|tarefas|manual", alvo: "n", atual: "n", periodo: "trimestre|ano", prazo: "?d", historico: [{ data: "d", valor: "n" }] }],
     visao: [{ id, titulo: "s", descricao: "s", estado: "em_andamento|planejada|concluida", prazo: "?d" }], eventos: [evento],
+    registrosOperacao: [{ id, titulo: "s!", detalhes: "s", data: "d", tipo: "aviso|ocorrencia|atualizacao" }],
   },
   importados: {
     produtos: [{ id, nome: "s!", link: "s", foto: "?s", fotos: ["s"], preco: "z", moeda: "BRL|USD|CNY|EUR", categoria: "s", plataforma: "s", fornecedor: "s", origem: "s", nota: "s" }],
