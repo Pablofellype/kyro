@@ -95,6 +95,10 @@ function ehLinkExterno(url: string): boolean {
   return /^https?:\/\//i.test(url) && !url.startsWith(window.location.origin);
 }
 
+export function definirPopupPowerBi(ativo: boolean) {
+  return invocar("definir_popup_power_bi", { ativo });
+}
+
 export function abrirLink(url: string) {
   if (!ehLinkExterno(url)) return;
   if (NATIVO) void invocar("abrir_link", { url });

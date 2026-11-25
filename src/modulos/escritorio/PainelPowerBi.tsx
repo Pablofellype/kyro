@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { ChartNoAxesCombined, ExternalLink, LoaderCircle, RefreshCw } from "lucide-react";
 import { AvisoFaixa, Botao } from "../../componentes/basicos";
+import { definirPopupPowerBi, NATIVO } from "../../desktop/desktop";
 import { useAuth } from "../../estado/autenticacao";
 import { consultarAppsEmpresa } from "./catalogoAppsEmpresa";
 import "./painelPowerBi.css";
@@ -12,6 +13,13 @@ function RelatorioPowerBi({ token }: { token: string }) {
   const [erro, setErro] = useState("");
   const [revisao, setRevisao] = useState(0);
   const [carregandoQuadro, setCarregandoQuadro] = useState(true);
+  const relatorioAberto = Boolean(url);
+
+  useEffect(() => {
+    if (!NATIVO || !relatorioAberto) return;
+    void definirPopupPowerBi(true);
+    return () => { void definirPopupPowerBi(false); };
+  }, [relatorioAberto]);
 
   useEffect(() => {
     const controle = new AbortController();

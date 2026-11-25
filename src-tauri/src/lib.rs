@@ -13,6 +13,8 @@ use tauri_plugin_global_shortcut::ShortcutState;
 mod atalhos;
 mod docks;
 mod plataforma;
+#[cfg(windows)]
+mod power_bi;
 mod salvamento;
 
 use plataforma::{barra, janela_frente, miniaturas};
@@ -579,7 +581,9 @@ pub fn run() {
             atalhos::definir_atalhos,
             devolver_foco,
             agir_na_janela,
-            sinal_de_vida
+            sinal_de_vida,
+            #[cfg(windows)]
+            power_bi::definir_popup_power_bi
         ])
         .setup(move |app| {
             let handle = app.handle().clone();
@@ -614,7 +618,7 @@ pub fn run() {
                 None => (mx, my, mw),
             };
 
-            let sistema = WebviewWindowBuilder::new(app, "sistema", WebviewUrl::App("index.html".into()))
+            let construtor = WebviewWindowBuilder::new(app, "sistema", WebviewUrl::App("index.html".into()))
                 .title("Niko")
                 .decorations(false)
                 .inner_size(1320.0_f64.min(mw - 40.0), 860.0_f64.min(mh - 40.0))
@@ -622,8 +626,13 @@ pub fn run() {
                 .background_color(tauri::window::Color(14, 14, 16, 255))
                 .disable_drag_drop_handler()
                 .center()
-                .visible(false)
-                .build()?;
+                .visible(false);
+            #[cfg(windows)]
+            let construtor = {
+                let handle = handle.clone();
+                construtor.on_new_window(move |url, features| power_bi::abrir_popup(&handle, url, features))
+            };
+            let sistema = construtor.build()?;
             if !escondido && plataforma::abrir_sistema_sem_esperar() {
                 let _ = sistema.show();
                 let _ = sistema.set_focus();
