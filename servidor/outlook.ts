@@ -4,8 +4,7 @@ import type { AddressInfo } from "node:net";
 import { plataforma } from "./plataforma/index.ts";
 import { clienteMicrosoftValido } from "../src/utilitarios/conexoesMicrosoft.ts";
 
-const AUTORIZACAO = "https://login.microsoftonline.com/common/oauth2/v2.0/authorize";
-const TOKEN = "https://login.microsoftonline.com/common/oauth2/v2.0/token";
+const LOGIN = "https://login.microsoftonline.com";
 const GRAPH = "https://graph.microsoft.com/v1.0";
 export type ServicoMicrosoft = "outlook" | "teams" | "planner";
 const ESCOPOS: Record<ServicoMicrosoft, string[]> = {
@@ -17,6 +16,7 @@ const NOMES = { outlook: "Outlook", teams: "Microsoft Teams", planner: "Microsof
 
 export interface CredencialOutlook {
   clienteId: string;
+  locatarioId?: string;
   refresh: string;
   email?: string;
   servico?: ServicoMicrosoft;
@@ -30,7 +30,7 @@ export function lerCredencialOutlook(texto: string): CredencialOutlook {
   let c: CredencialOutlook;
   try { c = JSON.parse(texto) as CredencialOutlook; }
   catch { throw new Error("credencial_invalida"); }
-  if (!c || !clienteMicrosoftValido(c.clienteId) || typeof c.refresh !== "string" || !c.refresh || (c.servico !== undefined && !Object.hasOwn(ESCOPOS, c.servico))) throw new Error("credencial_invalida");
+  if (!c || !clienteMicrosoftValido(c.clienteId) || typeof c.refresh !== "string" || !c.refresh || (c.locatarioId !== undefined && !clienteMicrosoftValido(c.locatarioId)) || (c.servico !== undefined && !Object.hasOwn(ESCOPOS, c.servico))) throw new Error("credencial_invalida");
   return c;
 }
 
@@ -42,10 +42,15 @@ export function lerCredencialMicrosoft(texto: string, servico: ServicoMicrosoft)
 
 export const autorizarOutlook = (clienteId: string) => autorizarMicrosoft(clienteId, "outlook");
 
-export async function autorizarMicrosoft(clienteId: string, servico: ServicoMicrosoft): Promise<CredencialOutlook> {
+function autoridadeMicrosoft(servico: ServicoMicrosoft, locatarioId?: string): string {
+  return `${LOGIN}/${locatarioId || (servico === "outlook" ? "common" : "organizations")}/oauth2/v2.0`;
+}
+
+export async function autorizarMicrosoft(clienteId: string, servico: ServicoMicrosoft, locatarioId?: string): Promise<CredencialOutlook> {
   if (!clienteMicrosoftValido(clienteId)) throw new Error("cliente_id_invalido");
+  if (locatarioId && !clienteMicrosoftValido(locatarioId)) throw new Error("microsoft_locatario_invalido");
   const escopos = ESCOPOS[servico].join(" ");
-  const autoridade = servico === "outlook" ? "common" : "organizations";
+  const autoridade = autoridadeMicrosoft(servico, locatarioId);
   const verificador = base64url(randomBytes(48));
   const desafio = base64url(createHash("sha256").update(verificador).digest());
   const estado = base64url(randomBytes(16));
@@ -87,7 +92,7 @@ export async function autorizarMicrosoft(clienteId: string, servico: ServicoMicr
         state: estado,
       });
       try {
-        plataforma.abrirNoNavegador(`${AUTORIZACAO.replace("/common/", `/${autoridade}/`)}?${parametros}`);
+        plataforma.abrirNoNavegador(`${autoridade}/authorize?${parametros}`);
       } catch (e) {
         clearTimeout(relogio);
         servidor.close();
@@ -95,7 +100,7 @@ export async function autorizarMicrosoft(clienteId: string, servico: ServicoMicr
       }
     });
   });
-  const r = await fetch(TOKEN.replace("/common/", `/${autoridade}/`), {
+  const r = await fetch(`${autoridade}/token`, {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({ code: codigo, client_id: clienteId, redirect_uri: redirecionamento, grant_type: "authorization_code", code_verifier: verificador, scope: escopos }),
@@ -103,18 +108,18 @@ export async function autorizarMicrosoft(clienteId: string, servico: ServicoMicr
   });
   const json = (await r.json()) as { refresh_token?: string; access_token?: string; expires_in?: number; error?: string; error_description?: string };
   if (!r.ok || !json.refresh_token) throw new Error("microsoft_autorizacao_negada");
-  const credencial = { clienteId, refresh: json.refresh_token, servico };
+  const credencial = { clienteId, refresh: json.refresh_token, servico, ...(locatarioId ? { locatarioId } : {}) };
   if (json.access_token) acessos.set(chaveDoAcesso(credencial), { token: json.access_token, expira: Date.now() + (json.expires_in ?? 3600) * 1000 - 60000 });
   return credencial;
 }
 
 const acessos = new Map<string, { token: string; expira: number }>();
 const renovacoesEmAndamento = new Map<string, Promise<string>>();
-const chaveDoAcesso = (c: CredencialOutlook) => `${c.servico ?? "outlook"}:${c.clienteId}:${c.refresh}`;
+const chaveDoAcesso = (c: CredencialOutlook) => `${c.servico ?? "outlook"}:${c.locatarioId ?? ""}:${c.clienteId}:${c.refresh}`;
 
 async function renovarToken(c: CredencialOutlook): Promise<string> {
   const servico = c.servico ?? "outlook";
-  const r = await fetch(TOKEN.replace("/common/", servico === "outlook" ? "/common/" : "/organizations/"), {
+  const r = await fetch(`${autoridadeMicrosoft(servico, c.locatarioId)}/token`, {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({ client_id: c.clienteId, refresh_token: c.refresh, grant_type: "refresh_token", scope: ESCOPOS[servico].join(" ") }),

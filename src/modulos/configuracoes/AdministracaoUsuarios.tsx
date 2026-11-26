@@ -3,6 +3,9 @@ import type { FormEvent } from "react";
 import { Check, FileSpreadsheet, LoaderCircle, MailPlus, Pencil, RefreshCw, Save, ShieldCheck, Trash2, UserCheck, UserCog, UserX, X } from "lucide-react";
 import { Botao, Campo, AvisoFaixa } from "../../componentes/basicos";
 import { cabecalhosNiko, useAuth, urlApi } from "../../estado/autenticacao";
+import { useInterface } from "../../estado/interface";
+import { acessosPowerBiEfetivos, type RelatorioPowerBi } from "../../tiposPowerBi";
+import { usarCatalogoPowerBi, useSincronizarCatalogoPowerBi } from "../escritorio/catalogoPowerBi";
 
 interface UsuarioAdministrado {
   id: number;
@@ -14,6 +17,7 @@ interface UsuarioAdministrado {
   cargo?: string | null;
   setor?: string | null;
   telefone?: string | null;
+  power_bi_relatorios?: string[] | null;
 }
 
 interface ConvitePendente {
@@ -41,8 +45,24 @@ function mensagemDoConvite(erro: string) {
     nome_obrigatorio: "Informe o nome da pessoa.",
     usuario_ja_cadastrado: "Esse e-mail já possui uma conta no Kyro.",
     convite_nao_encontrado: "Esse convite não está mais pendente.",
+    acessos_power_bi_invalidos: "Atualize a lista e confira os relatórios selecionados.",
   };
   return mensagens[erro] ?? erro;
+}
+
+function PermissoesPowerBi({ relatorios, erro, selecionados, desativado, aoAlterar }: {
+  relatorios: RelatorioPowerBi[] | null; erro: boolean; selecionados: readonly string[];
+  desativado?: boolean; aoAlterar: (ids: string[]) => void;
+}) {
+  const irPara = useInterface((s) => s.irPara);
+  return <fieldset className="admin-usuarios-power-bi" disabled={desativado}>
+    <legend>Relatórios Power BI</legend>
+    {relatorios?.length ? relatorios.map(({ id, nome }) => <label key={id}>
+      <input type="checkbox" checked={selecionados.includes(id)} onChange={(e) => aoAlterar(e.target.checked ? [...selecionados, id] : selecionados.filter((item) => item !== id))} />
+      {nome}
+    </label>) : <span role="status">{erro ? "Não foi possível carregar os relatórios." : relatorios ? "Nenhum relatório cadastrado." : "Carregando relatórios…"}</span>}
+    {relatorios?.length === 0 && <Botao pequeno onClick={() => irPara("powerBi", { modo: "gerenciar" })}>Gerenciar relatórios</Botao>}
+  </fieldset>;
 }
 
 export function AdministracaoUsuarios() {
@@ -61,10 +81,16 @@ export function AdministracaoUsuarios() {
   const [carregando, setCarregando] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [salvandoPerfil, setSalvandoPerfil] = useState(false);
+  const [powerBiConvite, setPowerBiConvite] = useState<string[]>([]);
+  const [powerBiEdicao, setPowerBiEdicao] = useState<string[] | null>(null);
   const [erro, setErro] = useState("");
   const [mensagem, setMensagem] = useState("");
 
   const headers = { ...cabecalhosNiko(), Authorization: `Bearer ${token ?? ""}` };
+  const area = useInterface((s) => s.area);
+  const tokenPowerBi = usuario?.perfil === "dono" ? token : null;
+  useSincronizarCatalogoPowerBi(area === "pessoal" ? tokenPowerBi : null);
+  const catalogoPowerBi = usarCatalogoPowerBi(tokenPowerBi);
 
   const carregar = useCallback(async () => {
     if (!token || usuario?.perfil !== "dono") return;
@@ -96,7 +122,7 @@ export function AdministracaoUsuarios() {
       const dados = await respostaJson(await fetch(urlApi("/api/auth?acao=convite"), {
         method: "POST",
         headers: { ...headers, "Content-Type": "application/json" },
-        body: JSON.stringify({ nome: nome.trim(), email: email.trim(), perfil: papel, cargo: cargo.trim(), setor: setor.trim(), telefone: telefone.trim() }),
+        body: JSON.stringify({ nome: nome.trim(), email: email.trim(), perfil: papel, cargo: cargo.trim(), setor: setor.trim(), telefone: telefone.trim(), powerBiRelatorios: powerBiConvite }),
       }));
       setMensagem(typeof dados.mensagem === "string" ? dados.mensagem : "Convite enviado.");
       setNome("");
@@ -105,6 +131,7 @@ export function AdministracaoUsuarios() {
       setSetor("");
       setTelefone("");
       setPapel("gerencia");
+      setPowerBiConvite([]);
       void carregar();
     } catch (e) {
       setErro(mensagemDoConvite(e instanceof Error ? e.message : "Não foi possível enviar o convite."));
@@ -139,7 +166,7 @@ export function AdministracaoUsuarios() {
         body: JSON.stringify({ id: alvo.id, ativo: !alvo.ativo }),
       }));
       const atualizado = dados.usuario as UsuarioAdministrado;
-      setUsuarios((atuais) => atuais.map((item) => item.id === atualizado.id ? atualizado : item));
+      setUsuarios((atuais) => atuais.map((item) => item.id === atualizado.id ? { ...item, ...atualizado } : item));
       setMensagem(atualizado.ativo ? `${atualizado.nome} foi reativado.` : `${atualizado.nome} foi desativado.`);
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Não foi possível alterar o acesso.");
@@ -156,7 +183,7 @@ export function AdministracaoUsuarios() {
         body: JSON.stringify({ id: alvo.id, roboAderencias: !alvo.robo_aderencias }),
       }));
       const atualizado = dados.usuario as UsuarioAdministrado;
-      setUsuarios((atuais) => atuais.map((item) => item.id === atualizado.id ? atualizado : item));
+      setUsuarios((atuais) => atuais.map((item) => item.id === atualizado.id ? { ...item, ...atualizado } : item));
       setMensagem(atualizado.robo_aderencias ? `${atualizado.nome} recebeu acesso ao Robô de Aderências.` : `O acesso de ${atualizado.nome} ao Robô de Aderências foi removido.`);
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Não foi possível alterar a permissão do robô.");
@@ -187,6 +214,7 @@ export function AdministracaoUsuarios() {
     setSetor(alvo.setor ?? "");
     setTelefone(alvo.telefone ?? "");
     setPapelEdicao(alvo.perfil === "gerencia" ? "gerencia" : "visitante");
+    setPowerBiEdicao(null);
     setErro("");
     setMensagem("");
   };
@@ -197,11 +225,14 @@ export function AdministracaoUsuarios() {
     setSetor("");
     setTelefone("");
     setPapelEdicao("gerencia");
+    setPowerBiEdicao(null);
   };
 
   const salvarPerfil = async (e: FormEvent) => {
     e.preventDefault();
-    if (!editandoId || salvandoPerfil) return;
+    const alvo = usuarios.find((item) => item.id === editandoId);
+    if (!alvo || !token || salvandoPerfil) return;
+    const mudancaDePapel = alvo.perfil !== "dono" && papelEdicao !== alvo.perfil;
     setSalvandoPerfil(true);
     setErro("");
     setMensagem("");
@@ -209,14 +240,19 @@ export function AdministracaoUsuarios() {
       const dados = await respostaJson(await fetch(urlApi("/api/auth?acao=usuario"), {
         method: "POST",
         headers: { ...headers, "Content-Type": "application/json" },
-        body: JSON.stringify({ id: editandoId, perfilProfissional: true, perfil: papelEdicao, cargo: cargo.trim(), setor: setor.trim(), telefone: telefone.trim() }),
+        body: JSON.stringify({
+          id: alvo.id, perfilProfissional: true, cargo: cargo.trim(), setor: setor.trim(), telefone: telefone.trim(),
+          ...(mudancaDePapel ? { perfil: papelEdicao } : {}),
+          ...(!mudancaDePapel && alvo.perfil === "gerencia" && powerBiEdicao !== null ? { powerBiRelatorios: powerBiEdicao } : {}),
+        }),
       }));
+      if (useAuth.getState().token !== token) return;
       const atualizado = dados.usuario as UsuarioAdministrado;
-      setUsuarios((atuais) => atuais.map((item) => item.id === atualizado.id ? atualizado : item));
+      setUsuarios((atuais) => atuais.map((item) => item.id === atualizado.id ? { ...item, ...atualizado } : item));
       setMensagem(`Perfil profissional de ${atualizado.nome} atualizado.`);
       cancelarEdicao();
     } catch (e) {
-      setErro(e instanceof Error ? e.message : "Não foi possível salvar o perfil profissional.");
+      setErro(mensagemDoConvite(e instanceof Error ? e.message : "Não foi possível salvar o perfil profissional."));
     } finally {
       setSalvandoPerfil(false);
     }
@@ -266,6 +302,7 @@ export function AdministracaoUsuarios() {
             <input id="admin-telefone" className="campo" type="tel" value={telefone} maxLength={40} onChange={(e) => setTelefone(e.target.value)} placeholder="(00) 00000-0000" autoComplete="tel" />
           </Campo>
         </div>
+        <PermissoesPowerBi relatorios={catalogoPowerBi.relatorios} erro={catalogoPowerBi.erro} selecionados={powerBiConvite} desativado={enviando} aoAlterar={setPowerBiConvite} />
         <div className="admin-usuarios-rodape-form">
           <span><ShieldCheck size={13} /> A senha nunca passa pelo Pablo.</span>
           <Botao type="submit" variante="primario" icone={enviando ? <LoaderCircle size={14} className="girando" /> : <MailPlus size={14} />} disabled={enviando || !nome.trim() || !email.trim()}>
@@ -322,7 +359,7 @@ export function AdministracaoUsuarios() {
                   <Botao pequeno variante="fantasma" icone={<Trash2 size={13} />} onClick={() => void excluirAcesso(item)}>Excluir</Botao>
                 </>
               )}
-              <Botao pequeno variante="fantasma" icone={<Pencil size={13} />} onClick={() => editandoId === item.id ? cancelarEdicao() : iniciarEdicao(item)}>
+              <Botao pequeno variante="fantasma" disabled={salvandoPerfil} icone={<Pencil size={13} />} onClick={() => editandoId === item.id ? cancelarEdicao() : iniciarEdicao(item)}>
                 {editandoId === item.id ? "Fechar" : "Editar perfil"}
               </Botao>
             </div>
@@ -346,8 +383,12 @@ export function AdministracaoUsuarios() {
                     <input id={`admin-editar-telefone-${item.id}`} className="campo" type="tel" value={telefone} maxLength={40} onChange={(e) => setTelefone(e.target.value)} />
                   </Campo>
                 </div>
+                {item.perfil === "gerencia" && papelEdicao === "gerencia" && <>
+                  <PermissoesPowerBi relatorios={catalogoPowerBi.relatorios} erro={catalogoPowerBi.erro}
+                    selecionados={powerBiEdicao ?? acessosPowerBiEfetivos(item.power_bi_relatorios)} desativado={salvandoPerfil} aoAlterar={setPowerBiEdicao} />
+                </>}
                 <div className="admin-usuarios-edicao-acoes">
-                  <Botao pequeno variante="fantasma" type="button" icone={<X size={13} />} onClick={cancelarEdicao}>Cancelar</Botao>
+                  <Botao pequeno variante="fantasma" type="button" disabled={salvandoPerfil} icone={<X size={13} />} onClick={cancelarEdicao}>Cancelar</Botao>
                   <Botao pequeno variante="primario" type="submit" icone={salvandoPerfil ? <LoaderCircle size={13} className="girando" /> : <Save size={13} />} disabled={salvandoPerfil}>
                     {salvandoPerfil ? "Salvando..." : "Salvar perfil"}
                   </Botao>

@@ -3,6 +3,7 @@ import { motion } from "motion/react";
 import { usarMovimentoReduzido } from "./usarMovimentoReduzido";
 import { PersonagemKyro } from "../../../personagens/PersonagemKyro";
 import { useConfig } from "../../../estado/configuracoes";
+import { primeiroNomeDaConta, useAuth } from "../../../estado/autenticacao";
 import { tocarSom } from "../../../ponte/sons";
 import { liberarSistemaInicial } from "../../../desktop/desktop";
 import { useInterface } from "../../../estado/interface";
@@ -28,10 +29,11 @@ function resumoDeHoje(): { tarefas: number; habitos: number } {
 }
 
 export function Saudacao({ versaoNova, aoTerminar }: { versaoNova?: string; aoTerminar: () => void }) {
-  const nome = useConfig((s) => s.nome.trim().split(/\s+/)[0] ?? "");
+  const nome = useAuth((s) => primeiroNomeDaConta(s.usuario));
   const reduzido = usarMovimentoReduzido();
   const [fase, setFase] = useState<Fase>("entrada");
-  const [titulo] = useState(() => T.ilha.saudacao.titulo(saudacao(), nome));
+  const [cumprimento] = useState(saudacao);
+  const titulo = T.ilha.saudacao.titulo(cumprimento, nome);
   const [subtitulo] = useState(() => (versaoNova ? T.ilha.saudacao.atualizado(versaoNova) : T.ilha.saudacao.hoje(resumoDeHoje())));
   const saindo = fase === "saida";
   const sair = useRef<() => void>(() => undefined);

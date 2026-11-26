@@ -1129,16 +1129,11 @@ button.ilha-rapido-icone:hover:not(:disabled),
 
 
 /* Catálogo de Materiais na Barra Esquerda */
-.ilha-materiais {
-  width: 420px;
-  max-width: calc(100vw - 16px);
-  gap: 10px;
-}
-
-.ilha-materiais-topo {
+.ilha-catalogo-materiais-topo {
   display: flex;
+  flex: 0 0 auto;
   flex-direction: column;
-  gap: 8px;
+  gap: 11px;
 }
 
 .ilha-materiais-cabecalho {
@@ -1244,14 +1239,19 @@ button.ilha-rapido-icone:hover:not(:disabled),
   font-weight: 600;
 }
 
-.ilha-materiais-lista {
+.ilha-catalogo-materiais-lista {
   display: flex;
+  flex: 0 1 auto;
   flex-direction: column;
   gap: 8px;
-  max-height: 420px;
+  min-height: 0;
   overflow-y: auto;
-  padding-right: 2px;
+  overscroll-behavior: contain;
+  padding: 1px;
+  margin: 0 -1px -1px;
 }
+
+.ilha-catalogo-materiais-lista > * { flex-shrink: 0; }
 
 .ilha-material-card {
   gap: 8px;
@@ -1479,7 +1479,7 @@ button.ilha-rapido-icone:hover:not(:disabled),
 }
 
 /* O catálogo usa a mesma linguagem visual das telas principais do Kyro. */
-.ilha-pop.estilo-sistema.ilha-materiais {
+.ilha-pop.estilo-sistema.ilha-catalogo-materiais {
   --i-tinta: var(--texto);
   --i-dim: var(--texto-2);
   --i-dim-3: var(--texto-3);
@@ -1622,13 +1622,6 @@ button.ilha-rapido-icone:hover:not(:disabled),
   font-weight: 600;
 }
 
-.ilha-materiais-lista {
-  gap: 10px;
-  max-height: 440px;
-  padding: 2px;
-  margin: 0 -2px -2px;
-}
-
 .ilha-material-card {
   gap: 10px;
   padding: 13px 14px;
@@ -1699,17 +1692,13 @@ button.ilha-rapido-icone:hover:not(:disabled),
 }
 
 /* Catálogo compacto: foto e nome primeiro; códigos somente quando o cartão abre. */
-.ilha-pop.estilo-sistema.ilha-materiais {
+.ilha-pop.estilo-sistema.ilha-catalogo-materiais {
   width: 398px;
   padding: 15px;
   gap: 12px;
   border-radius: 20px;
   background: var(--fundo-barra);
   box-shadow: 0 20px 48px rgba(0, 0, 0, 0.24);
-}
-
-.ilha-materiais-topo {
-  gap: 11px;
 }
 
 .ilha-materiais-titulo {
@@ -1732,13 +1721,6 @@ button.ilha-rapido-icone:hover:not(:disabled),
 
 .ilha-materiais-subtitulo {
   color: var(--texto-2);
-}
-
-.ilha-materiais-lista {
-  gap: 8px;
-  max-height: 430px;
-  padding: 1px;
-  margin: 0 -1px -1px;
 }
 
 .ilha-material-card {
@@ -1836,7 +1818,7 @@ button.ilha-rapido-icone:hover:not(:disabled),
 }
 
 @media (max-width: 520px) {
-  .ilha-pop.estilo-sistema.ilha-materiais {
+  .ilha-pop.estilo-sistema.ilha-catalogo-materiais {
     left: 8px;
     right: 8px;
     width: auto;

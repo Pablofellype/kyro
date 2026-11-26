@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Sun, Moon, PanelLeftClose, PanelLeftOpen, Check, Settings, ChevronDown, LogOut, UserRound, Building2, LayoutDashboard, Menu, X } from "lucide-react";
-import { useConfig, GRUPO_DA_ROTA } from "../../estado/configuracoes";
+import { useConfig, GRUPO_DA_ROTA, type ItemBarra } from "../../estado/configuracoes";
 import { useInterface } from "../../estado/interface";
 import { useRotina, tarefasDoDia } from "../../estado/rotina";
 import { useEstudos, revisoesParaHoje } from "../../estado/estudos";
@@ -14,13 +14,14 @@ import { LogoNiko } from "../../componentes/LogoNiko";
 import { Avatar } from "../../componentes/FotoPerfil";
 import { hojeISO } from "../../utilitarios/datas";
 import type { AreaSistema, Rota } from "../../tipos";
-import { funcaoLigada, rotaLigada } from "../../utilitarios/funcoes";
-import { primeiraRotaDaArea, rotaDisponivelNaArea, rotaVisivelNaArea, ROTULOS_EMPRESA, ROTULOS_PESSOAIS } from "./areas";
+import { funcaoLigada } from "../../utilitarios/funcoes";
+import { itensVisiveisDaBarra, primeiraRotaDaArea, rotaDisponivelNaArea, ROTAS_NO_TOPO_EMPRESA, ROTULOS_EMPRESA, ROTULOS_PESSOAIS } from "./areas";
 import { mudarTema } from "../area-de-trabalho/mudarTema";
 import { IndicadorSincronia } from "../../componentes/IndicadorSincronia";
 import { Marca } from "../../marcas/Marca";
 import { ehDono, podeAcessarArea, podeAcessarRota, rotuloDoPapel } from "../../servicos/permissoes";
 import { AppsEmpresaNoMenu } from "./AppsEmpresaNoMenu";
+import { PlanilhasNoMenu, PowerBiNoMenu } from "./RelatoriosEPlanilhasNoMenu";
 import "./barraLateral.css";
 import { conexaoVisivelPara } from "../../utilitarios/visibilidadeConexoes";
 import { useIlha } from "../../estado/ilha";
@@ -211,7 +212,9 @@ export function BarraLateral({ recolhida, mobile = false }: { recolhida: boolean
   const [fade, setFade] = useState({ topo: false, base: false });
   const desligadas = useConfig((s) => s.funcoesDesligadas);
   const hoje = tarefasDoDia(tarefas.filter((t) => area === "empresa" ? t.area === "empresa" : t.area !== "empresa"), hojeISO()).filter((t) => t.status !== "cancelada").slice(0, 5);
-  const visiveis = barra.filter((i) => i.visivel && rotaLigada(i.rota, desligadas) && rotaVisivelNaArea(i.rota, area) && podeAcessarRota(usuario, i.rota, area));
+  const visiveis = itensVisiveisDaBarra(barra, area, usuario, desligadas);
+  const rotasNoTopo = area === "empresa" ? ROTAS_NO_TOPO_EMPRESA : [];
+  const itensNoTopo = visiveis.filter((i) => rotasNoTopo.includes(i.rota));
   const dono = ehDono(usuario);
   const podeConfigurar = podeAcessarRota(usuario, "configuracoes", area);
   const mostrarHoje = funcaoLigada("journal", desligadas);
@@ -239,7 +242,7 @@ export function BarraLateral({ recolhida, mobile = false }: { recolhida: boolean
 
   const grupos = (["principal", "organizacao", "ferramentas"] as const).map((g) => ({
     grupo: g,
-    itens: visiveis.filter((i) => GRUPO_DA_ROTA[i.rota] === g && i.rota !== "configuracoes"),
+    itens: visiveis.filter((i) => GRUPO_DA_ROTA[i.rota] === g && i.rota !== "configuracoes" && !rotasNoTopo.includes(i.rota)),
   }));
 
   const alternarGrupo = (g: string) => definir({ gruposFechados: fechados.includes(g) ? fechados.filter((x) => x !== g) : [...fechados, g] });
@@ -271,7 +274,7 @@ export function BarraLateral({ recolhida, mobile = false }: { recolhida: boolean
     const posicao = visiveis.findIndex((v) => v.rota === r) + 1;
     const contador = contadores[r];
     const atalho = posicao > 0 && posicao <= 9 ? ` (Ctrl + ${posicao})` : "";
-    const compacto = nomeItem || ({ conexoes: "Conexões", calendario: "Agenda", journal: "Rotina", metas: "Objetivos" } as Partial<Record<Rota, string>>)[r] || T.rotas[r];
+    const compacto = nomeItem || ({ conexoes: "Conexões", calendario: area === "empresa" ? T.rotas.calendario : "Agenda", journal: "Rotina", metas: "Objetivos" } as Partial<Record<Rota, string>>)[r] || T.rotas[r];
     return (
       <button key={r} type="button" className="barra-item" data-rota={r} aria-label={rotulo} aria-current={ativo ? "page" : undefined} title={`${rotulo}${atalho}`} onClick={() => navegar(r)}>
         <Icone size={16} />
@@ -288,6 +291,17 @@ export function BarraLateral({ recolhida, mobile = false }: { recolhida: boolean
       {naoLidasWhatsapp > 0 && <span className="barra-contador barra-contador-whatsapp" aria-label={String(naoLidasWhatsapp)}>{recolhida ? "" : naoLidasWhatsapp > 99 ? "99+" : naoLidasWhatsapp}</span>}
     </button>
   );
+
+  const itemDoGrupo = (i: ItemBarra) => {
+    const props = { recolhida, nome: i.nome, aoNavegar: fecharMenu };
+    switch (i.rota) {
+      case "appsEmpresa": return <AppsEmpresaNoMenu key={i.rota} {...props} />;
+      case "powerBi": return <PowerBiNoMenu key={i.rota} {...props} />;
+      case "planilhasEmpresa": return <PlanilhasNoMenu key={i.rota} {...props} />;
+      case "conexoes": return <div key={i.rota} className="barra-conexoes">{item(i.rota, i.nome)}{itemDoWhatsapp()}</div>;
+      default: return item(i.rota, i.nome);
+    }
+  };
 
   const sistemaEscuro = typeof window !== "undefined" && window.matchMedia?.("(prefers-color-scheme: dark)").matches;
   const escuroAgora = tema === "escuro" || (tema === "sistema" && sistemaEscuro);
@@ -330,6 +344,7 @@ export function BarraLateral({ recolhida, mobile = false }: { recolhida: boolean
           aria-hidden="true"
           style={caixa ? { left: caixa.l, top: caixa.t, width: caixa.w, height: caixa.h, borderRadius: caixa.r, transition: caixa.tr, opacity: 1 } : { left: 0, top: 0, width: 0, height: 0, opacity: 0 }}
         />}
+        {itensNoTopo.length > 0 && <div className="barra-grupo">{itensNoTopo.map((i) => item(i.rota, i.nome))}</div>}
         {grupos.map(({ grupo, itens }) => {
           if (itens.length === 0) return null;
           const fechado = !recolhida && fechados.includes(grupo) && !itens.some((i) => i.rota === rota || (rota === "whatsapp" && i.rota === "conexoes"));
@@ -341,7 +356,7 @@ export function BarraLateral({ recolhida, mobile = false }: { recolhida: boolean
                   <ChevronDown size={12} className="barra-rotulo-seta" />
                 </button>
               )}
-              {!fechado && itens.map((i) => i.rota === "appsEmpresa" ? <AppsEmpresaNoMenu key="appsEmpresa" recolhida={recolhida} nome={i.nome} aoNavegar={fecharMenu} /> : i.rota === "conexoes" ? <div key="conexoes" className="barra-conexoes">{item(i.rota, i.nome)}{itemDoWhatsapp()}</div> : item(i.rota, i.nome))}
+              {!fechado && itens.map(itemDoGrupo)}
             </div>
           );
         })}

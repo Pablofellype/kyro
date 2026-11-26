@@ -1700,3 +1700,173 @@ Atualização desta pasta:
 - Validação. Três testes passaram, cobrindo a fonte principal, a ativação do fallback, a rejeição de respostas incompletas e a recuperação em nova tentativa. Com uma falha 503 simulada na fonte principal, o Frankfurter real retornou BRL, USD, CNY e EUR.
 - Pendência. Publicar a correção e confirmar `GET /api/cotacoes` com HTTP 200 no site.
 
+## 2026-11-22 — v0.2.47 — Publicação da correção de cotações
+
+- Resultado. A correção de Importados descrita na entrada anterior foi publicada na tag `v0.2.47`, commit `eb4b41d`. A tela identifica a cotação de referência quando entra o fallback.
+- Pendência. A resposta da função de cotações em produção ficou sem nova confirmação.
+
+## 2026-11-24 — v0.2.48 — Escritório editável, WhatsApp, Aderências e sistemas
+
+- Objetivo. Dar ao Escritório informações que a equipe possa registrar no próprio painel e reunir os acessos de trabalho na área Empresa.
+- Alterações. O Escritório ganhou indicadores, filtros de atividades e formulários para atividades, compromissos e registros da operação. O catálogo passou a se chamar **Sistemas**. Foram criadas as abas **Power BI** e **SULTS**, com SULTS abaixo de Power BI e a mensagem **Em breve no Kyro**.
+- WhatsApp e Aderências. O painel **Mensagens automáticas** foi movido para o WhatsApp. O layout acompanha o recolhimento do menu e os seletores de destino permitem busca por nome. Cada rotina pode salvar o próprio destino e escolher a ordem de envio das planilhas. O PNG original é enviado como documento para preservar a nitidez.
+- Validação. A compilação web passou. Os testes do Escritório cobriram a persistência e o backup dos registros. A suíte completa reportada pelo usuário passou com **473 testes e zero falhas**.
+- Resultado. Release no commit `cc1e68c` com tag `v0.2.48`. O usuário instalou o aplicativo Windows e constatou que a aba Power BI precisava da URL do relatório na API publicada. A conferência da qualidade recebida dos prints em conversa real ficou pendente.
+
+## 2026-11-24 — v0.2.49 — Power BI no aplicativo Windows
+
+- Objetivo. Abrir o **Controle de Custos SAP** dentro do Kyro para Windows usando o login oficial da Microsoft.
+- Configuração. O link privado de incorporação foi configurado na Vercel como `KYRO_POWER_BI_REPORT_URL` em **Production**. Após o redeploy, o usuário confirmou o acesso pela web. O desktop já carregava o quadro, mas os botões de login do quadro não abriam a janela.
+- Alterações. O Kyro passou a aceitar o pop-up do relatório no mesmo ambiente WebView2 da janela original. O tratamento é ativado na tela do Power BI e limita a navegação aos destinos definidos para o relatório e o login da Microsoft.
+- Validação. Build web e 41 testes relacionados passaram. A compilação nativa local foi bloqueada pela ausência do linker e das bibliotecas do SDK Windows. O usuário instalou a v0.2.49 e confirmou que o relatório funcionou dentro do `.exe` após o login.
+- Resultado. Versão publicada no commit `aabe2e4`, com tag `v0.2.49`. A saída do DigitalOcean confirmou o avanço de `/opt/kyro` para esse commit e a chegada da tag. A confirmação encerra a pendência do login Power BI para a conta testada. A conexão do Outlook segue um fluxo separado.
+
+## 2026-11-25 — base v0.2.50 — Conexões Microsoft com registros corporativos
+
+- Objetivo. Diagnosticar o bloqueio ao preparar Outlook e Teams com a conta de trabalho.
+- Diagnóstico. As capturas mostram 401 por privilégios insuficientes no centro administrativo do Microsoft Entra e o painel inicial exibindo nenhuma função atribuída. O guia do Kyro direcionava o usuário a Registros de aplicativo.
+- Alterações. O guia explica quando pedir à TI um registro e separa o acesso ao portal do login pelo Kyro. Outlook, Teams e Planner aceitam o ID do locatário para registros exclusivos da empresa, incluindo na troca e na renovação do token. Registros sem esse campo continuam usando os endpoints anteriores.
+- Validação. Build da interface e da ponte aprovado. Sete testes Microsoft passaram, incluindo autenticação e renovação simuladas com locatário, validação do ID e compatibilidade com credenciais anteriores.
+- Resultado e pendências. Alterações locais. O registro e a confirmação do consentimento dependem da TI da empresa. A autenticação com a conta corporativa segue pendente.
+
+## 2026-11-25 — base v0.2.50 — Retirada das conexões que exigiam Microsoft Entra
+
+- Objetivo. Retirar as conexões que levaram ao bloqueio de acesso ao portal administrativo.
+- Alterações. Outlook / Microsoft 365, Microsoft Teams e Microsoft Planner saíram do catálogo, da Ilha, dos guias de configuração e das rotas da ponte local. A restauração e a reidratação ignoram as três conexões e seus eventos antigos. O reset de dados ainda consegue apagar credenciais antigas dessas conexões.
+- Validação. Builds da interface e da ponte aprovados e 474 testes passaram. Os testes da retirada confirmaram o catálogo, a Ilha, os links diretos, a ponte e a leitura de contas antigas.
+- Resultado e pendências. Alteração local, pendente de publicação no aplicativo instalado.
+
+## 2026-11-25 — base v0.2.50 — Retirada da conexão Google Planilhas
+
+- Objetivo. Retirar também a integração autônoma Google Planilhas do catálogo do Kyro.
+- Alterações. O cartão, a configuração OAuth, a janela da conexão e as rotas da ponte foram retirados. A restauração e a reidratação ignoram a integração e seus eventos antigos. O reset de dados continua compatível com credenciais antigas.
+- Validação. Builds da interface e da ponte aprovados. Os 44 testes selecionados passaram, incluindo as verificações de links antigos, ausência de consultas e rotinas do Robô de Aderências.
+- Resultado e pendências. Alteração local, pendente de publicação no aplicativo instalado.
+
+## 2026-11-25 — base v0.2.50 — Dashboard, Calendário e saudação por conta
+
+- Objetivo. Colocar o Calendário no topo do menu Empresa e usar o nome da pessoa que entrou no Kyro.
+- Alterações. O painel principal recebeu o nome Dashboard. O Calendário da empresa ficou logo abaixo, fora dos grupos recolhíveis. Os atalhos numéricos da área Empresa seguem a ordem exibida.
+- Saudação. Dashboard, Início, primeira execução e Ilha usam o primeiro nome do cadastro da conta autenticada. A Ilha registra a saudação diária com o ID da conta para reconhecer a troca de usuário no mesmo dia.
+- Validação. Build aprovado e 131 testes selecionados passaram. Os testes renderizaram o menu no computador e no celular e simularam a saudação de um novo colaborador e a troca de conta com o nome Pablo ainda nas preferências.
+- Resultado e pendências. Alteração local, pendente de publicação no aplicativo instalado.
+
+## 2026-11-26 — base v0.2.50 — Protótipos e propostas de aplicativos
+
+- Objetivo. Registrar projetos em avaliação e reunir o PDF da proposta e o vídeo de apresentação em Sistemas.
+- Alterações. O dono pode escolher o status Protótipo em Gerenciar aplicativos e salvar um PDF de até 15 MB e um vídeo MP4 de até 50 MB, por arquivo ou link HTTPS. Dono e gerência consultam o material na página do sistema. A API retira a proposta e o link do protótipo do catálogo público.
+- Validação. Builds da interface e da ponte aprovados. A API passou na checagem de tipos. A rodada de 76 testes passou e a rodada final do catálogo e da interface passou com 41 testes. Os testes de arquivo usaram Blob e banco simulados.
+- Resultado e pendências. Alteração local. Para arquivos reais, falta configurar um Vercel Blob privado com `KYRO_PROPOSTAS_BLOB_READ_WRITE_TOKEN` no ambiente publicado e verificar o envio com esse armazenamento.
+
+## 2026-11-26 — base v0.2.50 — Limite do vídeo da proposta
+
+- Objetivo. Aceitar o MP4 de 82.647 KB mostrado na captura do usuário.
+- Alterações. O limite do vídeo de apresentação passou para 100 MB na interface, na autorização de envio e na leitura. A ponte do Windows voltou a ser gerada em um arquivo único para incluir as dependências do armazenamento.
+- Validação. Os testes do catálogo aceitaram metadados de vídeo com o tamanho da captura. A checagem de tipos e a compilação da ponte passaram. O arquivo gerado passou na análise de sintaxe do Node.
+- Resultado e pendências. Alteração local. A publicação e o envio real ainda dependem da configuração do Vercel Blob privado.
+
+## 2026-11-26 — base v0.2.50 — Seleção de arquivos da proposta
+
+- Objetivo. Corrigir o campo que aparecia vazio após clicar em Abrir no seletor.
+- Alterações. O seletor conserva o arquivo válido e mostra nome e tamanho na hora. Arquivos inválidos recebem uma mensagem junto ao campo. O envio tem indicação própria e conserva a seleção se o armazenamento estiver indisponível.
+- Validação. Build e testes do catálogo passaram. Chrome no Windows confirmou a seleção de um MP4 de teste de 82.647 KB, a limpeza e nova seleção, o erro acima do limite e a manutenção da seleção após uma falha simulada do armazenamento.
+- Resultado e pendências. Correção local. A confirmação de envio real depende do armazenamento privado e da publicação.
+
+## 2026-11-26 — base v0.2.50 — Catálogo e acessos por relatório do Power BI
+
+- Objetivo. Reunir vários relatórios de Power BI e permitir ao dono escolher quais a gerência pode abrir.
+- Alterações. A área Power BI passou a ter seletor de relatórios e gerenciador exclusivo do dono. A seção Administração oferece seleção por relatório tanto no convite quanto na edição do perfil. Convites novos começam sem relatórios marcados e preservam a seleção no reenvio e na ativação.
+- Compatibilidade. Contas antigas conservam o relatório Controle de Custos SAP até editar seus acessos. O segundo link fornecido foi configurado no ambiente local com o nome editável Relatório Power BI 2. Os links são filtrados na API, inclusive na rota anterior de relatório único.
+- Validação. Builds da interface e da ponte aprovados, checagem de tipos das APIs e 46 testes passaram. A validação simulou cadastro, edição, convite, reenvio, ativação, concessão e revogação. O link local foi conferido sem autenticar no relatório.
+- Resultado e pendências. Alteração local. A publicação e a disponibilização do segundo link no ambiente de produção continuam pendentes.
+
+## 2026-11-26 — base v0.2.50 — Submenus de Planilhas e Power BI
+
+- Empresa mostra Planilhas logo abaixo de Power BI. Os dois submenus seguem o padrão de Sistemas e abrem os itens pelo nome. Gerenciar relatórios continua disponível para o dono no submenu do Power BI.
+- Planilhas consulta a configuração do Robô de Aderências em modo somente leitura e lista um item por arquivo. O link compartilhado abre o documento inteiro, sem `gid`, e preserva as permissões do Google. O painel oferece uma prévia e um botão para abrir no Google Planilhas.
+- A configuração local consultada resultou em 10 documentos distintos. Foram aprovados os builds da interface e da ponte e os 476 testes do projeto. A lista e a prévia com a conta de produção ainda precisam ser verificadas após publicação.
+
+## 2026-11-26 — base v0.2.50 — Gerenciar planilhas
+
+- Objetivo. Permitir que o dono adicione, edite, inative, reative e remova planilhas no Kyro.
+- Alterações. A opção Gerenciar planilhas fica no submenu Planilhas. Um cadastro próprio no Neon guarda itens manuais, ajustes a itens do Robô de Aderências e remoções do catálogo. A API exige perfil de dono para alterar. Os links abrem o documento completo e as rotinas do Robô continuam sendo consultadas em modo somente leitura.
+- Validação. Builds da interface e da ponte e 103 testes focados passaram. Os testes de API simularam o Neon. A prévia da sincronização para 0.2.51 passou e a tag ainda estava livre no GitHub durante a conferência.
+- Resultado e pendências. Alterações locais. A publicação da v0.2.51, a atualização do Droplet e a validação com a conta de produção ficam pendentes.
+
+## 2026-11-26 — base v0.2.50 — Nome, categoria e foto nas notificações do Inventário
+
+- Objetivo. Identificar o colaborador e distinguir pedidos de material DML de equipamento pessoal (EPI) no aviso da Ilha.
+- Alterações. O Kyro usa o nome e a categoria no título e mostra itens, local e protocolo quando disponíveis. A Ilha busca a foto quando o Inventário informa que ela existe. O ícone padrão cobre a ausência ou falha de foto. O código local do Inventário enriquece o evento pelo protocolo e serve a imagem privada pelo evento com o token de integração já existente.
+- Validação. Builds da interface e da ponte aprovados. Passaram 67 testes focados do Kyro e a integração do Inventário foi conferida com banco e Blob simulados, incluindo autenticação e ausência de foto.
+- Resultado e pendências. Alterações nos dois projetos locais. Nenhum push ou deploy foi feito. Falta conferir uma solicitação real quando as duas alterações forem publicadas.
+
+## 2026-11-26 — base v0.2.50 — Prévia local dos avisos de materiais
+
+- Objetivo. Testar o aviso novo no localhost mesmo com o token local rejeitado pelo Inventário publicado.
+- Alterações. A aba Solicitações mostra botões de prévia de DML e EPI apenas em desenvolvimento. Eles usam o aviso da Ilha com pedidos fictícios e sem chamadas ao Inventário. A prévia EPI usa a foto de perfil da própria conta quando disponível e respeita a privacidade.
+- Validação. Vite em localhost:5420 serviu os dois botões. O build passou e confirmou que eles não aparecem no pacote de produção. Passaram 38 testes focados, incluindo a abertura da prévia sem rede.
+- Resultado e pendências. Alteração local no Kyro. O controle visual do navegador não iniciou. A consulta de pedidos reais ainda depende de uma credencial aceita pelo Inventário e da API atualizada para retornar nome e foto.
+
+## 2026-11-26 — base v0.2.50 — Foto exclusiva do solicitante do Inventário
+
+- Objetivo. Evitar que a notificação use a foto de perfil do Kyro como substituta da foto do pedido.
+- Alterações. As prévias DML e EPI agora usam um colaborador fictício e o ícone de material. A única origem de foto na Ilha é o evento do Inventário, vinculado à matrícula do solicitante no cadastro de colaboradores.
+- Validação. TypeScript e 38 testes focados passaram. O localhost serviu a prévia corrigida. O teste confirma que a foto de perfil não aparece nem quando existe.
+- Resultado e pendências. Alteração local no Kyro. A foto de um pedido real ainda precisa ser conferida com a API do Inventário atualizada.
+
+## 2026-11-26 — base v0.2.50 — Prévia baseada em pedidos reais
+
+- Objetivo. Mostrar na prévia o nome e a foto do solicitante do próprio pedido, sem nome fictício.
+- Alterações. A prévia em desenvolvimento usa um pedido real disponível no histórico ou nos avisos da conta. Cada botão só fica disponível quando há um pedido daquele tipo com solicitante identificado.
+- Validação. TypeScript e 38 testes passaram. Uma consulta somente leitura pelo código local do Inventário retornou oito pedidos com nome, quatro com referência de foto. Nenhuma credencial do Blob estava configurada no Inventário local para abrir as imagens.
+- Resultado e pendências. Alteração local. A exibição da foto real continua condicionada à API atualizada e ao acesso autenticado ao Blob privado.
+
+## 2026-11-26 — base v0.2.50 — Inventário real no Kyro local
+
+- Objetivo. Abrir no localhost o aviso do pedido que chegou na Ilha publicada e testar novos avisos sem usar a credencial rejeitada pelo Inventário publicado.
+- Alterações. O servidor de desenvolvimento pode usar uma integração em loopback que consulta o Inventário em transações somente leitura. As preferências e a contagem desse modo ficam em memória. A aba Solicitações oferece Testar último pedido para rever um aviso já recebido.
+- Validação. O build e 69 testes focados passaram. A integração local leu nove pedidos reais e confirmou o pedido da bota da captura como EPI, com nome e referência de foto. A amostra não continha pedidos DML.
+- Resultado e pendências. Serviços locais em 5420 e 33318. O Blob privado ainda precisa de credencial no Inventário local para exibir a foto. Nenhuma publicação ou nova solicitação foi realizada.
+
+## 2026-11-26 — base v0.2.50 — OIDC do Blob do Inventário no localhost
+
+- Objetivo. Aproveitar a autenticação OIDC já usada pelo Blob privado inventario-arquivos.
+- Alterações. O script da ponte local usa BLOB_STORE_ID e VERCEL_OIDC_TOKEN do cache de desenvolvimento da Vercel, preservando o arquivo de ambiente do Inventário.
+- Validação. O SDK local tem suporte a OIDC. A sintaxe do script e o diff foram verificados.
+- Resultado e pendências. O usuário precisa vincular o projeto na CLI e baixar a sessão de desenvolvimento. A leitura real da foto ainda precisa ser confirmada depois de reiniciar a ponte local.
+
+## 2026-11-26 — base v0.2.50 — Foto real validada no Inventário local
+
+- Objetivo. Confirmar a foto do solicitante após habilitar Development no Blob e baixar a sessão OIDC.
+- Alterações. A ponte do Inventário foi reiniciada na porta 33318 com o script que carrega o cache local da Vercel. O Kyro permaneceu ativo na porta 5420.
+- Validação. A API local entregou o JPEG privado e a ponte do Kyro recuperou o nome e a imagem do mesmo pedido da captura. A imagem não foi exibida nem salva durante a verificação.
+- Resultado e pendências. A entrega da foto no localhost foi validada pela integração. A conferência visual na Ilha pode ser feita com Testar aviso EPI. Nenhum deploy foi realizado.
+
+## 2026-11-26 — base v0.2.50 — Consulta rápida de solicitações na Ilha
+
+- Objetivo. Mostrar os pedidos de material logo ao abrir a aba Solicitações e deixar o aviso da Ilha intacto.
+- Alterações. A lista compacta mostra solicitante, categoria legível e itens. Os filtros Todos, DML e EPI ficam no topo. Cada pedido expande para mostrar os detalhes. Os controles de prévia local ficam recolhidos no final da aba.
+- Validação. Build e 35 testes da Ilha passaram. O servidor local está servindo a versão nova da tela. A tentativa de gerar a imagem de conferência em um ambiente isolado não chegou à renderização no navegador.
+- Resultado e pendências. Alteração local da aba Solicitações. Nenhum deploy realizado.
+
+## 2026-11-26 — base v0.2.50 — Reservas atuais na Ilha
+
+- Objetivo. Remover da lista as reservas excluídas no Inventário e simplificar a consulta por colaborador.
+- Alterações. A aba consulta a tabela de reservas atuais e usa a memória dos avisos somente para identificar o que é novo. Cada linha mostra o nome e carrega a foto do solicitante pelo protocolo quando está visível. Ao expandir, são exibidos os materiais e os códigos. A apresentação e a consulta de eventos dos avisos foram preservadas.
+- Validação. Builds e 39 testes focados passaram. A consulta local real retornou zero reservas e não retornou o pedido excluído da captura nem sua foto pelo protocolo de reserva. O serviço local foi atualizado.
+- Resultado e pendências. Alterações locais no Kyro e no Inventário. A conferência visual de uma linha preenchida permanece pendente porque não havia reservas atuais. Nenhum deploy realizado.
+
+## 2026-11-26 — base v0.2.50 — Altura do catálogo de Materiais
+
+- Objetivo. Remover o vão abaixo da lista do catálogo acessado pela barra da Ilha.
+- Alterações. O catálogo ganhou classes de layout próprias. A lista usa a altura disponível para rolar e o painel encolhe com poucos resultados. O cabeçalho e a busca continuam acima da lista.
+- Validação. Chrome com dados fictícios confirmou a altura do painel para 56 e 2 materiais, com apenas a margem inferior do painel abaixo da lista. Build e 35 testes da Ilha foram executados.
+- Resultado. Ajuste local no Kyro. Nenhum deploy realizado.
+
+## 2026-11-26 — base v0.2.50 — Hierarquia das pastas da Empresa
+
+- Objetivo. Facilitar a distinção entre pastas, subpastas e acessos no menu lateral.
+- Alterações. Sistemas, Power BI e Planilhas usam ícone de pasta e itens recuados. Sistemas agrupa os protótipos em uma subpasta recolhível, que abre ao navegar para um protótipo. Os atalhos administrativos têm separador próprio. As pastas começam recolhidas quando estão fora da rota atual.
+- Validação. Build e 43 testes focados de interface e catálogo passaram. O servidor local está servindo o menu atualizado.
+- Resultado. Alteração local, sem publicação.
+

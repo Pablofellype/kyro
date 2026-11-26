@@ -112,7 +112,8 @@ export function configuracoesValidas(valor: unknown, padrao: Configuracoes): Con
 export function validarFormatoConfiguracoes(valor: unknown, padrao: unknown, campo = "") {
   if (valor === undefined) return;
   if (padrao === null) {
-    if (campo === "ultimaSaudacao") exigir(valor === null || (objeto(valor) && typeof valor.dia === "string" && typeof valor.versao === "string"));
+    if (campo === "ultimaSaudacao") exigir(valor === null || (objeto(valor) && typeof valor.dia === "string" && typeof valor.versao === "string"
+      && (valor.usuarioId === undefined || (typeof valor.usuarioId === "number" && Number.isSafeInteger(valor.usuarioId) && valor.usuarioId > 0))));
     else exigir(valor === null || typeof valor === "string");
   } else if (Array.isArray(padrao)) {
     exigir(Array.isArray(valor));

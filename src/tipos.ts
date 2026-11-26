@@ -16,6 +16,7 @@ export type Rota =
   | "escritorio"
   | "appsEmpresa"
   | "powerBi"
+  | "planilhasEmpresa"
   | "sults"
   | "conexoes"
   | "journal"

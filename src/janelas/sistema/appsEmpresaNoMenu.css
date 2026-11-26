@@ -1,12 +1,14 @@
 .barra-apps,
-.barra-apps-lista {
+.barra-apps-lista,
+.barra-apps-sublista {
   display: flex;
   flex-direction: column;
   gap: 4px;
   min-width: 0;
 }
 
-.barra-apps-lista[hidden] {
+.barra-apps-lista[hidden],
+.barra-apps-sublista[hidden] {
   display: none;
 }
 
@@ -16,24 +18,42 @@
   transition: transform .18s ease;
 }
 
-.barra-apps-toggle[aria-expanded="true"] .barra-apps-seta {
+.barra-apps [aria-expanded="true"] > .barra-apps-seta,
+.barra-apps-subpasta[aria-expanded="true"] > .barra-apps-seta {
   transform: rotate(180deg);
 }
 
-.barra-apps-quantidade { margin-left: auto; font-size: 10px; font-variant-numeric: tabular-nums; color: var(--texto-3); }
-.barra-apps-seta { margin-left: 0; }
-.barra-apps-icone { display: grid; place-items: center; flex: 0 0 26px; width: 26px; height: 26px; border-radius: 7px; color: var(--texto-2); background: var(--superficie-2); }
+.barra-apps-quantidade { font-size: 10px; font-variant-numeric: tabular-nums; color: var(--texto-3); }
+.barra-apps-icone { display: grid; place-items: center; flex: 0 0 20px; width: 20px; height: 20px; color: inherit; }
+.barra-apps-lista, .barra-apps-sublista {
+  margin-inline-start: 15px;
+  padding-inline-start: 7px;
+  border-inline-start: 1px solid var(--borda);
+  gap: 2px;
+}
+.barra-apps-painel-lista .barra-apps-sublista { border-color: var(--marca-borda); }
+.barra-apps-gerencia { margin-top: 4px; padding-top: 4px; border-top: 1px solid var(--borda-suave); }
+.barra-apps-painel-lista .barra-apps-gerencia { border-color: var(--marca-borda); }
+.barra-apps-gerencia > button { width: 100%; }
+.barra-apps-toggle > .barra-item-texto { flex: 1; }
+.barra-apps-toggle > .barra-apps-seta { margin: 0; }
+.barra-apps-subpasta > .cortar { flex: 1; }
+.barra-apps-subpasta > svg { flex-shrink: 0; }
 .barra-apps-estado { flex-shrink: 0; margin-left: auto; font-size: 9px; font-weight: 500; color: inherit; }
+.barra-apps-vazio { padding: 8px 10px; color: var(--texto-3); font-size: 12px; }
 
 @media (min-width: 769px) and (pointer: fine), (min-width: 1025px) {
-  .estilo-sistema .sistema .barra-lateral .barra-apps { margin-top: 12px; gap: 5px; }
-  .estilo-sistema .sistema .barra-lateral .barra-apps-toggle { height: 30px; flex-basis: 30px; gap: 8px; color: var(--texto-2); }
-  .estilo-sistema .sistema .barra-lateral .barra-apps-toggle .barra-item-texto { font-size: 10px; font-weight: 550; letter-spacing: .06em; text-transform: uppercase; }
-  .estilo-sistema .sistema .barra-lateral .barra-apps-lista { gap: 3px; }
-  .estilo-sistema .sistema .barra-lateral .barra-apps-item { height: 38px; flex-basis: 38px; gap: 10px; padding-inline: 10px; font-size: 12px; }
+  .estilo-sistema .sistema .barra-lateral .barra-apps { gap: 4px; }
+  .estilo-sistema .sistema .barra-lateral .barra-apps-toggle { height: 34px; flex-basis: 34px; gap: 8px; }
+  .estilo-sistema .sistema .barra-lateral:not(.barra-recolhida) .barra-apps-toggle:not([aria-current="page"]) {
+    color: var(--texto);
+    background: var(--superficie-2);
+  }
+  .estilo-sistema .sistema .barra-lateral .barra-apps-toggle .barra-item-texto { font-size: 12px; font-weight: 650; }
+  .estilo-sistema .sistema .barra-lateral .barra-apps-item { height: 32px; flex-basis: 32px; gap: 6px; padding-inline: 6px; font-size: 11.5px; }
   .estilo-sistema .sistema .barra-lateral .barra-apps-item::before { content: none; }
   .estilo-sistema .sistema .barra-lateral .barra-apps-item:disabled { color: var(--texto-3); opacity: .65; }
-  .estilo-sistema .sistema .barra-lateral .barra-apps-item[aria-current="page"] .barra-apps-icone { background: rgb(255 255 255 / .16); color: inherit; }
+  .estilo-sistema .sistema .barra-lateral .barra-apps-subpasta { font-weight: 600; }
   .estilo-sistema .sistema .barra-recolhida .barra-apps { width: 100%; margin-top: 0; }
   .estilo-sistema .sistema .barra-recolhida .barra-apps-toggle { height: 56px; flex-basis: 56px; padding: 8px 2px; gap: 6px; }
   .estilo-sistema .sistema .barra-recolhida .barra-apps-toggle .barra-item-texto { font-size: 10px; font-weight: 500; letter-spacing: 0; text-transform: none; }
@@ -63,11 +83,11 @@
 .barra-apps-fechar:hover { background: var(--marca-suave); color: var(--marca-primaria-hover); }
 .barra-apps-painel-lista { display: flex; flex-direction: column; gap: 3px; min-height: 0; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #b9b9b9 transparent; }
 .barra-apps-opcao { display: flex; align-items: center; gap: 10px; min-height: 42px; flex-shrink: 0; padding: 7px 9px; border-radius: 9px; color: #625b50; font-size: 12px; text-align: left; }
-.barra-apps-opcao .barra-apps-icone { color: var(--marca-primaria); background: var(--marca-suave); }
+.barra-apps-opcao .barra-apps-icone { color: var(--marca-primaria); }
 .barra-apps-opcao .cortar { min-width: 0; }
 .barra-apps-opcao:hover { color: var(--marca-primaria-hover); background: var(--marca-suave); }
 .barra-apps-opcao[aria-current="page"] { color: var(--marca-primaria-hover); background: var(--marca-suave); }
-.barra-apps-opcao[aria-current="page"] .barra-apps-icone { color: inherit; background: #fff; }
+.barra-apps-opcao[aria-current="page"] .barra-apps-icone { color: inherit; }
 .barra-apps-opcao:disabled { opacity: .55; cursor: default; }
 .barra-apps-opcao:disabled:hover { color: #625b50; background: transparent; }
 .barra-apps-opcao:focus-visible, .barra-apps-fechar:focus-visible { outline: 2px solid var(--marca-primaria); outline-offset: -2px; }

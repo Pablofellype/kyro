@@ -22,6 +22,70 @@ const documento = { spreadsheetId: id, properties: { title: "Controle de materia
 const valores = { range: "Materiais!A1:T100", values: [["Material", "Quantidade"], ["Papel", "3"], ["Luvas", "5"]] };
 const resposta = (dados) => new Response(JSON.stringify(dados), { headers: { "content-type": "application/json" } });
 
+test("Planilhas da empresa agrupa documentos completos e conserva o link compartilhado sem gid", async () => {
+  const { planilhasDasAderencias } = await vite.ssrLoadModule("/src/modulos/escritorio/planilhasDaEmpresa.ts");
+  const registro = (nome, sheetUrl, tabUrl = "") => Object.freeze({ nome, sheetUrl, tabUrl });
+  const original = registro("Controle de materiais", `${link(id)}?usp=sharing&resourcekey=chave-teste&gid=0#gid=0`, link(id, 8));
+  const grupo = (...planilhas) => ({ planilhas });
+  const config = { grupos: [
+    grupo(original, registro("Outra aba do mesmo arquivo", link(id, 7))),
+    grupo(registro("Segundo arquivo", link(outro, 3)), original, registro("URL inválida", "https://outro.example/spreadsheets/d/arquivo/edit")),
+    grupo(registro("Publicado na web", "https://docs.google.com/spreadsheets/d/e/exemplo/pubhtml")),
+  ], planilhas: [original] };
+  const antes = JSON.stringify(config);
+  assert.deepEqual(planilhasDasAderencias(config), [
+    { id, nome: "Controle de materiais", url: `${link(id)}?usp=sharing&resourcekey=chave-teste`, previa: `https://docs.google.com/spreadsheets/d/${id}/preview?resourcekey=chave-teste` },
+    { id: outro, nome: "Segundo arquivo", url: link(outro), previa: `https://docs.google.com/spreadsheets/d/${outro}/preview` },
+  ]);
+  assert.equal(JSON.stringify(config), antes);
+  assert.equal(planilhasDasAderencias({ grupos: [], planilhas: [original] }).length, 1);
+});
+
+test("o catálogo da empresa preserva os ajustes de planilhas e só lê o Robô para contas autorizadas", async (t) => {
+  const { carregarPlanilhasEmpresa } = await vite.ssrLoadModule("/src/modulos/escritorio/catalogoPlanilhasEmpresa.ts");
+  const { useAuth } = await vite.ssrLoadModule("/src/estado/autenticacao.ts");
+  const { aderenciasPonte } = await vite.ssrLoadModule("/src/ponte/aderencias.ts");
+  const antes = useAuth.getState();
+  t.after(() => useAuth.setState(antes, true));
+  const api = t.mock.method(globalThis, "fetch", async (url, opcoes) => {
+    assert.match(String(url), /acao=planilhas-catalogo$/);
+    assert.equal(opcoes.method, "GET");
+    return resposta({ ajustes: [] });
+  });
+  const leitura = t.mock.method(aderenciasPonte, "configuracao", async (signal) => {
+    assert.equal(signal.aborted, false);
+    return { configuracao: { grupos: [], planilhas: [{ nome: "Teste", sheetUrl: link(id) }] } };
+  });
+  useAuth.setState({ token: "teste", usuario: { id: 2, perfil: "gerencia", roboAderencias: false } });
+  await carregarPlanilhasEmpresa();
+  assert.equal(leitura.mock.callCount(), 0);
+  assert.equal(api.mock.callCount(), 0);
+  useAuth.setState({ usuario: { id: 2, perfil: "gerencia", roboAderencias: true } });
+  await carregarPlanilhasEmpresa();
+  assert.equal(leitura.mock.callCount(), 1);
+  assert.equal(api.mock.callCount(), 1);
+});
+
+test("ajustes do Kyro valem para o menu sem alterar a lista do Robô", async () => {
+  const { combinarPlanilhas, planilhaPeloLink } = await vite.ssrLoadModule("/src/modulos/escritorio/planilhasDaEmpresa.ts");
+  const { GerenciarPlanilhasEmpresa } = await vite.ssrLoadModule("/src/modulos/escritorio/GerenciarPlanilhasEmpresa.tsx");
+  const manual = { ...planilhaPeloLink("Cadastro manual", link("documento_manual")), id: "kyro:exemplo", origemRobo: false, ativa: true };
+  const originais = [planilhaPeloLink("Do Robô", link(id)), planilhaPeloLink("Outro arquivo", link(outro))];
+  const ajustes = [{ ...originais[0], nome: "Nome editado", ativa: false, origemRobo: true }, { id: outro, oculta: true }, manual];
+  const listaDoDono = combinarPlanilhas(originais, ajustes, true);
+  assert.deepEqual(listaDoDono.map(({ nome, ativa }) => [nome, ativa]), [["Nome editado", false], ["Cadastro manual", true]]);
+  assert.deepEqual(combinarPlanilhas(originais, ajustes, false), [manual]);
+  assert.deepEqual(combinarPlanilhas(originais, [{ ...ajustes[0], ativa: true }], false).map(({ nome }) => nome), ["Outro arquivo", "Nome editado"]);
+  assert.deepEqual(combinarPlanilhas([], [{ ...ajustes[0], ativa: true }], false), []);
+  assert.deepEqual(originais.map(({ nome }) => nome), ["Do Robô", "Outro arquivo"]);
+  const painel = renderToStaticMarkup(createElement(GerenciarPlanilhasEmpresa, { token: "dono", planilhas: listaDoDono }));
+  assert.match(painel, /Adicionar planilha/);
+  assert.match(painel, /Reativar Nome editado/);
+  assert.match(painel, /Editar Cadastro manual/);
+  assert.match(painel, /Inativar Cadastro manual/);
+  assert.match(painel, /Remover Cadastro manual/);
+});
+
 test("links de planilhas validam domínio, identificador, quantidade e aba antes de acessar a rede", () => {
   assert.deepEqual(google.fontesDasPlanilhas(`${link(id, 0)}\n${link(id, 0)}\n${link(outro)}`), [{ id, gid: 0 }, { id: outro }]);
   for (const ruim of ["http://docs.google.com/spreadsheets/d/" + id, "https://docs.google.com.evil.example/spreadsheets/d/" + id, "https://eu:senha@docs.google.com/spreadsheets/d/" + id, "https://docs.google.com/spreadsheets/d/e/pubhtml", "http://localhost/a", link(id, "-1"), link(id, "1e4")]) assert.throws(() => google.fontesDasPlanilhas(ruim), /planilhas_/);
@@ -108,7 +172,7 @@ test("consulta preserva posições e formatação, limita a prévia e sinaliza f
   assert.deepEqual(vazia.planilhas[0].previa.valores, []);
 });
 
-test("serviços ocultos não aparecem na gerência, inclusive na ilha e em links diretos, e permanecem no dono", async (t) => {
+test("catálogo, ilha e links diretos respeitam o perfil e a retirada das conexões", async (t) => {
   const { default: Conexoes } = await vite.ssrLoadModule("/src/modulos/conexoes/Conexoes.tsx");
   const { VisaoConexoes } = await vite.ssrLoadModule("/src/janelas/ilha/Visoes.tsx");
   const { JanelaConexao } = await vite.ssrLoadModule("/src/modulos/conexoes/JanelaConexao.tsx");
@@ -136,7 +200,14 @@ test("serviços ocultos não aparecem na gerência, inclusive na ilha e em links
       assert.equal(conexaoVisivelPara(auth.usuario, servico), perfil === "dono");
       for (const html of [pagina, ilha]) assert.equal(html.includes(T.conexoes.servicos[servico].nome), perfil === "dono", `${perfil}/${servico}`);
     }
-    for (const servico of ["teams", "planner", "planilhas", "outlook"]) assert.ok(pagina.includes(T.conexoes.servicos[servico].nome));
+    assert.ok(pagina.includes(T.conexoes.servicos.calendario.nome));
+    for (const servico of ["outlook", "teams", "planner", "planilhas"]) {
+      const nome = T.conexoes.servicos[servico].nome;
+      assert.equal(pagina.includes(nome), false);
+      assert.equal(ilha.includes(nome), false);
+      assert.equal(renderToStaticMarkup(createElement(VisaoConexoes, { aberta: servico, aoSelecionar() {} })).includes(nome), false);
+      assert.equal(renderToStaticMarkup(createElement(JanelaConexao, { janela: { id: servico, minimizada: false } })), "");
+    }
     if (perfil === "gerencia") {
       assert.doesNotMatch(pagina, /role="dialog"[^>]*GitHub/);
       assert.doesNotMatch(renderToStaticMarkup(createElement(VisaoConexoes, { aberta: "github", aoSelecionar() {} })), /GitHub/);
@@ -159,6 +230,10 @@ test("perfil gerência não consulta os serviços ocultos na ponte nem em segund
   await atualizarConexaoAgora("github");
   assert.equal(chamadas, 0);
   useAuth.setState({ usuario: { id: 1, perfil: "dono" }, token: "dono-teste" });
+  await assert.rejects(conexoesPonte.ler("planilhas"), /conexao_oculta_perfil/);
+  await assert.rejects(conexoesPonte.lerAbaPlanilha(id, 0), /conexao_oculta_perfil/);
+  await atualizarConexaoAgora("planilhas");
+  assert.equal(chamadas, 0);
   await conexoesPonte.ler("github");
   assert.equal(chamadas, 1);
 });

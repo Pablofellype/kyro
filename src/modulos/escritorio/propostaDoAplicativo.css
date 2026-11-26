@@ -1,0 +1,28 @@
+.app-empresa-status {
+  display: inline-flex;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: var(--superficie-2);
+  font-size: 0.72rem;
+}
+
+.app-empresa-status[data-status="prototipo"] {
+  background: var(--destaque-suave);
+  color: var(--texto);
+  font-weight: 600;
+}
+
+.app-proposta {
+  width: 100%;
+  max-width: 820px;
+  padding: 12px 16px;
+  border: 1px solid var(--borda);
+  border-radius: 10px;
+}
+
+.app-proposta > summary { cursor: pointer; font-weight: 600; }
+.app-proposta-lista { display: flex; flex-wrap: wrap; gap: 12px; list-style: none; margin: 12px 0 0; padding: 0; }
+.app-proposta-anexo { display: grid; gap: 8px; justify-items: start; flex: 1 1 215px; min-width: 0; }
+.app-proposta-anexo > strong { display: flex; align-items: center; gap: 6px; }
+.app-proposta-arquivo-nome { overflow-wrap: anywhere; color: var(--texto-3); }
+.app-proposta-anexo video { width: 100%; max-height: 240px; border-radius: 8px; background: #000; }

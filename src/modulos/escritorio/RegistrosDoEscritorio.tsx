@@ -66,7 +66,7 @@ function FormularioRegistro({ tipo, registro, atividade, hoje, usuarioId, aoFech
       } else {
         rotina.criarTarefa({ ...dados, area: "empresa" });
       }
-      aoSalvar(atividade ? "Atividade atualizada." : "Atividade adicionada ao Escritório.");
+      aoSalvar(atividade ? "Atividade atualizada." : "Atividade adicionada.");
       return;
     }
     if (tipo === "compromisso") {
@@ -79,7 +79,7 @@ function FormularioRegistro({ tipo, registro, atividade, hoje, usuarioId, aoFech
       setErro("O registro não está mais disponível para edição.");
       return;
     }
-    aoSalvar(registro ? "Registro atualizado." : "Registro adicionado ao Escritório.");
+    aoSalvar(registro ? "Registro atualizado." : "Registro adicionado.");
   };
 
   return <form className="ee-formulario-registro" onSubmit={salvar} aria-labelledby="ee-formulario-titulo">

@@ -1,0 +1,26 @@
+.estilo-sistema .sistema .pagina[data-rota="planilhasEmpresa"] { max-width: none; }
+.planilhas-empresa { display: flex; flex: 1; flex-direction: column; gap: 12px; min-width: 0; }
+.planilhas-empresa-dica { margin: 0; color: var(--texto-2); }
+.planilhas-empresa-quadro {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-height: max(380px, calc(100dvh - 200px));
+  overflow: hidden;
+  border: 1px solid var(--borda);
+  border-radius: 12px;
+  background: var(--superficie);
+}
+.planilhas-empresa-quadro iframe { flex: 1; width: 100%; min-width: 0; border: 0; }
+.planilhas-empresa-carregando { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 8px; pointer-events: none; }
+
+.planilhas-empresa-gerencia { display: grid; gap: 16px; width: min(100%, 900px); }
+.planilhas-empresa-cartao { display: grid; gap: 12px; margin: 0; padding: 16px; border: 1px solid var(--borda); border-radius: 12px; background: var(--superficie); }
+.planilhas-empresa-lista { list-style: none; }
+.planilhas-empresa-lista > li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.planilhas-empresa-lista > li + li { padding-top: 12px; border-top: 1px solid var(--borda); }
+.planilhas-empresa-identificacao { display: grid; min-width: 0; gap: 4px; overflow-wrap: anywhere; }
+.planilhas-empresa-identificacao span { color: var(--texto-2); font-size: 13px; }
+.planilhas-empresa-acoes { display: flex; flex-wrap: wrap; gap: 8px; }
+.planilhas-empresa-confirmacao { flex-basis: 100%; }
+.planilhas-empresa-confirmacao p { margin: 0 0 8px; }

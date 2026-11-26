@@ -3,6 +3,7 @@ import { useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { ArrowRight } from "lucide-react";
 import { useConfig, type ModoBorda, type Tema } from "../../estado/configuracoes";
+import { primeiroNomeDaConta, useAuth } from "../../estado/autenticacao";
 import { PersonagemKyro } from "../../personagens/PersonagemKyro";
 import { Botao, Campo, Segmentado } from "../../componentes/basicos";
 import { T } from "../../textos/textos";
@@ -26,8 +27,10 @@ const TEXTOS = [T.primeira.boasVindasTexto, "", T.primeira.ilhaTexto, "", T.prim
 
 export function PrimeiraExecucao() {
   const cfg = useConfig();
+  const usuario = useAuth((s) => s.usuario);
+  const primeiroNome = primeiroNomeDaConta(usuario);
   const [passo, setPasso] = useState(0);
-  const [nome, setNome] = useState(cfg.nome);
+  const [nome, setNome] = useState(cfg.nome.trim() || usuario?.nome.trim().slice(0, 40) || "");
   const [erroNome, setErroNome] = useState("");
   const total = T.primeira.passos.length;
   const modos = (["fixo", "esconder", "inteligente"] as ModoBorda[]).map((m) => ({ valor: m, rotulo: T.configuracoes.modos[m] }));
@@ -64,7 +67,7 @@ export function PrimeiraExecucao() {
         <AnimatePresence mode="wait">
           <motion.div key={passo} className="boas-vindas-corpo" initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }} transition={{ duration: 0.18 }}>
             <div className="boas-vindas-conteudo">
-              <h2 className="boas-vindas-titulo">{TITULOS[passo]}</h2>
+              <h2 className="boas-vindas-titulo">{passo === 0 && primeiroNome ? T.primeira.boasVindasNome(primeiroNome) : TITULOS[passo]}</h2>
               {TEXTOS[passo] && <p className="boas-vindas-texto">{TEXTOS[passo]}</p>}
               {passo === 1 && (
                 <div className="formulario">

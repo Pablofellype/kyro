@@ -20,7 +20,6 @@ import { mensagemDeErroDaConexao } from "../../utilitarios/errosDeConexao";
 import { ConteudoTeams, ConteudoPlanner } from "./ConteudoMicrosoft";
 import { useAuth } from "../../estado/autenticacao";
 import { conexaoVisivelPara } from "../../utilitarios/visibilidadeConexoes";
-import { ConteudoPlanilhas } from "./ConteudoPlanilhas";
 
 const MINIMO = { w: 560, h: 420 };
 const INTERVALOS = [30, 60, 120, 300, 600];
@@ -30,7 +29,6 @@ const E = T.janelaConexao.estados;
 const data = dataCurta;
 
 function ConteudoServico({ servico, aba, filtro, dados }: { servico: ServicoId; aba: string; filtro: string; dados: DadosServico[ServicoId] }) {
-  if (servico === "planilhas") return <ConteudoPlanilhas dados={dados as DadosServico["planilhas"]} filtro={filtro} />;
   if (servico === "teams") return <ConteudoTeams dados={dados as DadosServico["teams"]} aba={aba} filtro={filtro} />;
   if (servico === "planner") return <ConteudoPlanner dados={dados as DadosServico["planner"]} aba={aba} filtro={filtro} />;
   if (ehServicoExtra(servico)) return <ConteudoExtra servico={servico} aba={aba} filtro={filtro} dados={dados} />;

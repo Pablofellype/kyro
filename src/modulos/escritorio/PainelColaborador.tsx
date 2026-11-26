@@ -3,7 +3,7 @@ import type { FormEvent } from "react";
 import { AppWindow, CheckCircle2, ClipboardList, LoaderCircle, PackageOpen, Search } from "lucide-react";
 import { AvisoFaixa, Botao, Campo, Modal } from "../../componentes/basicos";
 import { CabecalhoAba } from "../../componentes/CabecalhoAba";
-import { cabecalhosNiko, useAuth, urlApi } from "../../estado/autenticacao";
+import { cabecalhosNiko, primeiroNomeDaConta, useAuth, urlApi } from "../../estado/autenticacao";
 import { useMateriais } from "../../estado/materiais";
 import { controle, type AppInstalado } from "../../ponte/ponteLocal";
 import { NATIVO } from "../../desktop/desktop";
@@ -75,7 +75,7 @@ export function PainelColaborador() {
   return (
     <>
       <CabecalhoAba
-        titulo={`Olá, ${usuario?.nome?.trim().split(/\s+/)[0] || "colaborador"}`}
+        titulo={`Olá, ${primeiroNomeDaConta(usuario) || "colaborador"}`}
         subtitulo="Este é o painel da empresa. Faça uma solicitação de material ou abra um aplicativo de trabalho."
       />
       <div className="colaborador-painel">

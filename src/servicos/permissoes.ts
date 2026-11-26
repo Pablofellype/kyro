@@ -3,7 +3,7 @@ import type { UsuarioAutenticado } from "../estado/autenticacao";
 
 export type PapelOrganizacional = UsuarioAutenticado["perfil"];
 
-export const ROTAS_DA_EMPRESA: Rota[] = ["escritorio", "appsEmpresa", "powerBi", "sults", "calendario", "conexoes", "whatsapp", "configuracoes", "atualizacao"];
+export const ROTAS_DA_EMPRESA: Rota[] = ["escritorio", "appsEmpresa", "powerBi", "planilhasEmpresa", "sults", "calendario", "conexoes", "whatsapp", "configuracoes", "atualizacao"];
 
 const CONFIGURACOES_PESSOAIS = new Set([
   "geral", "aparencia", "ilha", "dock", "assistive", "pomodoro", "sons", "tela", "atalhos", "privacidade", "sobre",
@@ -22,11 +22,12 @@ export function podeAcessarArea(usuario: Pick<UsuarioAutenticado, "perfil"> | nu
 }
 
 export function podeAcessarRota(
-  usuario: Pick<UsuarioAutenticado, "perfil"> | null | undefined,
+  usuario: (Pick<UsuarioAutenticado, "perfil"> & Partial<Pick<UsuarioAutenticado, "roboAderencias">>) | null | undefined,
   rota: Rota,
   area: AreaSistema,
 ): boolean {
   if (rota === "importados") return usuario?.perfil === "dono" && area === "pessoal";
+  if (rota === "planilhasEmpresa") return area === "empresa" && (usuario?.perfil === "dono" || (usuario?.perfil === "gerencia" && usuario.roboAderencias === true));
   if (!usuario || usuario.perfil === "dono") return true;
   if (area !== "empresa") return false;
   if (usuario.perfil === "gerencia") return ROTAS_DA_EMPRESA.includes(rota);

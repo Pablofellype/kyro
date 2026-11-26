@@ -3,18 +3,15 @@ import { join } from "node:path";
 import { lerSegredo, gravarSegredo, apagarSegredo } from "./segredos.ts";
 import { pastaDados, validarUrlBase } from "./ia.ts";
 import { autorizarWorkspace, lerGoogle } from "./google.ts";
-import { autorizarMicrosoft, lerOutlook } from "./outlook.ts";
-import { lerTeams, lerPlanner } from "./microsoftCorporativo.ts";
-import { credencialDasPlanilhas, configuracaoPublicaPlanilhas, lerPlanilhasGoogle, lerAbaPlanilhaGoogle } from "./planilhasGoogle.ts";
 import { lerContribuicoesGithub, lerCommitsGithub } from "./github.ts";
-import { exigirConexaoDisponivel } from "../src/utilitarios/disponibilidadeConexoes.ts";
+import { exigirConexaoDisponivel, CONEXOES_REMOVIDAS } from "../src/utilitarios/disponibilidadeConexoes.ts";
 import { autorizarStrava, lerJson, lerCalendarios, lerDiscord, lerEmail, lerJira, lerLinear, lerRailway, lerReddit, lerStrava, lerTrello, urlPublicaSegura } from "./conexoesExtras.ts";
 import { configDaCripto, enderecoValido, lerCripto } from "./cripto.ts";
 import { pastaDoUsuario, segredoDoUsuario, usuarioLocalAtual } from "./escopoUsuario.ts";
 
 export const SERVICOS = [
   "stripe", "github", "vercel", "resend", "notion", "calcom", "n8n", "google", "supabase", "cloudflare",
-  "linear", "jira", "trello", "railway", "discord", "reddit", "strava", "email", "calendario", "cripto", "outlook", "teams", "planner", "planilhas",
+  "linear", "jira", "trello", "railway", "discord", "reddit", "strava", "email", "calendario", "cripto",
 ] as const;
 const SERVICOS_ANTIGOS_DO_GOOGLE = ["gmail", "agenda"];
 export type Servico = (typeof SERVICOS)[number];
@@ -343,10 +340,6 @@ const LEITORES: Record<Servico, Leitor> = {
   email: (chave) => lerEmail(chave),
   calendario: (chave) => lerCalendarios(chave),
   cripto: (chave) => lerCripto(chave),
-  outlook: (chave) => lerOutlook(chave),
-  teams: (chave) => lerTeams(chave),
-  planner: (chave) => lerPlanner(chave),
-  planilhas: (chave) => lerPlanilhasGoogle(chave),
 };
 
 const PRESETS_DE_EMAIL: Record<string, { servidor: string; porta: number }> = {
@@ -373,7 +366,6 @@ export async function credencialDoServico(servico: Servico, dados: Record<string
   const anterior = anteriorDe(guardada);
   const segredoOuAnterior = (novo: string, chaveAntiga: string) => novo || (typeof anterior[chaveAntiga] === "string" ? (anterior[chaveAntiga] as string) : "");
   switch (servico) {
-    case "planilhas": return credencialDasPlanilhas(dados, guardada);
     case "jira": {
       const site = urlPublicaSegura(campo(dados.site, 300)).origin;
       const token = segredoOuAnterior(campo(dados.chave, 4000), "token");
@@ -435,7 +427,7 @@ export async function credencialDoServico(servico: Servico, dados: Record<string
 
 const cacheDados = new Map<string, { quando: number; dados: unknown }>();
 const leiturasEmAndamento = new Map<string, Promise<unknown>>();
-const chaveDoCache = (servico: Servico) => `${usuarioLocalAtual()}:${servico}`;
+const chaveDoCache = (servico: Servico | typeof CONEXOES_REMOVIDAS[number]) => `${usuarioLocalAtual()}:${servico}`;
 
 async function buscarConexao(servico: Servico, aindaValida: () => boolean) {
   const config = lerConfig()[servico];
@@ -483,18 +475,6 @@ export async function salvarChaveConexao(servico: Servico, dados: Record<string,
     leiturasEmAndamento.delete(chaveDoCache(servico));
     return { ok: true };
   }
-  if (servico === "outlook" || servico === "teams" || servico === "planner") {
-    const credencial = await autorizarMicrosoft(String(dados.clienteId ?? "").trim(), servico);
-    const texto = JSON.stringify(credencial);
-    await LEITORES[servico](texto);
-    await gravarSegredo(segredoDoUsuario(`conexao-${servico}`), texto);
-    const c = lerConfig();
-    c[servico] = { temChave: true };
-    salvarConfig(c);
-    cacheDados.delete(chaveDoCache(servico));
-    leiturasEmAndamento.delete(chaveDoCache(servico));
-    return { ok: true };
-  }
   const url = servico === "n8n" ? validarUrlBase(String(dados.url ?? ""), true) : undefined;
   const guardada = lerConfig()[servico]?.temChave ? await lerSegredo(segredoDoUsuario(`conexao-${servico}`)) : null;
   const chave = await credencialDoServico(servico, dados, guardada);
@@ -515,7 +495,6 @@ export async function configPublica(servico: Servico): Promise<Record<string, un
   exigirConexaoDisponivel(servico);
   const texto = lerConfig()[servico]?.temChave ? await lerSegredo(segredoDoUsuario(`conexao-${servico}`)) : null;
   if (!texto) return {};
-  if (servico === "planilhas") return configuracaoPublicaPlanilhas(texto);
   const c = lerJson<Record<string, unknown>>(texto);
   switch (servico) {
     case "jira":
@@ -528,10 +507,6 @@ export async function configPublica(servico: Servico): Promise<Record<string, un
       return { usuario: typeof c.feed === "string" ? new URL(c.feed).searchParams.get("user") : null, temToken: Boolean(c.feed) };
     case "strava":
       return { clienteId: c.clienteId, temToken: Boolean(c.segredo) };
-    case "outlook":
-    case "teams":
-    case "planner":
-      return { clienteId: c.clienteId, email: c.email, temToken: Boolean(c.refresh) };
     case "email":
       return { servidor: c.servidor, porta: c.porta, usuario: c.usuario, temToken: Boolean(c.senha) };
     case "calendario":
@@ -545,11 +520,7 @@ export async function configPublica(servico: Servico): Promise<Record<string, un
   }
 }
 
-export async function lerAbaDasPlanilhas(id: string, gid: number) {
-  return lerAbaPlanilhaGoogle(await chaveDe("planilhas"), id, gid);
-}
-
-export async function removerChaveConexao(servico: Servico) {
+export async function removerChaveConexao(servico: Servico | typeof CONEXOES_REMOVIDAS[number]) {
   await apagarSegredo(segredoDoUsuario(`conexao-${servico}`)).catch(() => undefined);
   const c = lerConfig();
   delete c[servico];
@@ -557,4 +528,8 @@ export async function removerChaveConexao(servico: Servico) {
   cacheDados.delete(chaveDoCache(servico));
   leiturasEmAndamento.delete(chaveDoCache(servico));
   return { ok: true };
+}
+
+export async function removerTodasAsChavesDeConexao() {
+  for (const servico of [...SERVICOS, ...CONEXOES_REMOVIDAS]) await removerChaveConexao(servico);
 }

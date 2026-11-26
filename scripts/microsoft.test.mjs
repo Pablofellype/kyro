@@ -12,13 +12,21 @@ const microsoft = await vite.ssrLoadModule("/servidor/outlook.ts");
 const corporativo = await vite.ssrLoadModule("/servidor/microsoftCorporativo.ts");
 const { plataforma } = await vite.ssrLoadModule("/servidor/plataforma/index.ts");
 const clienteId = "12345678-1234-4234-8234-123456789abc";
+const locatarioId = "87654321-4321-4321-8321-abcdef123456";
 const credencial = (servico, refresh = "credencial-de-teste") => JSON.stringify({ clienteId, refresh, servico });
 const resposta = (dados, status = 200) => new Response(JSON.stringify(dados), { status, headers: { "content-type": "application/json" } });
 
 test("login Microsoft valida estado e PKCE e mantém os escopos separados por conexão", async (t) => {
   const abrirAntes = plataforma.abrirNoNavegador, fetchAntes = globalThis.fetch;
   t.after(() => { plataforma.abrirNoNavegador = abrirAntes; globalThis.fetch = fetchAntes; });
-  for (const servico of ["outlook", "teams", "planner"]) {
+  const casos = [
+    { servico: "outlook", autoridade: "common" },
+    { servico: "teams", autoridade: "organizations" },
+    { servico: "planner", autoridade: "organizations" },
+    { servico: "outlook", autoridade: locatarioId, locatario: locatarioId },
+    { servico: "teams", autoridade: locatarioId, locatario: locatarioId },
+  ];
+  for (const { servico, autoridade, locatario } of casos) {
     let urlLogin, retorno, troca;
     const statusRetorno = [];
     plataforma.abrirNoNavegador = (href) => {
@@ -36,23 +44,25 @@ test("login Microsoft valida estado e PKCE e mantém os escopos separados por co
       troca = { url: String(url), corpo: new URLSearchParams(opcoes.body) };
       return resposta({ access_token: `acesso-${servico}`, refresh_token: `refresh-${servico}`, expires_in: 3600 });
     };
-    const c = await microsoft.autorizarMicrosoft(clienteId, servico);
+    const c = await microsoft.autorizarMicrosoft(clienteId, servico, locatario);
     await retorno;
     assert.deepEqual(statusRetorno, [404, 200]);
     assert.equal(urlLogin.searchParams.get("code_challenge_method"), "S256");
     assert.equal(urlLogin.searchParams.get("code_challenge"), createHash("sha256").update(troca.corpo.get("code_verifier")).digest("base64url"));
     assert.equal(troca.corpo.get("redirect_uri"), urlLogin.searchParams.get("redirect_uri"));
     assert.equal(troca.corpo.get("scope"), urlLogin.searchParams.get("scope"));
+    assert.equal(urlLogin.pathname, `/${autoridade}/oauth2/v2.0/authorize`);
+    assert.equal(troca.url, `https://login.microsoftonline.com/${autoridade}/oauth2/v2.0/token`);
     const escopos = urlLogin.searchParams.get("scope").split(" ");
     assert.ok(escopos.includes("User.Read"));
     assert.ok(!escopos.some((s) => /Write|Send|All/.test(s)));
     if (servico === "outlook") assert.deepEqual(escopos.slice(-2), ["Mail.Read", "Calendars.Read"]);
     else {
-      assert.equal(urlLogin.pathname, "/organizations/oauth2/v2.0/authorize");
       assert.equal(escopos.at(-1), servico === "teams" ? "Chat.Read" : "Tasks.Read");
       assert.ok(!escopos.includes("Mail.Read"));
     }
     assert.equal(c.servico, servico);
+    assert.equal(c.locatarioId, locatario);
     assert.equal(c.refresh, `refresh-${servico}`);
   }
 });
@@ -69,9 +79,10 @@ test("tokens Microsoft renovam uma vez por conexão e recusam links externos ant
     }
     return resposta({ ok: true });
   };
-  const c = microsoft.lerCredencialMicrosoft(credencial("teams", "nova"), "teams");
+  const c = microsoft.lerCredencialMicrosoft(JSON.stringify({ clienteId, locatarioId, refresh: "nova", servico: "teams" }), "teams");
   await Promise.all([microsoft.apiMicrosoft(c, "/me"), microsoft.apiMicrosoft(c, "/me/chats")]);
   assert.equal(chamadas.filter((x) => x.url.includes("/token")).length, 1);
+  assert.equal(chamadas[0].url, `https://login.microsoftonline.com/${locatarioId}/oauth2/v2.0/token`);
   assert.ok(chamadas.filter((x) => x.url.includes("graph.microsoft.com")).every((x) => x.opcoes.headers.authorization === "Bearer token-teams" && x.opcoes.redirect === "error"));
   const planner = microsoft.lerCredencialMicrosoft(credencial("planner", "nova"), "planner");
   await microsoft.apiMicrosoft(planner, "/me/planner/tasks");
@@ -86,6 +97,7 @@ test("tokens Microsoft renovam uma vez por conexão e recusam links externos ant
   assert.equal(microsoft.lerCredencialMicrosoft(JSON.stringify({ clienteId, refresh: "legado" }), "outlook").refresh, "legado");
   assert.throws(() => microsoft.lerCredencialMicrosoft("segredo que não pode aparecer no erro", "teams"), /^Error: credencial_invalida$/);
   await assert.rejects(microsoft.autorizarMicrosoft("invalido", "teams"), /cliente_id_invalido/);
+  await assert.rejects(microsoft.autorizarMicrosoft(clienteId, "teams", "../invalido"), /microsoft_locatario_invalido/);
 });
 
 const perfil = { id: "eu", displayName: "Pessoa", mail: "pessoa@empresa.example", userPrincipalName: "pessoa@empresa.example" };
@@ -156,41 +168,47 @@ test("telas Microsoft filtram os dados reais e não renderizam HTML ou links de 
   assert.match(planner, /<progress[^>]+value="0"/);
 });
 
-test("catálogo e restauração de contas antigas incluem Teams e Planner sem ligá-los automaticamente", async () => {
+test("Outlook, Teams, Planner e Google Planilhas saem do catálogo, da ponte e de contas antigas", async () => {
   const { useComunicacao, SERVICOS } = await vite.ssrLoadModule("/src/estado/comunicacao.ts");
-  const { SERVICOS: backend } = await vite.ssrLoadModule("/servidor/conexoes.ts");
-  const { resumoDe, ocorrenciasDe, SERVICOS_DO_MICROSOFT } = await vite.ssrLoadModule("/src/ponte/conexoesReais.ts");
-  const { T } = await vite.ssrLoadModule("/src/textos/textos.ts");
+  const { servicoValido, estadoConexoes } = await vite.ssrLoadModule("/servidor/conexoes.ts");
+  const { conexaoVisivelPara } = await vite.ssrLoadModule("/src/utilitarios/visibilidadeConexoes.ts");
   const anterior = useComunicacao.getState();
-  const storageAnterior = useComunicacao.persist.getOptions().storage;
+  const { storage: storageAnterior, merge } = useComunicacao.persist.getOptions();
+  const removidas = ["outlook", "teams", "planner", "planilhas"];
+  const contaAntiga = {
+    conexoes: [...removidas, "calendario"].map((id) => ({ id, ligada: true, chaveSalva: true, fixadaNaIlha: true, status: "conectado" })),
+    eventosConexao: [...removidas, "calendario"].map((servico) => ({ servico, tipo: "falha" })),
+  };
+  const estadoDaPonte = estadoConexoes();
   useComunicacao.persist.setOptions({ storage: { getItem: () => null, setItem() {}, removeItem() {} } });
   try {
-    useComunicacao.getState().substituir({ conexoes: [{ id: "outlook", ligada: true, chaveSalva: true, status: "conectado" }] });
-    for (const servico of ["teams", "planner"]) {
-      assert.ok(SERVICOS.includes(servico) && backend.includes(servico) && SERVICOS_DO_MICROSOFT.includes(servico));
-      const c = useComunicacao.getState().conexoes.find((c) => c.id === servico);
-      assert.equal(c.ligada, false);
-      assert.equal(c.chaveSalva, false);
-      assert.equal(c.status, "sem_chave");
-      assert.ok(T.conexoes.guias[servico].length > 0);
-      assert.ok(T.janelaConexao.abas[servico]);
+    useComunicacao.getState().substituir(contaAntiga);
+    const estados = [useComunicacao.getState(), merge(contaAntiga, anterior)];
+    for (const servico of removidas) {
+      assert.equal(SERVICOS.includes(servico), false);
+      assert.equal(servicoValido(servico), false);
+      assert.equal(Object.hasOwn(estadoDaPonte, servico), false);
+      assert.equal(conexaoVisivelPara({ perfil: "dono" }, servico), false);
+      for (const estado of estados) assert.equal(estado.conexoes.some((c) => c.id === servico), false);
     }
-    assert.match(resumoDe("teams", dadosTeams), /Consulta parcial/);
-    assert.equal(ocorrenciasDe("teams", dadosTeams).length, 1);
-    assert.match(resumoDe("planner", dadosPlanner), /2 tarefas abertas/);
+    assert.equal(servicoValido("calendario"), true);
+    for (const estado of estados) {
+      assert.deepEqual(estado.eventosConexao.map((e) => e.servico), ["calendario"]);
+      assert.equal(estado.conexoes.find((c) => c.id === "calendario")?.fixadaNaIlha, true);
+    }
   } finally { useComunicacao.setState(anterior, true); useComunicacao.persist.setOptions({ storage: storageAnterior }); }
 });
 
-test("resposta de Teams da conta anterior é descartada após trocar a sessão", async (t) => {
+test("resposta de uma conexão da conta anterior é descartada após trocar a sessão", async (t) => {
   const { conexoesPonte } = await vite.ssrLoadModule("/src/ponte/conexoesReais.ts");
   const { useAuth } = await vite.ssrLoadModule("/src/estado/autenticacao.ts");
   const estadoAntes = useAuth.getState(), fetchAntes = globalThis.fetch;
   t.after(() => { useAuth.setState(estadoAntes, true); globalThis.fetch = fetchAntes; });
   let entregar;
   globalThis.fetch = () => new Promise((resolve) => { entregar = resolve; });
-  useAuth.setState({ usuario: { id: 7, perfil: "gerencia" }, token: "sessao-7" });
-  const consulta = conexoesPonte.ler("teams");
-  useAuth.setState({ usuario: { id: 8, perfil: "gerencia" }, token: "sessao-8" });
-  entregar(resposta(dadosTeams));
+  useAuth.setState({ usuario: { id: 7, perfil: "dono" }, token: "sessao-7" });
+  const consulta = conexoesPonte.ler("calendario");
+  useAuth.setState({ usuario: { id: 8, perfil: "dono" }, token: "sessao-8" });
+  entregar(resposta({ eventos: [] }));
   await assert.rejects(consulta, /conexao_sessao_alterada/);
 });

@@ -3,9 +3,10 @@ import { AppWindow, Check, Copy, Ellipsis, ExternalLink, LoaderCircle, RefreshCw
 import { AvisoFaixa, Botao } from "../../componentes/basicos";
 import { useInterface } from "../../estado/interface";
 import { ORIGENS_DE_APPS_INCORPORADOS, type AplicativoEmpresa } from "./aplicativosEmpresaConfig";
+import { PropostaDoAplicativo } from "./PropostaDoAplicativo";
 import "./sistemaEmpresaAberto.css";
 
-export function SistemaEmpresaAberto({ app, mobile = false }: { app: AplicativoEmpresa; mobile?: boolean }) {
+export function SistemaEmpresaAberto({ app, mobile = false, mostrarProposta = false }: { app: AplicativoEmpresa; mobile?: boolean; mostrarProposta?: boolean }) {
   const [tentativa, setTentativa] = useState(0);
   const [carregando, setCarregando] = useState(true);
   const [linkCopiado, setLinkCopiado] = useState(false);
@@ -63,6 +64,7 @@ export function SistemaEmpresaAberto({ app, mobile = false }: { app: AplicativoE
         </div>
       </dialog>}
       {falhaAoCopiar && <div className="apps-empresa-copia-manual"><AvisoFaixa tipo="alerta">A cópia automática não ficou disponível. Selecione o link para copiar.</AvisoFaixa><input className="campo" aria-label="Link do sistema para copiar" readOnly value={app.url} onFocus={(evento) => evento.currentTarget.select()} /></div>}
+      {mostrarProposta && <PropostaDoAplicativo app={app} recolhida />}
       {incorporado ? <div className="apps-empresa-quadro" aria-busy={carregando}>
         {carregando && <div className="apps-empresa-quadro-carregando" role="status"><LoaderCircle size={16} className="girando" /> Carregando página…</div>}
         <iframe

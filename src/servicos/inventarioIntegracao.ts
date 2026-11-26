@@ -5,11 +5,15 @@ export class InventarioIndisponivel extends Error {
 }
 
 const URL_INVENTARIO = "https://inventario-internoo.vercel.app/api/integracoes/solicitacoes";
+const ID_EVENTO = /^[1-9]\d{0,18}$/;
+const TIPOS_DE_FOTO = new Set(["image/jpeg", "image/png", "image/webp"]);
+const LIMITE_FOTO = 2 * 1024 * 1024;
 
 export interface ResumoSolicitacaoMaterial {
   chave?: string;
   protocolo: string;
   solicitante: string;
+  fotoEvento?: string;
   tipo: string;
   itens: string;
   local: string;
@@ -17,6 +21,7 @@ export interface ResumoSolicitacaoMaterial {
 }
 
 export type SolicitacaoMaterialRecebida = ResumoSolicitacaoMaterial & { ordem: number };
+export type ReservaMaterial = ResumoSolicitacaoMaterial & { fotoDisponivel: boolean; codigoSap: string };
 
 function texto(valor: unknown, limite: number): string {
   return typeof valor === "string" ? valor.trim().replace(/\s+/g, " ").slice(0, limite) : "";
@@ -32,6 +37,7 @@ export function unirSolicitacoesMaterial(anterior: ResumoSolicitacaoMaterial, at
     chave: chaveDaSolicitacaoMaterial(anterior) || chaveDaSolicitacaoMaterial(atual),
     protocolo: anterior.protocolo || atual.protocolo,
     solicitante: anterior.solicitante || atual.solicitante,
+    ...((anterior.fotoEvento || atual.fotoEvento) && { fotoEvento: anterior.fotoEvento || atual.fotoEvento }),
     tipo: anterior.tipo || atual.tipo,
     itens: itens.slice(0, 500),
     local: anterior.local || atual.local,
@@ -77,6 +83,7 @@ export async function consultarInventario(cursor?: string, consultar: typeof fet
         chave,
         protocolo,
         solicitante: texto(solicitacao?.solicitante, 120),
+        ...(solicitacao?.foto_disponivel === true && ID_EVENTO.test(idEvento) && { fotoEvento: idEvento }),
         tipo: texto(solicitacao?.tipo, 80),
         itens: texto(solicitacao?.itens, 500),
         local: texto(solicitacao?.local, 120),
@@ -87,6 +94,75 @@ export async function consultarInventario(cursor?: string, consultar: typeof fet
     }
     const solicitacoes = [...agrupadas.values()];
     return { cursor: String(proximo), quantidade: solicitacoes.length, solicitacoes, temMais };
+  } catch (erro) {
+    if (erro instanceof InventarioIndisponivel) throw erro;
+    throw new InventarioIndisponivel();
+  }
+}
+
+export async function lerFotoDoInventario(evento: unknown, consultar: typeof fetch = fetch, protocolo?: unknown) {
+  const token = process.env.INVENTARIO_INTEGRACAO_TOKEN?.trim();
+  if (!token) return null;
+  const url = new URL(URL_INVENTARIO);
+  if (typeof protocolo === "string" && /^[A-Z0-9-]{1,80}$/.test(protocolo)) url.searchParams.set("foto_protocolo", protocolo);
+  else if (typeof evento === "string" && ID_EVENTO.test(evento)) url.searchParams.set("foto_evento", evento);
+  else return null;
+  const resposta = await consultar(url, {
+    headers: { Authorization: `Bearer ${token}` }, redirect: "error", signal: AbortSignal.timeout(8_000),
+  });
+  const tipo = resposta.headers.get("content-type") ?? "";
+  if (!resposta.ok || !TIPOS_DE_FOTO.has(tipo) || !resposta.body || Number(resposta.headers.get("content-length")) > LIMITE_FOTO) {
+    await resposta.body?.cancel();
+    return null;
+  }
+  const leitor = resposta.body.getReader();
+  const partes: Uint8Array[] = [];
+  let tamanho = 0;
+  try {
+    for (;;) {
+      const { value, done } = await leitor.read();
+      if (done) break;
+      tamanho += value.byteLength;
+      if (tamanho > LIMITE_FOTO) {
+        await leitor.cancel();
+        return null;
+      }
+      partes.push(value);
+    }
+  } finally {
+    leitor.releaseLock();
+  }
+  return tamanho ? `data:${tipo};base64,${Buffer.concat(partes, tamanho).toString("base64")}` : null;
+}
+
+export async function lerReservasInventario(consultar: typeof fetch = fetch) {
+  const token = process.env.INVENTARIO_INTEGRACAO_TOKEN?.trim();
+  if (!token) throw new InventarioIndisponivel("inventario_token_ausente");
+  const url = new URL(URL_INVENTARIO);
+  url.searchParams.set("reservas_atuais", "1");
+  url.searchParams.set("limite", "20");
+  try {
+    const resposta = await consultar(url, {
+      headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+      redirect: "error", signal: AbortSignal.timeout(8_000),
+    });
+    if (resposta.status === 401 || resposta.status === 403) throw new InventarioIndisponivel("inventario_token_rejeitado");
+    if (!resposta.ok) throw new InventarioIndisponivel();
+    const dados = await resposta.json();
+    if (!Array.isArray(dados?.reservas)) throw new InventarioIndisponivel("inventario_resposta_invalida");
+    const pedidos: ReservaMaterial[] = [];
+    for (const item of dados.reservas) {
+      const protocolo = texto(item?.protocolo, 80);
+      if (!protocolo) continue;
+      const evento = texto(item.id_evento, 20);
+      pedidos.push({
+        chave: `protocolo:${protocolo}`, protocolo, solicitante: texto(item.solicitante, 120),
+        tipo: texto(item.tipo, 80), local: texto(item.local, 120), data: texto(item.data_solicitacao, 64),
+        itens: texto(item.itens, 30_000), codigoSap: texto(item.codigo_sap, 80), fotoDisponivel: item.foto_disponivel === true,
+        ...(item.foto_disponivel === true && ID_EVENTO.test(evento) && { fotoEvento: evento }),
+      });
+    }
+    return { pedidos, parcial: dados.tem_mais === true };
   } catch (erro) {
     if (erro instanceof InventarioIndisponivel) throw erro;
     throw new InventarioIndisponivel();

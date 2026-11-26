@@ -1,6 +1,33 @@
 # Retomada do Kyro
 
-## Estado atual — 22/11/2026 — v0.2.46
+## Estado atual — 25/11/2026 — v0.2.49
+
+### Versões e ambientes
+
+- **Alteração local na base v0.2.50.** Outlook / Microsoft 365, Microsoft Teams, Microsoft Planner e Google Planilhas foram retirados de Conexões, da Ilha e da ponte local a pedido do usuário.
+- **Alteração local na base v0.2.50.** Na área Empresa, o Dashboard e o Calendário são os dois primeiros itens, fora dos grupos recolhíveis. As saudações usam o primeiro nome da conta autenticada, e a Ilha registra a saudação por conta.
+- **Alteração local na base v0.2.50.** Gerenciar aplicativos ganhou o status **Protótipo** e uma proposta interna com PDF e vídeo. Links HTTPS usam o catálogo existente. Arquivos diretos precisam de um Vercel Blob privado e da variável `KYRO_PROPOSTAS_BLOB_READ_WRITE_TOKEN`.
+- **Alteração local na base v0.2.50.** O dono gerencia vários relatórios Power BI e seleciona o acesso por colaborador em Administração. O ambiente local já inclui o segundo link fornecido como **Relatório Power BI 2**.
+
+- **v0.2.49**, commit `aabe2e4` na `main` e na tag, com o pop-up de login do Power BI no Windows. O console do DigitalOcean confirmou o avanço de `cc1e68c` para `aabe2e4` em `/opt/kyro` e a chegada da tag `v0.2.49`. A mudança era do desktop e dispensava reinício do gateway. A saída compartilhada confirma Git e tag. A última checagem de saúde registrada está na seção da v0.2.46.
+- **v0.2.48**, commit `cc1e68c`, reúne as mudanças de Escritório, WhatsApp, Aderências, Power BI e SULTS. A suíte completa passou com **473 testes e zero falhas** antes da publicação.
+- **v0.2.47**, commit `eb4b41d`, publicou a correção das cotações de Importados com fonte principal AwesomeAPI e referência Frankfurter. A confirmação de HTTP 200 em produção ficou pendente.
+
+### Power BI — confirmado no web e no Windows
+
+- A aba **Empresa → Power BI** abre o relatório privado **Controle de Custos SAP**. A API do Kyro entrega o link de incorporação configurado em `KYRO_POWER_BI_REPORT_URL`. Na Vercel, foi preenchida como **Config** em **Production**, usando o link `reportEmbed`, seguido de um redeploy. O usuário confirmou que o relatório abriu no Kyro Web.
+- Na v0.2.48, o quadro aparecia no Windows, mas os botões de login do Power BI não abriam a janela. A v0.2.49 permite que a própria página do Power BI abra o pop-up oficial da Microsoft no mesmo ambiente WebView2, preservando o vínculo com o quadro. O pop-up só é habilitado enquanto o relatório está montado e aceita os destinos definidos em `src-tauri/src/power_bi.rs`.
+- O usuário confirmou que o relatório abriu dentro do **Kyro .exe v0.2.49** após o login no navegador interno. O web e o botão **Abrir no Power BI** continuam disponíveis. A validação cobre a conta corporativa testada. O Kyro exibe o relatório incorporado e a Microsoft aplica as permissões da conta.
+- O erro 403 anterior no portal do Entra ocorreu na tentativa de preparar a conexão do Outlook. Essa tentativa fica separada da validação do Power BI. O fluxo que funcionou usa o pop-up do próprio relatório.
+
+### Escritório, WhatsApp e Aderências
+
+- **Escritório** reúne atividades, compromissos, não lidas do WhatsApp e resultados do Robô de Aderências conforme a permissão. Em **Registros da operação**, dono e gerência podem cadastrar atividades com prazo e prioridade, compromissos na agenda da empresa e avisos, ocorrências ou atualizações. Atividades podem ser editadas e concluídas pelo painel. Registros podem ser editados ou excluídos e entram no backup da conta.
+- **WhatsApp** ganhou o painel **Mensagens automáticas**, movido do Robô de Aderências. A lateral do Kyro se recolhe temporariamente ao entrar no WhatsApp e o layout acompanha a largura disponível. Os seletores reutilizados de contato e grupo filtram por nome enquanto a pessoa digita.
+- **Robô de Aderências** permite escolher a posição de envio de cada planilha e preserva o destinatário de cada rotina em alterações independentes. O print de envio usa PNG original de maior resolução como documento do WhatsApp. A nitidez recebida em conversas reais fica para conferência.
+- No menu Empresa, **Aplicativos** passou a se chamar **Sistemas**. **SULTS** fica logo abaixo de **Power BI**, com a mensagem **Em breve no Kyro**. A integração de dados do SULTS fica para uma etapa futura.
+
+## Registro de 22/11/2026 — v0.2.46
 
 ### Publicação e DigitalOcean
 
@@ -76,7 +103,7 @@ Este registro descreve a publicação e as verificações da 0.2.41. As seções
 - Teams e Planner implementados com login Microsoft e ícones próprios. Teams consulta conversas da conta; Planner consulta tarefas atribuídas. Escopos e credenciais são separados por integração, sem ampliar automaticamente o acesso do Outlook. São integrações de leitura.
 - Google Planilhas implementado com login Google, até cinco links configurados, seleção de abas e prévia em tabela com busca/paginação. A autorização é somente de leitura; edição ocorre no Google. Dados, erros e abas vazias são apresentados de forma distinta.
 - Gerência não vê nem consulta em segundo plano GitHub, Vercel, Railway, Supabase, Cloudflare, Resend, n8n, Linear, Stripe, Cripto, Strava, Reddit e Discord. A proteção abrange catálogo, ilha, janelas e ponte. Credenciais existentes foram preservadas; o dono mantém todas as conexões.
-- Instruções das novas integrações: [Microsoft](../docs/conexoes-microsoft.md) e [Google Planilhas](../docs/conexoes-planilhas.md).
+- Registro da retirada de [Google Planilhas](../docs/conexoes-planilhas.md) e das [conexões Microsoft](../docs/conexoes-microsoft.md) na base v0.2.50.
 
 ### Testes e GitHub confirmados
 
@@ -106,7 +133,6 @@ O usuário executou os comandos no Console do Droplet como root. O assistente co
 ### Próxima retomada e limites de validação
 
 - O usuário foi orientado a abrir o Kyro e instalar a atualização 0.2.41. A instalação no computador e o teste real das novidades após a atualização ainda não foram confirmados.
-- Confirmar a autorização real de Teams, Planner e Google Planilhas com as contas do usuário. Os testes usaram dados simulados; os cadastros OAuth e permissões corporativas seguem as instruções dos documentos próprios. Não pedir ou expor segredos no resumo.
 - Conferir no uso real a persistência das preferências após fechar/reabrir e os acessos de dono, gerência e visitante; houve validação automatizada, mas não confirmação final do usuário para todos os fluxos da versão publicada.
 - A prévia de Planilhas foi conferida com dados fictícios em desktop, celular e tema escuro; isso não comprova acesso a uma planilha privada real.
 - O usuário já confirmou em 13/11 que aderências e horários funcionam inclusive com o sistema fechado. Não reabrir essa questão como falha ativa. A qualidade HD final no WhatsApp e um teste prolongado de memória após esta versão ainda não foram confirmados.

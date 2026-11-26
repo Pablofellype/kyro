@@ -14,6 +14,7 @@ import { MapaDeCalor } from "../../componentes/MapaDeCalor";
 import { BarrasHorizontais, BarrasVerticais, Anel } from "../../componentes/Graficos";
 import { Marca } from "../../marcas/Marca";
 import { useConfig, type BlocoInicio } from "../../estado/configuracoes";
+import { primeiroNomeDaConta, useAuth } from "../../estado/autenticacao";
 import { useRotina, tarefasDoDia, habitoCumprido } from "../../estado/rotina";
 import { useEstudos, revisoesParaHoje, cartoesVencidos } from "../../estado/estudos";
 import { usePomodoro, restanteAtual, formatarRelogio } from "../../estado/pomodoro";
@@ -584,7 +585,8 @@ export default function Inicio() {
   const desligadas = useConfig((s) => s.funcoesDesligadas);
   const blocos = useMemo(() => todosOsBlocos.filter((b) => BLOCOS_PESSOAIS.has(b.id) && blocoLigado(b.id, desligadas)), [todosOsBlocos, desligadas]);
   const definir = useConfig((s) => s.definir);
-  const nome = useConfig((s) => s.nome);
+  const usuario = useAuth((s) => s.usuario);
+  const primeiroNome = primeiroNomeDaConta(usuario);
   const [personalizando, setPersonalizando] = useState(false);
   const [escolhendoFuncoes, setEscolhendoFuncoes] = useState(false);
 
@@ -622,7 +624,7 @@ export default function Inicio() {
         <div className="inicio-abertura">
           <CabecalhoAba
             rotulo={T.inicio.rotulo}
-            titulo={<>{T.inicio.saudacao(saudacao())}<em className="inicio-nome" title={nome || undefined}>{nome.trim().split(/\s+/)[0] || T.barraLateral.perfil}</em></>}
+            titulo={primeiroNome ? <>{T.inicio.saudacao(saudacao())}<em className="inicio-nome" title={usuario?.nome}>{primeiroNome}</em></> : saudacao()}
             subtitulo={data}
             acoes={
               <>

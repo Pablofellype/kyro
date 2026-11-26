@@ -11,7 +11,7 @@ export function numeroDaRota(rota: Rota) {
 }
 
 interface Props {
-  rotulo?: string;
+  rotulo?: ReactNode;
   titulo: ReactNode;
   subtitulo?: ReactNode;
   acoes?: ReactNode;

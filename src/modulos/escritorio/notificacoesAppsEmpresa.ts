@@ -2,6 +2,7 @@ import { useEffect, useMemo } from "react";
 import { create } from "zustand";
 import { NATIVO, notificarWindows } from "../../desktop/desktop";
 import { useAuth } from "../../estado/autenticacao";
+import { useConfig } from "../../estado/configuracoes";
 import { useIlha } from "../../estado/ilha";
 import { useInterface } from "../../estado/interface";
 import { tocarSom } from "../../ponte/sons";
@@ -25,7 +26,9 @@ const INTERVALO_SEM_FONTE_MS = 300_000;
 
 const ERROS_INVENTARIO: Record<string, string> = {
   inventario_token_ausente: "O token do inventário está faltando no backend do Kyro.",
-  inventario_token_rejeitado: "O inventário rejeitou o token. Confira se o Kyro usa o mesmo valor da versão publicada do inventário.",
+  inventario_token_rejeitado: import.meta.env.DEV
+    ? "O Inventário publicado rejeitou o token do Kyro local. A aba Solicitações tem uma prévia do aviso."
+    : "O inventário rejeitou o token. Confira se o Kyro usa o mesmo valor da versão publicada do inventário.",
   inventario_resposta_invalida: "O inventário respondeu em um formato que o Kyro não conseguiu ler.",
   inventario_indisponivel: "O inventário está indisponível. Tente novamente em instantes.",
   acao_nao_encontrada: "A versão do servidor do Kyro ainda não oferece esta consulta.",
@@ -58,17 +61,25 @@ function totalDaContagem(contagem: ContagemDeSolicitacoes | undefined, atual: No
   return Math.max(0, contagem.total - ajuste);
 }
 
-export function textoDaSolicitacaoDeMaterial(solicitacao: SolicitacaoMaterialRecebida) {
-  const material = solicitacao.itens || solicitacao.tipo;
-  const resumo = material.length > 155 ? `${material.slice(0, 152).trimEnd()}…` : material;
-  const texto = solicitacao.solicitante
-    ? `${solicitacao.solicitante} solicitou ${resumo || "material"}`
-    : `Nova solicitação de material${resumo ? `: ${resumo}` : ""}`;
-  return [texto, solicitacao.local, solicitacao.protocolo].filter(Boolean).join(" · ");
+export function categoriaDaSolicitacao(tipo: string, local: string) {
+  const categoria = tipo.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().replace(/[_\s/-]+/g, " ").trim();
+  if (/^(EPI(?: UNIFORMES?| E UNIFORMES?)?|UNIFORMES?|EQUIPAMENTOS? (?:DE USO |DE PROTECAO )?(?:PESSOAL|INDIVIDUAL))$/.test(categoria)) return "Equipamento pessoal (EPI)";
+  if (categoria === "MATERIAL" || /^(?:MATERIAL )?DML(?: |$)/.test(categoria)
+    || (!categoria && /^DML(?:[ _]|$)/i.test(local))) return "Material DML";
+  return "Material";
 }
 
-function detalheDaSolicitacao(solicitacao: SolicitacaoMaterialRecebida) {
-  return [solicitacao.itens || solicitacao.tipo, solicitacao.local, solicitacao.protocolo].filter(Boolean).join(" · ");
+export function avisoDaSolicitacao(solicitacao: SolicitacaoMaterialRecebida, quantidade = 1) {
+  const categoria = categoriaDaSolicitacao(solicitacao.tipo, solicitacao.local);
+  const tipo = categoria.slice(0, 1).toLowerCase() + categoria.slice(1);
+  const material = solicitacao.itens;
+  const resumo = material.length > 155 ? `${material.slice(0, 152).trimEnd()}…` : material;
+  const titulo = solicitacao.solicitante ? `${solicitacao.solicitante} solicitou ${tipo}` : `Nova solicitação de ${tipo}`;
+  return {
+    texto: quantidade > 1 ? `${titulo} (+${quantidade - 1})` : titulo,
+    detalhe: [resumo, solicitacao.local, solicitacao.protocolo].filter(Boolean).join(" · "),
+    fotoEvento: solicitacao.fotoEvento,
+  };
 }
 
 type EstadoDaConsulta = {
@@ -77,7 +88,6 @@ type EstadoDaConsulta = {
   erro?: string;
   notificacao?: NotificacaoRecebida;
 };
-type AvisoDeMaterial = { texto: string; detalhe?: string };
 const chaveDeVistos = (usuarioId: number) => `kyro:solicitacoes-material-vistas:${usuarioId}`;
 
 export const useEstadoNotificacoesApps = create<{
@@ -128,8 +138,8 @@ export function usarResumoDoInventario(confirmada?: NotificacaoRecebida | null) 
   };
 }
 
-function revelarNaIlha(aviso: AvisoDeMaterial) {
-  const revelou = useIlha.getState().revelar({ ...aviso, tipo: "info", aba: "materiais" }, 10_000);
+function revelarNaIlha(aviso: { texto: string; detalhe?: string; fotoEvento?: string }, usuarioId: number) {
+  const revelou = useIlha.getState().revelar({ ...aviso, destinatarioId: usuarioId, tipo: "info", aba: "materiais" }, 10_000);
   if (revelou) void tocarSom("pop", "avisos");
   return revelou;
 }
@@ -202,12 +212,13 @@ export function usarNotificacoesAppsEmpresa(janela: "sistema" | "ilha" = "sistem
                 // Carrega o histórico em silêncio na primeira consulta do celular.
                 registrarEntrega(chave, contagem);
               } else if (quantidade > 0) {
-                const aviso = fonte.mensagem(quantidade);
                 const solicitacao = notificacao.recentes?.find((item) => item.ordem > anterior);
-                const mensagem = !mobile && solicitacao ? `${textoDaSolicitacaoDeMaterial(solicitacao)}${quantidade > 1 ? ` (+${quantidade - 1})` : ""}` : aviso;
+                const aviso = solicitacao && !useConfig.getState().privacidade
+                  ? avisoDaSolicitacao(solicitacao, quantidade) : { texto: fonte.mensagem(quantidade), detalhe: "" };
+                const mensagem = [aviso.texto, aviso.detalhe].filter(Boolean).join(" · ");
                 useInterface.getState().avisar(mensagem, undefined, "info", mobile ? 4500 : 10_000);
                 registrarEntrega(chave, contagem);
-                if (NATIVO) void notificarWindows("Kyro · Inventário", aviso);
+                if (NATIVO) void notificarWindows(aviso.texto, aviso.detalhe || "Kyro · Inventário");
               }
             }
             if (avisarNaIlha) {
@@ -218,8 +229,8 @@ export function usarNotificacoesAppsEmpresa(janela: "sistema" | "ilha" = "sistem
               const quantidade = total - anterior;
               if (quantidade <= 0) continue;
               const solicitacao = notificacao.recentes?.find((item) => item.ordem > anterior);
-              const titulo = quantidade === 1 && solicitacao?.solicitante ? `${solicitacao.solicitante} solicitou material` : fonte.mensagem(quantidade);
-              if (revelarNaIlha({ texto: titulo, detalhe: solicitacao && detalheDaSolicitacao(solicitacao) })) {
+              const aviso = solicitacao ? avisoDaSolicitacao(solicitacao, quantidade) : { texto: fonte.mensagem(quantidade) };
+              if (revelarNaIlha(aviso, usuarioId)) {
                 registrarEntrega(chaveVisual, contagem);
               }
             }

@@ -19,6 +19,8 @@ import { useAuth } from "../../estado/autenticacao";
 import "./sistemaWeb.css";
 import { itensDoMenuAppsEmpresa } from "../../modulos/escritorio/aplicativosEmpresaConfig";
 import { useCatalogoAppsEmpresa, useSincronizarCatalogoAppsEmpresa } from "../../modulos/escritorio/catalogoAppsEmpresa";
+import { useSincronizarPlanilhasEmpresa } from "../../modulos/escritorio/catalogoPlanilhasEmpresa";
+import { useSincronizarCatalogoPowerBi } from "../../modulos/escritorio/catalogoPowerBi";
 
 const MINIMO = { w: 960, h: 600 };
 
@@ -34,6 +36,7 @@ export function JanelaSistema({ mobile = false }: { mobile?: boolean } = {}) {
   const appEmpresa = useInterface((s) => s.parametros.app ?? "");
   const area = useInterface((s) => s.area);
   const usuario = useAuth((s) => s.usuario);
+  const token = useAuth((s) => s.token);
   const desligadas = useConfig((s) => s.funcoesDesligadas);
   const areaValida = podeAcessarArea(usuario, area);
   const areaEfetiva = areaValida ? area : "empresa";
@@ -41,9 +44,11 @@ export function JanelaSistema({ mobile = false }: { mobile?: boolean } = {}) {
   const rota = rotaValida ? rotaPedida : primeiraRotaDaArea(areaEfetiva);
   const chavePagina = rota === "appsEmpresa" ? `${rota}:${appEmpresa}` : rota;
   useSincronizarCatalogoAppsEmpresa();
+  useSincronizarPlanilhasEmpresa(areaEfetiva === "empresa", rota === "planilhasEmpresa");
+  useSincronizarCatalogoPowerBi(areaEfetiva === "empresa" && usuario && usuario.perfil !== "visitante" ? token : null, usuario?.perfil === "gerencia" && rota === "powerBi");
   const { aplicativos } = useCatalogoAppsEmpresa();
   const appAberto = rota === "appsEmpresa" && itensDoMenuAppsEmpresa(usuario, aplicativos).some((app) => app.id === appEmpresa && app.disponivel);
-  const recolherBarraAoEntrar = appAberto || rota === "whatsapp" || rota === "powerBi";
+  const recolherBarraAoEntrar = appAberto || rota === "whatsapp";
   const geometriaSalva = useInterface((s) => s.geometria);
   const maximizada = useInterface((s) => s.sistemaMaximizado);
   const definirSistema = useInterface((s) => s.definirSistema);

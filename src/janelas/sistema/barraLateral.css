@@ -198,15 +198,13 @@
 .estilo-sistema .sistema .barra-mobile-menu .barra-conexoes { margin: 0; padding: 0; border: 0; }
 .barra-mobile-menu .barra-whatsapp::before { content: none; }
 .estilo-sistema .sistema .barra-mobile-menu .barra-apps { margin-top: 0; }
-.estilo-sistema .sistema .barra-mobile-menu .barra-apps-toggle { color: inherit; }
+.estilo-sistema .sistema .barra-mobile-menu .barra-apps-toggle:not([aria-current="page"]) { color: var(--texto); background: var(--superficie-2); }
 .estilo-sistema .sistema .barra-mobile-menu .barra-apps-toggle .barra-item-texto {
-  font-size: inherit;
+  font-weight: 650;
   letter-spacing: normal;
   text-transform: none;
 }
-.barra-mobile-menu .barra-apps-lista { margin-left: 12px; }
 .barra-mobile-menu .barra-apps-item:disabled { color: var(--texto-3); opacity: .7; }
-.barra-mobile-menu .barra-apps-item[aria-current="page"] .barra-apps-icone { background: rgb(255 255 255 / .16); color: inherit; }
 .estilo-sistema .sistema .barra-mobile-menu .barra-base { gap: 6px; padding-top: 8px; }
 .estilo-sistema .sistema .barra-mobile-menu .barra-base-linha { display: flex; flex-direction: row; gap: 6px; }
 .estilo-sistema .sistema .barra-mobile-menu .barra-perfil {

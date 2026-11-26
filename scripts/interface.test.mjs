@@ -204,10 +204,13 @@ test("menu e página de configurações da gerência mostram personalização e 
     else delete globalThis[nome];
   }));
   const { useAuth } = await servidor.ssrLoadModule("/src/estado/autenticacao.ts");
+  const { useConfig } = await servidor.ssrLoadModule("/src/estado/configuracoes.ts");
   const { useInterface } = await servidor.ssrLoadModule("/src/estado/interface.ts");
   const { BarraLateral } = await servidor.ssrLoadModule("/src/janelas/sistema/BarraLateral.tsx");
   const { default: Configuracoes } = await servidor.ssrLoadModule("/src/modulos/configuracoes/Configuracoes.tsx");
   const auth = useAuth.getInitialState(), ui = useInterface.getInitialState();
+  const config = useConfig.getInitialState();
+  const gruposAnteriores = config.gruposFechados;
   const usuarioAnterior = auth.usuario, areaAnterior = ui.area, parametrosAnteriores = ui.parametros, rotaAnterior = ui.rota;
   try {
     auth.usuario = { id: 7, nome: "Gerente", email: "gerente@example.com", perfil: "gerencia" };
@@ -220,7 +223,10 @@ test("menu e página de configurações da gerência mostram personalização e 
       assert.match(menu, /title="Editar perfil"/);
       assert.doesNotMatch(menu, /class="barra-perfil"[^>]*disabled/);
       assert.match(menu, /barra-item-texto cortar">WhatsApp<\/span>/);
-      assert.match(menu, /barra-item-texto cortar">Escritório<\/span>/);
+      assert.match(menu, /barra-item-texto cortar">Dashboard<\/span>/);
+      assert.match(menu, /barra-item-texto cortar">Calendário<\/span>/);
+      assert.deepEqual([...menu.matchAll(/data-rota="([^"]+)"/g)].slice(0, 2).map((m) => m[1]), ["escritorio", "calendario"]);
+      assert.doesNotMatch(menu, /data-grupo="organizacao"/);
       if (recolhida) {
         assert.match(menu, /aria-label="Sistemas"[^>]*aria-haspopup="dialog"/);
         assert.match(menu, /barra-item-texto cortar">Sistemas<\/span>/);
@@ -233,6 +239,44 @@ test("menu e página de configurações da gerência mostram personalização e 
         assert.doesNotMatch(menu, /barra-subitem/);
       }
     }
+    config.gruposFechados = ["principal", "organizacao"];
+    ui.rota = "calendario";
+    const menuMobile = renderToStaticMarkup(createElement(BarraLateral, { recolhida: false, mobile: true }));
+    assert.match(menuMobile, /Empresa · Calendário/);
+    assert.match(menuMobile, /data-rota="escritorio"[^>]*title="Dashboard \(Ctrl \+ 1\)"/);
+    assert.match(menuMobile, /data-rota="calendario"[^>]*aria-current="page"[^>]*title="Calendário \(Ctrl \+ 2\)"/);
+    assert.doesNotMatch(menuMobile, /data-grupo="organizacao"|data-rota="conexoes"/);
+    config.gruposFechados = [];
+    auth.usuario = { ...auth.usuario, roboAderencias: true };
+    ui.rota = "planilhasEmpresa";
+    const menuPlanilhas = renderToStaticMarkup(createElement(BarraLateral, { recolhida: false }));
+    const entradas = [...menuPlanilhas.matchAll(/data-rota="([^"]+)" aria-label="([^"]+)"/g)].map(([, rota, rotulo]) => [rota, rotulo]);
+    const powerBi = entradas.findIndex(([rota]) => rota === "powerBi");
+    assert.deepEqual(entradas.slice(powerBi, powerBi + 2), [["powerBi", "Power BI"], ["planilhasEmpresa", "Planilhas"]]);
+    assert.match(menuPlanilhas, /aria-label="Relatórios do Power BI"/);
+    assert.match(menuPlanilhas, /aria-label="Planilhas da empresa"/);
+    assert.doesNotMatch(menuPlanilhas, /Gerenciar planilhas/);
+    const gerente = auth.usuario;
+    auth.usuario = { ...gerente, perfil: "dono" };
+    ui.parametros = { modo: "gerenciar" };
+    const menuDoDono = renderToStaticMarkup(createElement(BarraLateral, { recolhida: false }));
+    assert.match(menuDoDono, /data-planilha="gerenciar:planilhas" aria-current="page" aria-label="Gerenciar planilhas"/);
+    const { MenuDaEmpresa } = await servidor.ssrLoadModule("/src/janelas/sistema/MenuDaEmpresa.tsx");
+    const icone = () => null;
+    const opcoes = [{ id: "sistema", nome: "Sistema ativo", icone },
+      { id: "teste", nome: "Projeto em teste", icone, secao: "prototipo" },
+      { id: "admin", nome: "Gerenciar", icone, secao: "gerenciar" }];
+    ui.rota = "appsEmpresa";
+    const menuSistemas = (escolhido) => renderToStaticMarkup(createElement(MenuDaEmpresa, {
+      rota: "appsEmpresa", nome: "Sistemas", rotuloLista: "Sistemas da empresa", icone, recolhida: false, escolhido, opcoes,
+    }));
+    assert.match(menuSistemas("sistema"), /aria-expanded="false" aria-controls="barra-apps-prototipos"/);
+    assert.doesNotMatch(menuSistemas("sistema"), /Projeto em teste/);
+    assert.match(menuSistemas("sistema"), /class="barra-apps-gerencia"/);
+    assert.match(menuSistemas("teste"), /aria-expanded="true" aria-controls="barra-apps-prototipos"/);
+    assert.match(menuSistemas("teste"), /data-app="teste" aria-current="page"/);
+    auth.usuario = gerente;
+    ui.rota = "calendario";
     for (const secao of ["geral", "aparencia", "ilha", "dock", "admin", "dados", "desenvolvedor"]) {
       ui.parametros = { secao };
       const html = renderToStaticMarkup(createElement(Configuracoes));
@@ -247,11 +291,17 @@ test("menu e página de configurações da gerência mostram personalização e 
     const dono = renderToStaticMarkup(createElement(Configuracoes));
     assert.match(dono, /Administração/);
     assert.match(dono, /Desenvolvedor/);
+    ui.area = "pessoal";
+    const menuPessoal = renderToStaticMarkup(createElement(BarraLateral, { recolhida: false }));
+    assert.match(menuPessoal, /data-grupo="organizacao"[\s\S]*data-rota="calendario"[^>]*aria-label="Calendário pessoal"/);
+    assert.doesNotMatch(menuPessoal, /data-rota="escritorio"/);
+    assert.doesNotMatch(menuPessoal, /data-rota="planilhasEmpresa"/);
   } finally {
     auth.usuario = usuarioAnterior;
     ui.area = areaAnterior;
     ui.parametros = parametrosAnteriores;
     ui.rota = rotaAnterior;
+    config.gruposFechados = gruposAnteriores;
   }
 });
 
@@ -557,8 +607,10 @@ test("verde principal mantém leitura nos botões e se distingue do vermelho de 
   assert.notEqual(cores["--marca-primaria"], cores["--erro"]);
 });
 
-test("painel da gerência recebe a pessoa pelo nome e oferece apenas atalhos permitidos", async () => {
+test("dashboard e Ilha saúdam a conta atual, inclusive um colaborador novo ou após trocar de usuário", async () => {
   const { PainelCoordenacao } = await vite.ssrLoadModule("/src/modulos/escritorio/PainelCoordenacao.tsx");
+  const { Saudacao } = await vite.ssrLoadModule("/src/janelas/ilha/animacoes/Saudacao.tsx");
+  const { PrimeiraExecucao } = await vite.ssrLoadModule("/src/modulos/configuracoes/PrimeiraExecucao.tsx");
   const { useAuth } = await vite.ssrLoadModule("/src/estado/autenticacao.ts");
   const { useConfig } = await vite.ssrLoadModule("/src/estado/configuracoes.ts");
   const { useInterface } = await vite.ssrLoadModule("/src/estado/interface.ts");
@@ -571,12 +623,22 @@ test("painel da gerência recebe a pessoa pelo nome e oferece apenas atalhos per
     config.nome = "";
     const html = renderToStaticMarkup(createElement(PainelCoordenacao));
     assert.ok(html.includes(`${saudacao()}, Mariana!`));
-    for (const texto of ["Painel da gerência", "Personalizar meu espaço", "Precisa da sua atenção", "Na sua agenda", "Seus sistemas", "Registros de limpeza", "Sistema de requisições", "Power BI", "Nova atividade", "Novo compromisso", "Novo registro"]) assert.ok(html.includes(texto), texto);
+    const renderIlha = () => renderToStaticMarkup(createElement(Saudacao, { aoTerminar() {} }));
+    assert.ok(renderIlha().includes(`${saudacao()}, Mariana.`));
+    for (const texto of ["Dashboard", "Personalizar meu espaço", "Precisa da sua atenção", "Na sua agenda", "Seus sistemas", "Registros de limpeza", "Sistema de requisições", "Power BI", "Nova atividade", "Novo compromisso", "Novo registro"]) assert.ok(html.includes(texto), texto);
     assert.doesNotMatch(html, /Abrir conversa|Administração|Provedores de IA|Gerenciar acessos|Equipe cadastrada|Robô de Aderências|Últimas atividades do Kyro|Membros cadastrados|Avisos e mensagens/);
-    config.nome = "Mari";
-    assert.ok(renderToStaticMarkup(createElement(PainelCoordenacao)).includes(`${saudacao()}, Mari!`));
+    config.nome = "Pablo";
+    auth.usuario = { id: 8, perfil: "gerencia", nome: "  João   Costa  " };
+    const painelNovo = renderToStaticMarkup(createElement(PainelCoordenacao));
+    const ilhaNova = renderIlha();
+    assert.ok(painelNovo.includes(`${saudacao()}, João!`));
+    assert.ok(ilhaNova.includes(`${saudacao()}, João.`));
+    for (const texto of [painelNovo, ilhaNova]) assert.doesNotMatch(texto, /Pablo|Mariana/);
     ui.area = "pessoal";
     assert.equal(renderToStaticMarkup(createElement(PainelCoordenacao)), "");
+    auth.usuario = { id: 9, perfil: "dono", nome: "Beatriz Lima" };
+    const primeiraExecucao = renderToStaticMarkup(createElement(PrimeiraExecucao));
+    assert.match(primeiraExecucao, /Oi, Beatriz! Eu sou o Kyro\./);
     ui.area = "empresa";
     auth.usuario = { id: 8, perfil: "visitante", nome: "Visitante" };
     assert.equal(renderToStaticMarkup(createElement(PainelCoordenacao)), "");
@@ -591,9 +653,9 @@ test("escritório diferencia os acessos do dono e mantém falhas da equipe disti
   const { VisaoDoEscritorio } = await vite.ssrLoadModule("/src/modulos/escritorio/PainelCoordenacao.tsx");
   const { resumirPainelEmpresa, DADOS_REMOTOS_VAZIOS } = await vite.ssrLoadModule("/src/modulos/escritorio/dadosDoPainelEmpresa.ts");
   const agora = new Date(2026, 10, 15, 10, 0);
-  const props = { nome: "Ana", usuario: { perfil: "dono", nome: "Ana", roboAderencias: false }, agora, resumo: resumirPainelEmpresa([], [], agora), remoto: { ...DADOS_REMOTOS_VAZIOS, carregando: false, atualizadoEm: null, erroMembros: true }, mensagens: null, whatsappComErro: false, aoNavegar() {}, aoAtualizar() {}, aoConcluir() {} };
+  const props = { usuario: { perfil: "dono", nome: "Ana", roboAderencias: false }, agora, resumo: resumirPainelEmpresa([], [], agora), remoto: { ...DADOS_REMOTOS_VAZIOS, carregando: false, atualizadoEm: null, erroMembros: true }, mensagens: null, whatsappComErro: false, aoNavegar() {}, aoAtualizar() {}, aoConcluir() {} };
   const falhou = renderToStaticMarkup(createElement(VisaoDoEscritorio, props));
-  for (const texto of ["Escritório da empresa", "Equipe cadastrada", "Gerenciar acessos", "Robô de Aderências", "Não foi possível consultar a equipe agora."]) assert.ok(falhou.includes(texto), texto);
+  for (const texto of ["Dashboard", "Equipe cadastrada", "Gerenciar acessos", "Robô de Aderências", "Não foi possível consultar a equipe agora."]) assert.ok(falhou.includes(texto), texto);
   assert.doesNotMatch(falhou, /Pedidos no Kyro|Solicitações recebidas|Ver solicitações|online|Nenhuma conta ativa nesta consulta/);
   const rotinas = [{ id: "rotina-teste", nome: "Envio da manhã", ativo: true, frequencia: "diaria", ultimoResultado: { executadoEm: agora.toISOString(), planilhasEnviadas: 2, erros: ["falha de teste"] } }];
   const carregado = renderToStaticMarkup(createElement(VisaoDoEscritorio, {
@@ -629,7 +691,7 @@ test("portal visitante oferece volta direta ao login e acessos com os destinos d
   assert.doesNotMatch(html, /<form|visitante-material|<button/);
 });
 
-test("portal público não exibe sistemas privados nem oferece link para sistemas em manutenção", async () => {
+test("portal público omite sistemas privados e mantém manutenção e protótipos sem links", async () => {
   const { default: VisitantePublico } = await vite.ssrLoadModule("/src/modulos/publico/VisitantePublico.tsx");
   const { APLICATIVOS_EMPRESA } = await vite.ssrLoadModule("/src/modulos/escritorio/aplicativosEmpresaConfig.ts");
   const tamanho = APLICATIVOS_EMPRESA.length;
@@ -637,10 +699,12 @@ test("portal público não exibe sistemas privados nem oferece link para sistema
     APLICATIVOS_EMPRESA.push(
       { id: "privado-teste", nome: "Sistema privado de teste", descricao: "Privado", url: "https://privado.example/", status: "disponivel", publico: false },
       { id: "manutencao-teste", nome: "Manutenção de teste", descricao: "Manutenção", url: "https://manutencao.example/", status: "manutencao", publico: true },
+      { id: "prototipo-teste", nome: "Sistema experimental", descricao: "Projeto em desenvolvimento", url: "https://prototipo.example/", status: "prototipo", publico: true, proposta: { pdf: { origem: "link", url: "https://documento.example/" } } },
     );
     const html = renderToStaticMarkup(createElement(VisitantePublico));
-    assert.doesNotMatch(html, /Sistema privado de teste|privado\.example|manutencao\.example/);
+    assert.doesNotMatch(html, /Sistema privado de teste|privado\.example|manutencao\.example|prototipo\.example|documento\.example/);
     assert.match(html, /aria-label="Manutenção de teste: em manutenção"/);
+    assert.match(html, /aria-label="Sistema experimental: protótipo"/);
   } finally {
     APLICATIVOS_EMPRESA.splice(tamanho);
   }
@@ -740,6 +804,9 @@ test("menu de apps preserva o catálogo, identifica manutenção e respeita a pe
   }
   assert.equal(itensDoMenuAppsEmpresa(null).some((app) => app.id === "aderencias"), false);
   assert.equal(itensDoMenuAppsEmpresa({ perfil: "visitante", roboAderencias: true }).some((app) => app.id === "aderencias"), false);
+  const prototipos = [{ id: "prototipo", nome: "Novo sistema", status: "prototipo", publico: false, url: null, descricao: "" }];
+  assert.equal(itensDoMenuAppsEmpresa({ perfil: "gerencia", roboAderencias: false }, prototipos)[0].disponivel, true);
+  assert.equal(itensDoMenuAppsEmpresa({ perfil: "visitante", roboAderencias: false }, prototipos)[0].disponivel, false);
   assert.equal(new Set(comum.map((app) => app.id)).size, comum.length);
 });
 
@@ -792,6 +859,19 @@ test("só o dono abre o gerenciador e um novo domínio abre pelo navegador", asy
   assert.match(html, /Ferramenta/);
   assert.match(html, /Abrir no navegador/);
   assert.doesNotMatch(html, /<iframe/);
+  const prototipo = {
+    ...app, id: "app-prototipo", url: null, status: "prototipo",
+    proposta: {
+      pdf: { origem: "link", url: "https://proposta.example/documento.pdf" },
+      video: { origem: "link", url: "https://proposta.example/video" },
+    },
+  };
+  const interno = renderizar(prototipo.id, "gerencia", [prototipo]);
+  assert.match(interno, /data-status="prototipo">Protótipo/);
+  assert.match(interno, /href="https:\/\/proposta\.example\/documento\.pdf"/);
+  assert.match(interno, /href="https:\/\/proposta\.example\/video"/);
+  assert.doesNotMatch(interno, /<iframe/);
+  assert.doesNotMatch(renderizar(prototipo.id, "visitante", [prototipo]), /proposta\.example/);
 });
 
 test("navegação entre apps troca o aplicativo e limpa a seleção ao mudar de área do menu", async (t) => {

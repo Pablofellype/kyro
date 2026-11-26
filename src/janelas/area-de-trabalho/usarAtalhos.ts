@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useInterface } from "../../estado/interface";
 import { useConfig } from "../../estado/configuracoes";
+import { useAuth } from "../../estado/autenticacao";
 import { usePomodoro } from "../../estado/pomodoro";
 import { useMidia } from "../../estado/midia";
 import { useRotina } from "../../estado/rotina";
@@ -9,6 +10,7 @@ import { T } from "../../textos/textos";
 import { rotaLigada } from "../../utilitarios/funcoes";
 import { ACOES_GLOBAIS, combinaCom, type AcaoGlobal } from "../../utilitarios/atalhos";
 import { NATIVO } from "../../desktop/desktop";
+import { itensVisiveisDaBarra } from "../sistema/areas";
 
 function emCampoDeTexto(alvo: EventTarget | null): boolean {
   const el = alvo as HTMLElement | null;
@@ -74,7 +76,9 @@ export function usarAtalhos() {
         return;
       }
       if (/^[1-9]$/.test(e.key)) {
-        const visiveis = cfg.barraLateral.filter((i) => i.visivel && rotaLigada(i.rota, cfg.funcoesDesligadas));
+        const visiveis = ui.area === "empresa"
+          ? itensVisiveisDaBarra(cfg.barraLateral, ui.area, useAuth.getState().usuario, cfg.funcoesDesligadas)
+          : cfg.barraLateral.filter((i) => i.visivel && rotaLigada(i.rota, cfg.funcoesDesligadas));
         const alvo = visiveis[Number(e.key) - 1];
         if (alvo) {
           e.preventDefault();

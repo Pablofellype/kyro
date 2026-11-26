@@ -19,12 +19,12 @@ export default defineConfig(({ mode }) => {
   // A ponte roda no mesmo processo do Vite, por isso precisa receber também
   // as variáveis sem prefixo VITE_ do .env.local. Elas nunca entram no bundle.
   const env = loadEnv(mode, process.cwd(), "");
-  for (const chave of ["KYRO_GATEWAY_URL", "VITE_GATEWAY_URL", "KYRO_GATEWAY_SECRET", "NIKO_GATEWAY_SECRET", "INVENTARIO_INTEGRACAO_TOKEN", "KYRO_POWER_BI_REPORT_URL"]) {
+  for (const chave of ["KYRO_GATEWAY_URL", "VITE_GATEWAY_URL", "KYRO_GATEWAY_SECRET", "NIKO_GATEWAY_SECRET", "INVENTARIO_INTEGRACAO_TOKEN", "KYRO_POWER_BI_REPORT_URL", "KYRO_POWER_BI_REPORT_URL_2", "KYRO_PROPOSTAS_BLOB_READ_WRITE_TOKEN"]) {
     if (!process.env[chave] && env[chave]) process.env[chave] = env[chave];
   }
   return {
     cacheDir: "node_modules/.vite-niko",
-    plugins: [react(), politicaDeSeguranca(), ponteLocal()],
+    plugins: [react(), politicaDeSeguranca(), ponteLocal(env.INVENTARIO_INTEGRACAO_URL_LOCAL)],
     optimizeDeps: {
       include: [
         "pdfjs-dist",

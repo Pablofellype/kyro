@@ -2,7 +2,7 @@ import { ArrowLeft, ArrowUpRight, CalendarDays, ClipboardCheck, ClipboardList, G
 import { useEffect, useState } from "react";
 import { LogoNiko } from "../../componentes/LogoNiko";
 import { NATIVO } from "../../desktop/desktop";
-import { APLICATIVOS_EMPRESA, type AplicativoEmpresa } from "../escritorio/aplicativosEmpresaConfig";
+import { APLICATIVOS_EMPRESA, STATUS_APLICATIVO, abreAplicativo, type AplicativoEmpresa } from "../escritorio/aplicativosEmpresaConfig";
 import { consultarAppsEmpresa } from "../escritorio/catalogoAppsEmpresa";
 import "./visitantePublico.css";
 
@@ -17,13 +17,14 @@ const ICONES: Record<string, LucideIcon> = {
 
 function CartaoDoSistema({ app }: { app: AplicativoEmpresa }) {
   const Icone = ICONES[app.id] ?? Globe2;
-  const disponivel = app.status === "disponivel" && Boolean(app.url);
+  const disponivel = abreAplicativo(app);
+  const prototipo = app.status === "prototipo";
   const conteudo = (
     <>
       <div className="visitante-app-topo">
         <span className="visitante-app-icone" aria-hidden="true"><Icone size={23} /></span>
         <span className="visitante-app-estado" data-disponivel={disponivel ? "sim" : "nao"}>
-          <i aria-hidden="true" />{disponivel ? "Disponível" : "Em manutenção"}
+          <i aria-hidden="true" />{disponivel || prototipo ? STATUS_APLICATIVO[app.status] : STATUS_APLICATIVO.manutencao}
         </span>
       </div>
       <div className="visitante-app-texto">
@@ -31,12 +32,12 @@ function CartaoDoSistema({ app }: { app: AplicativoEmpresa }) {
         <p>{app.descricao}</p>
       </div>
       <span className="visitante-app-acao">
-        {disponivel ? <>Acessar sistema <ArrowUpRight size={18} aria-hidden="true" /></> : <><LockKeyhole size={15} aria-hidden="true" /> Temporariamente indisponível</>}
+        {disponivel ? <>Acessar sistema <ArrowUpRight size={18} aria-hidden="true" /></> : <><LockKeyhole size={15} aria-hidden="true" /> {prototipo ? "Em desenvolvimento" : "Temporariamente indisponível"}</>}
       </span>
     </>
   );
 
-  if (!disponivel) return <article className="visitante-app visitante-app-indisponivel" data-sistema={app.id} aria-label={`${app.nome}: em manutenção`}>{conteudo}</article>;
+  if (!disponivel) return <article className="visitante-app visitante-app-indisponivel" data-sistema={app.id} aria-label={`${app.nome}: ${prototipo ? "protótipo" : "em manutenção"}`}>{conteudo}</article>;
   return (
     <a className="visitante-app" data-sistema={app.id} href={app.url!} target="_blank" rel="noopener noreferrer" aria-label={`Acessar ${app.nome} (${NATIVO ? "abre no navegador" : "abre em outra aba"})`}>
       {conteudo}
@@ -55,7 +56,7 @@ export default function VisitantePublico() {
     return () => controle.abort();
   }, []);
   const aplicativos = catalogo?.filter((app) => app.publico);
-  const disponiveis = aplicativos?.filter((app) => app.status === "disponivel" && app.url).length;
+  const disponiveis = aplicativos?.filter(abreAplicativo).length;
 
   return (
     <main className="visitante-publico">

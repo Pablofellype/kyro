@@ -83,12 +83,43 @@ test("configurações antigas recebem a aba de materiais e preservam a ordem das
   assert.equal(atual.ilha.blocos.avisos, false);
 });
 
-test("a aba de materiais oferece consulta e mostra somente as solicitações da conta atual", async () => {
+test("a prévia leva o nome e a referência de foto do pedido, com ícone para pedidos sem foto", async (t) => {
+  const { mostrarPreviaLocal } = await servidor.ssrLoadModule("/src/janelas/ilha/VisaoSolicitacoesMaterial.tsx");
+  const { useAuth } = await servidor.ssrLoadModule("/src/estado/autenticacao.ts");
+  const { useConfig } = await servidor.ssrLoadModule("/src/estado/configuracoes.ts");
+  const estados = [useIlha, useAuth, useConfig].map((s) => [s, s.getState()]);
+  t.mock.method(window, "setTimeout", () => 0);
+  t.mock.method(globalThis, "fetch", async () => assert.fail("A prévia não consulta o Inventário"));
+  t.after(() => {
+    while (useIlha.getState().revelacao) useIlha.getState().dispensarRevelacao();
+    for (const [store, estado] of estados) store.setState(estado);
+  });
+  useAuth.setState({ usuario: { id: 42, nome: "Pessoa de teste", perfil: "dono" } });
+  useConfig.setState((s) => ({ naoPerturbe: false, ilha: { ...s.ilha, notificacoes: "todas" }, foto: "data:image/png;base64,AQID" }));
+  useIlha.getState().abrir("materiais");
+  const pedido = { protocolo: "MAT-9", data: "", solicitante: "Pessoa do Inventário", local: "Comercial", tipo: "EPI_UNIFORME", itens: "2× Abafador concha", fotoEvento: "9" };
+  mostrarPreviaLocal({ ...pedido, solicitante: "" });
+  assert.equal(useIlha.getState().revelacao, null);
+  mostrarPreviaLocal(pedido);
+  const ilha = useIlha.getState();
+  assert.equal(ilha.estado, "compacta");
+  assert.equal(ilha.revelacao.destinatarioId, 42);
+  assert.equal(ilha.revelacao.texto, "Pessoa do Inventário solicitou equipamento pessoal (EPI)");
+  assert.match(ilha.revelacao.detalhe, /^Prévia local · 2× Abafador concha/);
+  assert.equal(ilha.revelacao.fotoEvento, "9");
+  assert.ok(!JSON.stringify(ilha.revelacao).includes("AQID"));
+  ilha.dispensarRevelacao();
+  mostrarPreviaLocal({ ...pedido, tipo: "MATERIAL", fotoEvento: undefined });
+  assert.equal(useIlha.getState().revelacao.texto, "Pessoa do Inventário solicitou material DML");
+  assert.equal(useIlha.getState().revelacao.fotoEvento, undefined);
+});
+
+test("a aba de materiais não lista reservas a partir da memória dos avisos", async () => {
   const { createElement } = await import("react");
   const { renderToStaticMarkup } = await import("react-dom/server");
-  const { VisaoSolicitacoesMaterial } = await servidor.ssrLoadModule("/src/janelas/ilha/VisaoSolicitacoesMaterial.tsx");
+  const { VisaoSolicitacoesMaterial, materiaisDaReserva } = await servidor.ssrLoadModule("/src/janelas/ilha/VisaoSolicitacoesMaterial.tsx");
   const { useAuth } = await servidor.ssrLoadModule("/src/estado/autenticacao.ts");
-  const { useEstadoNotificacoesApps, textoDaSolicitacaoDeMaterial } = await servidor.ssrLoadModule("/src/modulos/escritorio/notificacoesAppsEmpresa.ts");
+  const { useEstadoNotificacoesApps, avisoDaSolicitacao } = await servidor.ssrLoadModule("/src/modulos/escritorio/notificacoesAppsEmpresa.ts");
   const auth = useAuth.getInitialState(), estado = useEstadoNotificacoesApps.getInitialState();
   const { usuario } = auth;
   const { consultas, vistos } = estado;
@@ -98,17 +129,23 @@ test("a aba de materiais oferece consulta e mostra somente as solicitações da 
     estado.consultas = { inventario: { usuarioId: 7, situacao: "conectado", notificacao: { assinatura: "atual", total: 4, recentes: [pedido] } } };
     estado.vistos = { 7: { assinatura: "atual", total: 3 } };
     const renderizar = () => renderToStaticMarkup(createElement(VisaoSolicitacoesMaterial));
-    assert.match(renderizar(), /1 nova solicitação/);
-    assert.match(renderizar(), /4 solicitações recebidas/);
     assert.match(renderizar(), /Verificar agora/);
     assert.match(renderizar(), /Abrir inventário/);
-    assert.match(renderizar(), /Solicitante: Pessoa de Teste/);
-    assert.match(renderizar(), /Pano de limpeza/);
-    assert.match(renderizar(), /Comercial · MAT-10/);
-    assert.equal(textoDaSolicitacaoDeMaterial(pedido), "Pessoa de Teste solicitou Pano de limpeza · Comercial · MAT-10");
-    assert.equal(textoDaSolicitacaoDeMaterial({ ...pedido, solicitante: "" }), "Nova solicitação de material: Pano de limpeza · Comercial · MAT-10");
+    assert.doesNotMatch(renderizar(), /Pessoa de Teste|Pano de limpeza|MAT-10|1 nova solicitação/);
+    assert.deepEqual(materiaisDaReserva("(2x) BOTA PRETA [37] [7003127] | Pano [000112] | Luvas"), [
+      { material: "(2x) BOTA PRETA [37]", codigo: "7003127" },
+      { material: "Pano", codigo: "000112" },
+      { material: "Luvas" },
+    ]);
+    assert.deepEqual(avisoDaSolicitacao({ ...pedido, tipo: "MATERIAL", fotoEvento: "71" }), {
+      texto: "Pessoa de Teste solicitou material DML",
+      detalhe: "Pano de limpeza · Comercial · MAT-10",
+      fotoEvento: "71",
+    });
+    assert.equal(avisoDaSolicitacao({ ...pedido, tipo: "EPI_UNIFORME" }, 2).texto, "Pessoa de Teste solicitou equipamento pessoal (EPI) (+1)");
+    assert.equal(avisoDaSolicitacao({ ...pedido, solicitante: "", tipo: "", local: "" }).texto, "Nova solicitação de material");
     auth.usuario = { id: 8, perfil: "dono" };
-    assert.doesNotMatch(renderizar(), /4 solicitações recebidas/);
+    assert.doesNotMatch(renderizar(), /1 nova solicitação/);
     assert.doesNotMatch(renderizar(), /Pessoa de Teste/);
   } finally {
     auth.usuario = usuario;
@@ -310,12 +347,16 @@ test("clicar novamente na mesma aba recolhe a ilha", () => {
   assert.equal(useIlha.getState().estado, "compacta");
 });
 
-test("saudação ao abrir: primeira vez, dia novo e versão nova saúdam, mesmo dia não", async () => {
+test("saudação ao abrir considera primeira vez, dia, versão e troca de conta", async () => {
   const { decidirSaudacaoAoAbrir } = await servidor.ssrLoadModule("/src/janelas/ilha/animacoes/usarSaudacaoDiaria.ts");
-  assert.deepEqual(decidirSaudacaoAoAbrir(null, "2026-10-07", "0.2.1"), { saudar: true });
-  assert.deepEqual(decidirSaudacaoAoAbrir({ dia: "2026-10-07", versao: "0.2.1" }, "2026-10-07", "0.2.1"), { saudar: false });
-  assert.deepEqual(decidirSaudacaoAoAbrir({ dia: "2026-10-06", versao: "0.2.1" }, "2026-10-07", "0.2.1"), { saudar: true });
-  assert.deepEqual(decidirSaudacaoAoAbrir({ dia: "2026-10-07", versao: "0.2.0" }, "2026-10-07", "0.2.1"), { saudar: true, versaoNova: "0.2.1" });
+  const hoje = "2026-10-07", versao = "0.2.1";
+  const ultima = { dia: hoje, versao, usuarioId: 7 };
+  assert.deepEqual(decidirSaudacaoAoAbrir(null, hoje, versao, 7), { saudar: true });
+  assert.deepEqual(decidirSaudacaoAoAbrir({ dia: hoje, versao }, hoje, versao, 7), { saudar: true });
+  assert.deepEqual(decidirSaudacaoAoAbrir(ultima, hoje, versao, 7), { saudar: false });
+  assert.deepEqual(decidirSaudacaoAoAbrir(ultima, hoje, versao, 8), { saudar: true });
+  assert.deepEqual(decidirSaudacaoAoAbrir(ultima, "2026-10-08", versao, 7), { saudar: true });
+  assert.deepEqual(decidirSaudacaoAoAbrir(ultima, hoje, "0.2.2", 7), { saudar: true, versaoNova: "0.2.2" });
 });
 
 test("saudação na volta: só depois de 30 min longe ou do PC dormir, e quando a pessoa mexe de novo", async () => {

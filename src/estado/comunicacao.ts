@@ -7,7 +7,7 @@ import { conexaoEmTestes } from "../utilitarios/disponibilidadeConexoes";
 
 export const SERVICOS: ServicoId[] = [
   "stripe", "github", "vercel", "google", "supabase", "cloudflare", "resend", "notion", "calcom", "n8n",
-  "email", "calendario", "outlook", "teams", "planner", "planilhas", "linear", "jira", "trello", "railway", "discord", "reddit", "strava", "cripto",
+  "email", "calendario", "linear", "jira", "trello", "railway", "discord", "reddit", "strava", "cripto",
 ];
 
 export type CategoriaServico = "pagamentos" | "codigo" | "deploy" | "produtividade" | "comunicacao" | "pessoal";
@@ -154,7 +154,11 @@ export const useComunicacao = create<EstadoComunicacao>()(
       registrarEventoConexao: (evento) =>
         set((s) => ({ eventosConexao: [{ ...evento, id: gerarId(), data: new Date().toISOString() }, ...s.eventosConexao].slice(0, 200) })),
       definirUsoIa: (usoIa) => set({ usoIa }),
-      substituir: (dados) => set({ ...dados, ...(dados.conexoes ? { conexoes: SERVICOS.map((id) => conexaoDisponivel({ ...conexaoInicial(id), ...dados.conexoes?.find((c) => c.id === id) })) } : {}) }),
+      substituir: (dados) => set({
+        ...dados,
+        ...(dados.conexoes ? { conexoes: SERVICOS.map((id) => conexaoDisponivel({ ...conexaoInicial(id), ...dados.conexoes?.find((c) => c.id === id) })) } : {}),
+        ...(dados.eventosConexao ? { eventosConexao: dados.eventosConexao.filter((e) => SERVICOS.includes(e.servico)) } : {}),
+      }),
     }),
     {
       name: chave("comunicacao"),

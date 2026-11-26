@@ -1,5 +1,6 @@
 import { neon } from "@neondatabase/serverless";
 import crypto from "node:crypto";
+import { garantirPowerBiEmpresa, validarAcessosPowerBi } from "./powerBiEmpresa.ts";
 
 const JANELA_TENTATIVAS_MIN = 15;
 const LIMITE_TENTATIVAS = 5;
@@ -28,6 +29,7 @@ export interface PerfilProfissional {
 
 export interface DadosConvite extends Partial<PerfilProfissional> {
   perfil?: PerfilConvidado;
+  powerBiRelatorios?: unknown;
 }
 
 function normalizarPerfilUsuario(perfil: unknown): PerfilUsuario {
@@ -331,12 +333,14 @@ export async function criarConviteUsuario(dono: UsuarioAutenticadoServidor, emai
   if (!nome) throw new Error("nome_obrigatorio");
   const existentes = await sql`SELECT id FROM usuarios WHERE email = ${email} LIMIT 1`;
   if (existentes.length > 0) throw new Error("usuario_ja_cadastrado");
+  await garantirPowerBiEmpresa(sql);
+  const powerBi = await validarAcessosPowerBi(sql, perfilRecebido.powerBiRelatorios);
   const token = tokenSeguro();
   const tokenHash = hashToken(token);
   await sql`UPDATE tokens_acesso SET usado_em = CURRENT_TIMESTAMP WHERE email = ${email} AND tipo = 'convite' AND usado_em IS NULL`;
   await sql`
-    INSERT INTO tokens_acesso (token_hash, tipo, email, nome, perfil, cargo, setor, telefone, expira_em)
-    VALUES (${tokenHash}, 'convite', ${email}, ${nome}, ${papel}, ${perfil.cargo}, ${perfil.setor}, ${perfil.telefone}, CURRENT_TIMESTAMP + (${EXPIRACAO_CONVITE_HORAS} * INTERVAL '1 hour'))
+    INSERT INTO tokens_acesso (token_hash, tipo, email, nome, perfil, cargo, setor, telefone, expira_em, power_bi_relatorios)
+    VALUES (${tokenHash}, 'convite', ${email}, ${nome}, ${papel}, ${perfil.cargo}, ${perfil.setor}, ${perfil.telefone}, CURRENT_TIMESTAMP + (${EXPIRACAO_CONVITE_HORAS} * INTERVAL '1 hour'), ${JSON.stringify(powerBi)}::jsonb)
   `;
   try {
     await enviarEmailDeAcesso({
@@ -355,8 +359,9 @@ export async function criarConviteUsuario(dono: UsuarioAutenticadoServidor, emai
 export async function listarConvitesPendentes(dono: UsuarioAutenticadoServidor) {
   if (dono.perfil !== "dono") throw new Error("permissao_negada");
   const sql = getDb();
+  await garantirPowerBiEmpresa(sql);
   return sql`
-    SELECT email, nome, perfil, cargo, setor, telefone, expira_em, criado_em
+    SELECT email, nome, perfil, cargo, setor, telefone, expira_em, criado_em, power_bi_relatorios
     FROM tokens_acesso
     WHERE tipo = 'convite' AND usado_em IS NULL AND expira_em > CURRENT_TIMESTAMP
     ORDER BY criado_em DESC
@@ -366,9 +371,10 @@ export async function listarConvitesPendentes(dono: UsuarioAutenticadoServidor) 
 export async function reenviarConviteUsuario(dono: UsuarioAutenticadoServidor, emailRecebido: string, urlBase: string) {
   if (dono.perfil !== "dono") throw new Error("permissao_negada");
   const sql = getDb();
+  await garantirPowerBiEmpresa(sql);
   const email = emailNormalizado(emailRecebido);
   const convites = await sql`
-    SELECT email, nome, perfil, cargo, setor, telefone
+    SELECT email, nome, perfil, cargo, setor, telefone, power_bi_relatorios
     FROM tokens_acesso
     WHERE email = ${email} AND tipo = 'convite' AND usado_em IS NULL AND expira_em > CURRENT_TIMESTAMP
     ORDER BY criado_em DESC
@@ -381,6 +387,7 @@ export async function reenviarConviteUsuario(dono: UsuarioAutenticadoServidor, e
     cargo: convite.cargo ?? "",
     setor: convite.setor ?? "",
     telefone: convite.telefone ?? "",
+    powerBiRelatorios: convite.power_bi_relatorios ?? [],
   });
 }
 
@@ -402,9 +409,10 @@ export async function redefinirSenhaComToken(tokenRecebido: string, senha: strin
   if (erroSenha) throw new Error(erroSenha);
   if (!/^[a-f0-9]{64}$/i.test(tokenRecebido)) throw new Error("token_invalido");
   const sql = getDb();
+  await garantirPowerBiEmpresa(sql);
   const tokenHash = hashToken(tokenRecebido);
   const tokens = await sql`
-    SELECT token_hash, tipo, usuario_id, email, nome, perfil, cargo, setor, telefone, expira_em, usado_em
+    SELECT token_hash, tipo, usuario_id, email, nome, perfil, cargo, setor, telefone, expira_em, usado_em, power_bi_relatorios
     FROM tokens_acesso
     WHERE token_hash = ${tokenHash}
     LIMIT 1
@@ -417,8 +425,8 @@ export async function redefinirSenhaComToken(tokenRecebido: string, senha: strin
     const existentes = await sql`SELECT id FROM usuarios WHERE email = ${convite.email} LIMIT 1`;
     if (existentes.length > 0) throw new Error("usuario_ja_cadastrado");
     const criados = await sql`
-      INSERT INTO usuarios (email, nome, senha_hash, ativo, perfil, cargo, setor, telefone)
-      VALUES (${convite.email}, ${convite.nome}, ${hash}, TRUE, 'gerencia', ${convite.cargo ?? ""}, ${convite.setor ?? ""}, ${convite.telefone ?? ""})
+      INSERT INTO usuarios (email, nome, senha_hash, ativo, perfil, cargo, setor, telefone, power_bi_relatorios)
+      VALUES (${convite.email}, ${convite.nome}, ${hash}, TRUE, 'gerencia', ${convite.cargo ?? ""}, ${convite.setor ?? ""}, ${convite.telefone ?? ""}, ${JSON.stringify(convite.power_bi_relatorios ?? [])}::jsonb)
       RETURNING id, email, nome, perfil
     `;
     usuario = criados[0] as typeof usuario;
@@ -441,8 +449,9 @@ export async function redefinirSenhaComToken(tokenRecebido: string, senha: strin
 export async function listarUsuarios(dono: UsuarioAutenticadoServidor) {
   if (dono.perfil !== "dono") throw new Error("permissao_negada");
   const sql = getDb();
+  await garantirPowerBiEmpresa(sql);
   return sql`
-    SELECT id, email, nome, ativo, perfil, robo_aderencias, cargo, setor, telefone
+    SELECT id, email, nome, ativo, perfil, robo_aderencias, cargo, setor, telefone, power_bi_relatorios
     FROM usuarios
     ORDER BY CASE WHEN perfil = 'dono' THEN 0 ELSE 1 END, nome, email
   `;
@@ -477,16 +486,19 @@ export async function alterarPermissaoAderencias(dono: UsuarioAutenticadoServido
   return resultado[0];
 }
 
-export async function alterarPerfilProfissional(dono: UsuarioAutenticadoServidor, usuarioId: number, perfilRecebido: Partial<PerfilProfissional>) {
+export async function alterarPerfilProfissional(dono: UsuarioAutenticadoServidor, usuarioId: number, perfilRecebido: Partial<PerfilProfissional> & { powerBiRelatorios?: unknown }) {
   if (dono.perfil !== "dono") throw new Error("permissao_negada");
   if (!Number.isSafeInteger(usuarioId) || usuarioId <= 0) throw new Error("usuario_invalido");
   const perfil = normalizarPerfilProfissional(perfilRecebido);
   const sql = getDb();
+  await garantirPowerBiEmpresa(sql);
+  const acessos = perfilRecebido.powerBiRelatorios === undefined ? null : JSON.stringify(await validarAcessosPowerBi(sql, perfilRecebido.powerBiRelatorios));
   const resultado = await sql`
     UPDATE usuarios
-    SET cargo = ${perfil.cargo}, setor = ${perfil.setor}, telefone = ${perfil.telefone}
-    WHERE id = ${usuarioId}
-    RETURNING id, email, nome, ativo, perfil, robo_aderencias, cargo, setor, telefone
+    SET cargo = ${perfil.cargo}, setor = ${perfil.setor}, telefone = ${perfil.telefone},
+        power_bi_relatorios = COALESCE(${acessos}::jsonb, power_bi_relatorios)
+    WHERE id = ${usuarioId} AND (${acessos === null} OR perfil = 'gerencia')
+    RETURNING id, email, nome, ativo, perfil, robo_aderencias, cargo, setor, telefone, power_bi_relatorios
   `;
   if (resultado.length === 0) throw new Error("usuario_nao_encontrado");
   return resultado[0];

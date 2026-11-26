@@ -156,7 +156,7 @@ export function MateriaisNaBarra({
 
   return (
     <motion.div
-      className="ilha-pop ilha-personalizar ilha-materiais estilo-sistema"
+      className="ilha-pop ilha-personalizar ilha-catalogo-materiais estilo-sistema"
       style={{ top: topo, left: esquerda, maxHeight: `calc(100vh - ${topo + 12}px)` }}
       role="dialog"
       aria-label="Catálogo de Materiais"
@@ -165,7 +165,7 @@ export function MateriaisNaBarra({
       exit={{ opacity: 0, y: -8, scale: 0.98, transition: { duration: 0.12 } }}
       transition={{ type: "spring", visualDuration: 0.28, bounce: 0.15 }}
     >
-      <div className="ilha-materiais-topo">
+      <div className="ilha-catalogo-materiais-topo">
         <div className="ilha-materiais-cabecalho">
           <div className="ilha-materiais-identidade">
             <span className="ilha-materiais-titulo">
@@ -333,7 +333,7 @@ export function MateriaisNaBarra({
         </div>
       )}
 
-      <div className="ilha-materiais-lista">
+      <div className="ilha-catalogo-materiais-lista">
         {filtrados.lista.length === 0 ? (
           <p className="ilha-rapido-vazio">Nenhum material encontrado para "{busca}".</p>
         ) : (

@@ -487,8 +487,6 @@ export function ocorrenciasDe<S extends ServicoId>(servico: S, dados: DadosServi
       return [];
   }
 }
-export const SERVICOS_DO_GOOGLE: ServicoId[] = ["google", "planilhas"];
-export const SERVICOS_DO_MICROSOFT: ServicoId[] = ["outlook", "teams", "planner"];
 
 export const LINKS_DO_GUIA: Record<ServicoId, (string | null)[]> = {
   stripe: ["https://dashboard.stripe.com/apikeys", null, null, null],
@@ -506,10 +504,10 @@ export const LINKS_DO_GUIA: Record<ServicoId, (string | null)[]> = {
     "https://console.cloud.google.com/auth/clients",
     null,
   ],
-  outlook: ["https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade", "https://learn.microsoft.com/entra/identity-platform/scenario-desktop-app-registration", null, null],
-  teams: ["https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade", "https://learn.microsoft.com/entra/identity-platform/scenario-desktop-app-registration", "https://learn.microsoft.com/graph/api/chat-list-messages?view=graph-rest-1.0", null],
-  planner: ["https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade", "https://learn.microsoft.com/entra/identity-platform/scenario-desktop-app-registration", "https://learn.microsoft.com/graph/api/planneruser-list-tasks?view=graph-rest-1.0", null],
-  planilhas: ["https://console.cloud.google.com/projectcreate", "https://console.cloud.google.com/apis/library/sheets.googleapis.com", "https://console.cloud.google.com/auth/clients", null],
+  outlook: [],
+  teams: [],
+  planner: [],
+  planilhas: [],
   supabase: ["https://supabase.com/dashboard/account/tokens", null, null],
   cloudflare: ["https://dash.cloudflare.com/profile/api-tokens", null, null, null],
   linear: ["https://linear.app/settings/account/security", null, null],

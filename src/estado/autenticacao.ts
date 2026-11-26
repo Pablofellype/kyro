@@ -10,6 +10,10 @@ export interface UsuarioAutenticado {
   roboAderencias: boolean;
 }
 
+export function primeiroNomeDaConta(usuario: Pick<UsuarioAutenticado, "nome"> | null): string {
+  return usuario?.nome.trim().split(/\s+/, 1)[0] ?? "";
+}
+
 interface EstadoAuth {
   usuario: UsuarioAutenticado | null;
   carregando: boolean;

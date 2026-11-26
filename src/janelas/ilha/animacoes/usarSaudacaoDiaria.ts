@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { NATIVO, liberarSistemaInicial, tempoOciosoMs, versaoDoApp } from "../../../desktop/desktop";
 import { useConfig, type Configuracoes } from "../../../estado/configuracoes";
+import { primeiroNomeDaConta, useAuth } from "../../../estado/autenticacao";
 import { useIlha } from "../../../estado/ilha";
 import { useClaudeCode } from "../../../estado/claudeCode";
 import { hojeISO } from "../../../utilitarios/datas";
@@ -14,10 +15,10 @@ export const AUSENCIA_PARA_BOAS_VINDAS_MS = 2 * 60 * 60_000;
 
 type UltimaSaudacao = Configuracoes["ultimaSaudacao"];
 
-export function decidirSaudacaoAoAbrir(ultima: UltimaSaudacao, hoje: string, versao: string): { saudar: boolean; versaoNova?: string } {
-  if (!ultima) return { saudar: true };
+export function decidirSaudacaoAoAbrir(ultima: UltimaSaudacao, hoje: string, versao: string, usuarioId: number): { saudar: boolean; versaoNova?: string } {
+  if (!ultima || (ultima.usuarioId !== undefined && ultima.usuarioId !== usuarioId)) return { saudar: true };
   if (ultima.versao !== versao) return { saudar: true, versaoNova: versao };
-  return { saudar: ultima.dia !== hoje };
+  return { saudar: ultima.usuarioId !== usuarioId || ultima.dia !== hoje };
 }
 
 export function voltouDepoisDeAusencia(lacunaMs: number, ociosoMs: number, jaAusente: boolean): { ausente: boolean; voltou: boolean } {
@@ -50,7 +51,9 @@ function ilhaEmUso() {
 }
 
 export function usarSaudacaoDiaria(ligada: boolean) {
+  const usuarioId = useAuth((s) => s.usuario?.id);
   useEffect(() => {
+    if (usuarioId === undefined) return;
     let vivo = true;
     let versao = "";
     let ausente = false;
@@ -60,7 +63,8 @@ export function usarSaudacaoDiaria(ligada: boolean) {
     let intervalo: number | undefined;
 
     const saudarAgora = (versaoNova?: string) => {
-      useConfig.getState().definir({ ultimaSaudacao: { dia: hojeISO(), versao } });
+      if (!vivo || useAuth.getState().usuario?.id !== usuarioId) return;
+      useConfig.getState().definir({ ultimaSaudacao: { dia: hojeISO(), versao, usuarioId } });
       useIlha.getState().saudar(versaoNova);
     };
 
@@ -69,19 +73,21 @@ export function usarSaudacaoDiaria(ligada: boolean) {
       const lacuna = agora - ultimaVerificacao;
       ultimaVerificacao = agora;
       const ocioso = NATIVO ? (await tempoOciosoMs()) ?? 0 : 0;
-      if (!vivo) return;
+      const usuario = useAuth.getState().usuario;
+      if (!vivo || usuario?.id !== usuarioId) return;
       const r = voltouDepoisDeAusencia(lacuna, ocioso, ausente);
       if (r.ausente && !ausente) ausenteDesde = lacuna >= AUSENCIA_MS ? agora - lacuna : agora - ocioso;
       ausente = r.ausente;
       if (!r.voltou) return;
       const cfg = useConfig.getState();
-      const reacao = reagirAVolta({ jaSaudouHoje: cfg.ultimaSaudacao?.dia === hojeISO(), ausenciaMs: agora - ausenteDesde, naoPerturbe: cfg.naoPerturbe, ilhaEmUso: ilhaEmUso() });
+      const jaSaudouHoje = cfg.ultimaSaudacao?.usuarioId === usuarioId && cfg.ultimaSaudacao.dia === hojeISO();
+      const reacao = reagirAVolta({ jaSaudouHoje, ausenciaMs: agora - ausenteDesde, naoPerturbe: cfg.naoPerturbe, ilhaEmUso: ilhaEmUso() });
       if (reacao === "esperar") {
         ausente = true;
         return;
       }
       if (reacao === "saudar") saudarAgora();
-      if (reacao === "boasVindas") useIlha.getState().revelar({ texto: T.ilha.saudacao.deVolta(cfg.nome.trim().split(/\s+/)[0] ?? ""), tipo: "info", agente: cfg.agentes.favorito }, 4500);
+      if (reacao === "boasVindas") useIlha.getState().revelar({ texto: T.ilha.saudacao.deVolta(primeiroNomeDaConta(usuario)), tipo: "info", agente: cfg.agentes.favorito }, 4500);
     };
 
     void (async () => {
@@ -92,8 +98,8 @@ export function usarSaudacaoDiaria(ligada: boolean) {
         void liberarSistemaInicial();
         return;
       }
-      const decisao = decidirSaudacaoAoAbrir(useConfig.getState().ultimaSaudacao, hojeISO(), versao);
-      if (decisao.saudar) espera = window.setTimeout(() => vivo && saudarAgora(decisao.versaoNova), ESPERA_ANTES_DE_SAUDAR_MS);
+      const decisao = decidirSaudacaoAoAbrir(useConfig.getState().ultimaSaudacao, hojeISO(), versao, usuarioId);
+      if (decisao.saudar) espera = window.setTimeout(() => saudarAgora(decisao.versaoNova), ESPERA_ANTES_DE_SAUDAR_MS);
       else void liberarSistemaInicial();
       intervalo = window.setInterval(() => void verificarVolta(), INTERVALO_DA_VERIFICACAO_MS);
     })();
@@ -103,5 +109,5 @@ export function usarSaudacaoDiaria(ligada: boolean) {
       window.clearTimeout(espera);
       window.clearInterval(intervalo);
     };
-  }, [ligada]);
+  }, [ligada, usuarioId]);
 }

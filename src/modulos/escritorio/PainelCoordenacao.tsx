@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { ArrowRight, ArrowUpRight, Building2, CalendarDays, ChartNoAxesCombined, Check, CheckCircle2, ChevronDown, ClipboardCheck, ClipboardList, Clock3, FileSpreadsheet, History, ListTodo, MessageSquare, PackageOpen, Pencil, RefreshCw, Settings2, Users, type LucideIcon } from "lucide-react";
-import { useAuth, type UsuarioAutenticado } from "../../estado/autenticacao";
-import { useConfig } from "../../estado/configuracoes";
+import { primeiroNomeDaConta, useAuth, type UsuarioAutenticado } from "../../estado/autenticacao";
 import { useInterface } from "../../estado/interface";
 import { useOrganizacao } from "../../estado/organizacao";
 import { tarefaPendente, useRotina } from "../../estado/rotina";
 import { useWhatsapp } from "../../estado/whatsapp";
+import { T } from "../../textos/textos";
 import { dataValida, formatar, formatarData, saudacao } from "../../utilitarios/datas";
 import type { Rota, Tarefa } from "../../tipos";
-import { itensDoMenuAppsEmpresa } from "./aplicativosEmpresaConfig";
+import { STATUS_APLICATIVO, abreAplicativo, itensDoMenuAppsEmpresa } from "./aplicativosEmpresaConfig";
 import { useCatalogoAppsEmpresa } from "./catalogoAppsEmpresa";
 import { resumirPainelEmpresa, type DadosRemotosDoPainel, type PrioridadeDoPainel, type ResumoDoPainelEmpresa } from "./dadosDoPainelEmpresa";
 import { usarDadosDoPainelEmpresa, type RotinasDoPainel } from "./usarDadosDoPainelEmpresa";
@@ -16,7 +16,6 @@ import { RegistrosDoEscritorio } from "./RegistrosDoEscritorio";
 import "./painelEmpresa.css";
 
 interface PropsPainel {
-  nome: string;
   usuarioId?: number;
   usuario: Pick<UsuarioAutenticado, "perfil" | "roboAderencias" | "nome">;
   agora: Date;
@@ -90,18 +89,20 @@ function ResumoDasAderencias({ dados, aoAbrir }: { dados: RotinasDoPainel; aoAbr
   </section>;
 }
 
-export function VisaoDoEscritorio({ nome, usuarioId, usuario, agora, resumo, remoto, mensagens, whatsappComErro, aoNavegar, aoAtualizar, aoConcluir }: PropsPainel) {
+export function VisaoDoEscritorio({ usuarioId, usuario, agora, resumo, remoto, mensagens, whatsappComErro, aoNavegar, aoAtualizar, aoConcluir }: PropsPainel) {
   const [mostrarTodas, setMostrarTodas] = useState(false);
   const [filtro, setFiltro] = useState<FiltroAtividades>("todas");
   const [atividadeEmEdicao, setAtividadeEmEdicao] = useState<Tarefa | null>(null);
   const dono = usuario.perfil === "dono";
-  const primeiroNome = nome.trim().split(/\s+/)[0] || usuario.nome.trim().split(/\s+/)[0];
+  const nomeDaConta = usuario.nome.trim();
+  const primeiroNome = primeiroNomeDaConta(usuario);
   const contagem = { todas: resumo.abertas.length, hoje: resumo.paraHoje.length, vencidas: resumo.atrasadas.length };
   const prioridades = resumo.prioridades.filter((item) => filtro === "todas" || (filtro === "hoje" ? item.tarefa.data === resumo.hoje : item.atrasada));
   const exibidas = mostrarTodas ? prioridades : prioridades.slice(0, 5);
   const { aplicativos } = useCatalogoAppsEmpresa();
   const sistemas = SISTEMAS_PRINCIPAIS.flatMap((id) => aplicativos.find((app) => app.id === id) ?? []);
-  const outrosAcessos = itensDoMenuAppsEmpresa(usuario, aplicativos).filter((item) => !SISTEMAS_PRINCIPAIS.includes(item.id));
+  const itensDoMenu = itensDoMenuAppsEmpresa(usuario, aplicativos);
+  const outrosAcessos = itensDoMenu.filter((item) => !SISTEMAS_PRINCIPAIS.includes(item.id));
   const membrosAtivos = remoto.membros?.filter((membro) => membro.ativo && membro.perfil !== "visitante") ?? null;
   const mostrarFiltro = (proximo: FiltroAtividades) => {
     setFiltro(proximo);
@@ -114,14 +115,14 @@ export function VisaoDoEscritorio({ nome, usuarioId, usuario, agora, resumo, rem
 
   return <div className="escritorio-empresa">
     <header className="ee-abertura">
-      <div><span className="ee-contexto"><Building2 size={14} aria-hidden="true" />{dono ? "Escritório da empresa" : "Painel da gerência"}</span>
+      <div><span className="ee-contexto"><Building2 size={14} aria-hidden="true" />{T.rotas.escritorio}</span>
         <h1>{saudacao()}{primeiroNome ? `, ${primeiroNome}` : ""}!</h1>
       </div>
       <div className="ee-abertura-acoes">
         <time dateTime={agora.toISOString()}><CalendarDays size={14} aria-hidden="true" />{formatar(resumo.hoje, "EEEE, d 'de' MMMM")}</time>
         <div className="ee-acoes-do-painel">
           <button type="button" className="ee-botao ee-botao-discreto" onClick={() => aoNavegar("powerBi")}><ChartNoAxesCombined size={14} aria-hidden="true" />Power BI</button>
-          <button type="button" className="ee-botao ee-botao-discreto" onClick={aoAtualizar} disabled={remoto.carregando} aria-label="Atualizar dados do escritório"><RefreshCw size={14} className={remoto.carregando ? "girando" : ""} aria-hidden="true" />{remoto.carregando ? "Atualizando" : "Atualizar"}</button>
+          <button type="button" className="ee-botao ee-botao-discreto" onClick={aoAtualizar} disabled={remoto.carregando} aria-label="Atualizar dados do dashboard"><RefreshCw size={14} className={remoto.carregando ? "girando" : ""} aria-hidden="true" />{remoto.carregando ? "Atualizando" : "Atualizar"}</button>
         </div>
       </div>
     </header>
@@ -175,12 +176,14 @@ export function VisaoDoEscritorio({ nome, usuarioId, usuario, agora, resumo, rem
       <header className="ee-cabecalho-secao"><h2 id="ee-sistemas-titulo">Seus sistemas</h2></header>
       <div className="ee-sistemas-grade">{sistemas.map((app) => {
         const Icone = ICONES_SISTEMAS[app.id];
-        const disponivel = app.status === "disponivel" && Boolean(app.url);
+        const disponivel = itensDoMenu.some((item) => item.id === app.id && item.disponivel);
         return <button type="button" className="ee-sistema" data-sistema={app.id} key={app.id} disabled={!disponivel} onClick={() => aoNavegar("appsEmpresa", { app: app.id })}>
-          <span className="ee-icone" aria-hidden="true"><Icone size={22} /></span><strong>{app.nome}</strong><span className="ee-sistema-descricao">{app.descricao}</span><span className="ee-sistema-abrir">{disponivel ? "Acessar sistema" : "Em manutenção"}<ArrowUpRight size={15} aria-hidden="true" /></span>
+          <span className="ee-icone" aria-hidden="true"><Icone size={22} /></span><strong>{app.nome}</strong><span className="ee-sistema-descricao">{app.descricao}</span><span className="ee-sistema-abrir">{abreAplicativo(app) ? "Acessar sistema" : STATUS_APLICATIVO[app.status]}<ArrowUpRight size={15} aria-hidden="true" /></span>
         </button>;
       })}</div>
-      <div className="ee-outros-acessos"><span>Outros acessos</span>{outrosAcessos.map((item) => <button type="button" className="ee-link" key={item.id} disabled={!item.disponivel} onClick={() => aoNavegar("appsEmpresa", { app: item.id })}>{item.nome}{item.disponivel ? <ArrowUpRight size={13} aria-hidden="true" /> : <small>Em manutenção</small>}</button>)}</div>
+      <div className="ee-outros-acessos"><span>Outros acessos</span>{outrosAcessos.map((item) => <button type="button" className="ee-link" key={item.id} disabled={!item.disponivel} onClick={() => aoNavegar("appsEmpresa", { app: item.id })}>{item.nome}
+        {item.status === "prototipo" || item.status === "manutencao" ? <small>{STATUS_APLICATIVO[item.status]}</small> : <ArrowUpRight size={13} aria-hidden="true" />}
+      </button>)}</div>
     </section>
 
     <div className="ee-grade-secundaria">
@@ -192,11 +195,11 @@ export function VisaoDoEscritorio({ nome, usuarioId, usuario, agora, resumo, rem
         {dono ? <>
           {membrosAtivos === null ? <p className="ee-nota-vazia">{remoto.erroMembros ? "Não foi possível consultar a equipe agora." : "Consultando as contas da empresa…"}</p> : membrosAtivos.length === 0 ? <p className="ee-nota-vazia">Nenhuma conta ativa nesta consulta.</p> : <ul className="ee-equipe-lista">{membrosAtivos.slice(0, 4).map((membro) => <li key={membro.id}><span className="ee-avatar" aria-hidden="true">{membro.nome.slice(0, 1).toUpperCase()}</span><div><strong>{membro.nome}</strong><span>{membro.setor || membro.cargo || (membro.perfil === "dono" ? "Dono" : "Gerência")}</span></div><small>Conta ativa</small></li>)}</ul>}
           <button type="button" className="ee-link" onClick={() => aoNavegar("configuracoes", { secao: "admin" })}>Gerenciar acessos <ArrowUpRight size={13} aria-hidden="true" /></button>
-        </> : <><div className="ee-identidade"><span className="ee-avatar" aria-hidden="true">{(nome || usuario.nome).trim().slice(0, 1).toUpperCase()}</span><div><strong>{nome || usuario.nome}</strong><span>Gerência da empresa</span></div></div><p className="ee-nota-vazia">Agenda e ferramentas de trabalho reunidas para facilitar sua rotina.</p></>}
+        </> : <><div className="ee-identidade"><span className="ee-avatar" aria-hidden="true">{nomeDaConta.slice(0, 1).toUpperCase()}</span><div><strong>{nomeDaConta}</strong><span>Gerência da empresa</span></div></div><p className="ee-nota-vazia">Agenda e ferramentas de trabalho reunidas para facilitar sua rotina.</p></>}
       </section>
     </div>
 
-    <footer className="ee-rodape"><span>{remoto.atualizadoEm ? `Dados atualizados às ${formatarData(remoto.atualizadoEm, "HH:mm")}` : "Escritório da empresa"}</span><button type="button" className="ee-link" onClick={() => aoNavegar("configuracoes", { secao: "aparencia" })}><Settings2 size={14} aria-hidden="true" /> Personalizar meu espaço</button></footer>
+    <footer className="ee-rodape"><span>{remoto.atualizadoEm ? `Dados atualizados às ${formatarData(remoto.atualizadoEm, "HH:mm")}` : ""}</span><button type="button" className="ee-link" onClick={() => aoNavegar("configuracoes", { secao: "aparencia" })}><Settings2 size={14} aria-hidden="true" /> Personalizar meu espaço</button></footer>
   </div>;
 }
 
@@ -222,7 +225,6 @@ export function PainelCoordenacao() {
   const token = useAuth((estado) => estado.token);
   const area = useInterface((estado) => estado.area);
   const irPara = useInterface((estado) => estado.irPara);
-  const nomePreferido = useConfig((estado) => estado.nome);
   const eventos = useOrganizacao((estado) => estado.eventos);
   const tarefas = useRotina((estado) => estado.tarefas);
   const whatsapp = useWhatsapp((estado) => estado.estado);
@@ -245,5 +247,5 @@ export function PainelCoordenacao() {
     remoto.atualizar();
     if (token) void carregarWhatsapp();
   };
-  return <VisaoDoEscritorio key={usuario.id} nome={nomePreferido.trim() || usuario.nome} usuarioId={usuario.id} usuario={usuario} agora={agora} resumo={resumo} remoto={remoto} mensagens={mensagens} whatsappComErro={whatsappComErro} aoNavegar={irPara} aoAtualizar={atualizar} aoConcluir={(id) => concluirAtividadeDoPainel(id, usuario.id)} />;
+  return <VisaoDoEscritorio key={usuario.id} usuarioId={usuario.id} usuario={usuario} agora={agora} resumo={resumo} remoto={remoto} mensagens={mensagens} whatsappComErro={whatsappComErro} aoNavegar={irPara} aoAtualizar={atualizar} aoConcluir={(id) => concluirAtividadeDoPainel(id, usuario.id)} />;
 }

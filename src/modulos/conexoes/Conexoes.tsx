@@ -8,7 +8,7 @@ import { useInterface } from "../../estado/interface";
 import { useConfig } from "../../estado/configuracoes";
 import { T } from "../../textos/textos";
 import { horarioRelativo } from "../../utilitarios/datas";
-import { conexoesPonte, resumoDe, LINKS_DO_GUIA, SERVICOS_DO_GOOGLE, SERVICOS_DO_MICROSOFT } from "../../ponte/conexoesReais";
+import { conexoesPonte, resumoDe, LINKS_DO_GUIA } from "../../ponte/conexoesReais";
 import { atualizarConexaoAgora } from "../../servicos/servicos";
 import { tocarSom } from "../../ponte/sons";
 import type { NivelDeAvisosDaConexao, ServicoId } from "../../tipos";
@@ -16,7 +16,6 @@ import { conexaoEmTestes } from "../../utilitarios/disponibilidadeConexoes";
 import { CamposDaConexao, SERVICOS_COM_CAMPOS, valoresIniciais } from "./CamposDaConexao";
 import { mensagemDeErroDaConexao } from "../../utilitarios/errosDeConexao";
 import { CartaoWhatsapp, ConfigWhatsapp } from "./ConexaoWhatsapp";
-import { clienteMicrosoftValido } from "../../utilitarios/conexoesMicrosoft";
 import { useAuth } from "../../estado/autenticacao";
 import { conexaoVisivelPara } from "../../utilitarios/visibilidadeConexoes";
 
@@ -75,7 +74,6 @@ function Configurar({ servico, aoFechar }: { servico: ServicoId | null; aoFechar
   const [chave, setChave] = useState("");
   const [url, setUrl] = useState("");
   const [clienteId, setClienteId] = useState("");
-  const [linksPlanilhas, setLinksPlanilhas] = useState("");
   const [erro, setErro] = useState("");
   const [testando, setTestando] = useState(false);
   const [loginDisponivel, setLoginDisponivel] = useState(false);
@@ -86,7 +84,6 @@ function Configurar({ servico, aoFechar }: { servico: ServicoId | null; aoFechar
     let ativo = true;
     setChave("");
     setClienteId("");
-    setLinksPlanilhas("");
     setErro("");
     setUrl("");
     setLoginDisponivel(false);
@@ -101,23 +98,11 @@ function Configurar({ servico, aoFechar }: { servico: ServicoId | null; aoFechar
     }
     return () => { ativo = false; };
   }, [servico]);
-  useEffect(() => {
-    if (!servico || !permitido || (!SERVICOS_DO_MICROSOFT.includes(servico) && servico !== "planilhas") || !conexao?.chaveSalva) return;
-    let ativo = true;
-    void conexoesPonte.config(servico).then((config) => {
-      if (!ativo) return;
-      if (clienteMicrosoftValido(config.clienteId) || (servico === "planilhas" && typeof config.clienteId === "string")) setClienteId(String(config.clienteId));
-      if (servico === "planilhas" && typeof config.links === "string") setLinksPlanilhas(config.links);
-    }).catch(() => undefined);
-    return () => { ativo = false; };
-  }, [servico, conexao?.chaveSalva, permitido]);
   if (!servico || !conexao || !permitido) return <Modal aberto={false} titulo="" aoFechar={aoFechar}>{null}</Modal>;
   const nome = T.conexoes.servicos[servico].nome;
   if (conexaoEmTestes(servico)) return <Modal aberto titulo={nome} aoFechar={aoFechar}><AvisoFaixa>{T.conexoes.emTestesDica}</AvisoFaixa></Modal>;
-  const doGoogle = SERVICOS_DO_GOOGLE.includes(servico);
-  const doMicrosoft = SERVICOS_DO_MICROSOFT.includes(servico);
+  const doGoogle = servico === "google";
   const loginSimples = servico === "google" && loginDisponivel && !clienteProprio;
-  const precisaSegredo = !doMicrosoft && !loginSimples && !(servico === "planilhas" && conexao.chaveSalva);
   const fixadas = conexoes.filter((c) => c.fixadaNaIlha && conexaoVisivelPara(usuario, c.id)).length;
 
   const salvar = async () => {
@@ -126,16 +111,8 @@ function Configurar({ servico, aoFechar }: { servico: ServicoId | null; aoFechar
       setErro(T.conexoes.clienteIdInvalido);
       return;
     }
-    if (doMicrosoft && !clienteMicrosoftValido(clienteId.trim())) {
-      setErro(T.conexoes.clienteIdMicrosoftInvalido);
-      return;
-    }
-    if (!comCampos && precisaSegredo && chave.trim().length < 8) {
+    if (!comCampos && !loginSimples && chave.trim().length < 8) {
       setErro(T.conexoes.chaveCurta);
-      return;
-    }
-    if (servico === "planilhas" && !linksPlanilhas.trim()) {
-      setErro(T.conexoes.errosDeConexao.planilhas_quantidade_invalida);
       return;
     }
     salvando.current = true;
@@ -143,15 +120,16 @@ function Configurar({ servico, aoFechar }: { servico: ServicoId | null; aoFechar
     setErro("");
     try {
       if (comCampos) await conexoesPonte.salvarChave(servico, String(valores.chave ?? "").trim(), valores);
-      else await conexoesPonte.salvarChave(servico, loginSimples || doMicrosoft ? "" : chave.trim(), loginSimples ? {} : servico === "n8n" ? { url: url.trim() } : doGoogle ? { clienteId: clienteId.trim(), segredo: chave.trim(), ...(servico === "planilhas" ? { links: linksPlanilhas.trim() } : {}) } : doMicrosoft ? { clienteId: clienteId.trim() } : {});
+      else await conexoesPonte.salvarChave(servico, loginSimples ? "" : chave.trim(), loginSimples ? {} : servico === "n8n" ? { url: url.trim() } : doGoogle ? { clienteId: clienteId.trim(), segredo: chave.trim() } : {});
       setChave("");
       const dados = await conexoesPonte.ler(servico, true);
       atualizar(servico, { chaveSalva: true, ligada: true, status: "conectado", ultimaAtualizacao: new Date().toISOString(), resumo: resumoDe(servico, dados) });
-      avisar(servico === "planilhas" ? T.conexoes.planilhasConectadas : doGoogle ? T.conexoes.googleConectado : doMicrosoft ? T.conexoes.servicoMicrosoftConectado(nome) : T.conexoes.chaveSalva);
+      avisar(doGoogle ? T.conexoes.googleConectado : T.conexoes.chaveSalva);
       void tocarSom("approve");
     } catch (e) {
       if ((e as Error).message === "conexao_sessao_alterada") return;
-      setErro(doGoogle ? T.conexoes.falhaLoginGoogle(mensagemDeErroDaConexao((e as Error).message)) : T.conexoes.falhaChave(mensagemDeErroDaConexao((e as Error).message)));
+      const mensagem = mensagemDeErroDaConexao((e as Error).message);
+      setErro(doGoogle ? T.conexoes.falhaLoginGoogle(mensagem) : T.conexoes.falhaChave(mensagem));
       void tocarSom("error", "avisos");
     } finally {
       salvando.current = false;
@@ -167,9 +145,9 @@ function Configurar({ servico, aoFechar }: { servico: ServicoId | null; aoFechar
           <span>{T.conexoes.permissoes[servico]}</span>
         </AvisoFaixa>
         {!loginSimples && !verificandoLogin && <GuiaConexao servico={servico} />}
-        {(doGoogle || doMicrosoft) && !loginSimples && !verificandoLogin && (
+        {doGoogle && !loginSimples && !verificandoLogin && (
           <>
-            <Campo id="cx-cliente" rotulo={T.conexoes.clienteId} dica={doMicrosoft ? T.conexoes.clienteIdMicrosoftDica : T.conexoes.clienteIdDica}>
+            <Campo id="cx-cliente" rotulo={T.conexoes.clienteId} dica={T.conexoes.clienteIdDica}>
               <input id="cx-cliente" className="campo" autoComplete="off" spellCheck={false} value={clienteId} onChange={(e) => setClienteId(e.target.value)} />
             </Campo>
           </>
@@ -181,8 +159,7 @@ function Configurar({ servico, aoFechar }: { servico: ServicoId | null; aoFechar
         )}
         {comCampos && <CamposDaConexao servico={servico} salva={salva} valores={valores} mudar={(parcial) => { setValores((v) => ({ ...v, ...parcial })); setErro(""); }} />}
         {comCampos && erro && <AvisoFaixa tipo="erro"><span role="alert">{erro}</span></AvisoFaixa>}
-        {servico === "planilhas" && <Campo id="cx-planilhas" rotulo={T.conexoes.linksPlanilhas} dica={T.conexoes.linksPlanilhasDica}><textarea id="cx-planilhas" className="campo" rows={4} spellCheck={false} value={linksPlanilhas} onChange={(e) => { setLinksPlanilhas(e.target.value); setErro(""); }} /></Campo>}
-        {!comCampos && !loginSimples && !doMicrosoft && !verificandoLogin && <Campo id="cx-chave" rotulo={doGoogle ? T.conexoes.segredoCliente : T.conexoes.chave} erro={erro} dica={servico === "planilhas" && conexao.chaveSalva ? T.conexoes.campos.guardado : doGoogle ? T.conexoes.gmailDica : T.conexoes.chaveDica}>
+        {!comCampos && !loginSimples && !verificandoLogin && <Campo id="cx-chave" rotulo={doGoogle ? T.conexoes.segredoCliente : T.conexoes.chave} erro={erro} dica={doGoogle ? T.conexoes.gmailDica : T.conexoes.chaveDica}>
           <input
             id="cx-chave"
             className="campo"
@@ -199,10 +176,9 @@ function Configurar({ servico, aoFechar }: { servico: ServicoId | null; aoFechar
           />
         </Campo>}
         {loginSimples && erro && <AvisoFaixa tipo="erro"><span role="alert">{erro}</span></AvisoFaixa>}
-        {doMicrosoft && erro && <AvisoFaixa tipo="erro"><span role="alert">{erro}</span></AvisoFaixa>}
         <div className="linha">
-          <Botao type="submit" variante="primario" icone={loginSimples ? <Marca marca="google" tamanho={14} /> : doMicrosoft || servico === "planilhas" ? <Marca marca={servico} tamanho={14} /> : servico === "strava" ? <Marca marca="strava" tamanho={14} /> : <KeyRound size={14} />} disabled={testando || verificandoLogin || (!comCampos && !loginSimples && (((doMicrosoft || doGoogle) && !clienteId.trim()) || (precisaSegredo && !chave.trim())))}>
-            {verificandoLogin ? T.conexoes.verificandoLoginGoogle : testando ? (servico === "planilhas" && conexao.chaveSalva ? "Conferindo planilhas" : doGoogle || doMicrosoft || servico === "strava" ? T.conexoes.aguardandoGoogle : T.conexoes.testando) : servico === "planilhas" && conexao.chaveSalva ? "Salvar e atualizar" : loginSimples ? T.conexoes.entrarGoogle : doGoogle ? T.conexoes.conectarGoogle : doMicrosoft ? T.conexoes.conectarMicrosoft : servico === "strava" ? T.conexoes.campos.conectarStrava : T.conexoes.salvarChave}
+          <Botao type="submit" variante="primario" icone={loginSimples ? <Marca marca="google" tamanho={14} /> : servico === "strava" ? <Marca marca="strava" tamanho={14} /> : <KeyRound size={14} />} disabled={testando || verificandoLogin || (!comCampos && !loginSimples && ((doGoogle && !clienteId.trim()) || !chave.trim()))}>
+            {verificandoLogin ? T.conexoes.verificandoLoginGoogle : testando ? (doGoogle || servico === "strava" ? T.conexoes.aguardandoGoogle : T.conexoes.testando) : loginSimples ? T.conexoes.entrarGoogle : doGoogle ? T.conexoes.conectarGoogle : servico === "strava" ? T.conexoes.campos.conectarStrava : T.conexoes.salvarChave}
           </Botao>
           {conexao.chaveSalva && (
             <Botao

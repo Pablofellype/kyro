@@ -10,7 +10,7 @@ Rotina, estudos, finanças, metas e os serviços que você acompanha, reunidos e
 
 ![Windows 10 e 11](https://img.shields.io/badge/Windows-10%20%7C%2011-0b0d10?style=flat-square)
 ![Linux](https://img.shields.io/badge/Linux-Ubuntu%20%7C%20Fedora%20(GNOME)-0b0d10?style=flat-square)
-![Versão](https://img.shields.io/badge/versão-0.2.50-0b0d10?style=flat-square)
+![Versão](https://img.shields.io/badge/versão-0.2.51-0b0d10?style=flat-square)
 ![Licença](https://img.shields.io/badge/licença-proprietária-b42318?style=flat-square)
 
 <br />
@@ -368,6 +368,10 @@ Em **Aplicativos → Gerenciar aplicativos**, o dono pode editar links e adicion
 
 Na Vercel, configure `INVENTARIO_INTEGRACAO_TOKEN` no projeto do Kyro com o mesmo valor do projeto do inventário e faça um redeploy. Para desenvolvimento local, use a mesma variável no `.env.local` da ponte. A integração consulta o inventário pelo backend.
 
+Para testar o código local do Inventário, execute `node scripts/inventario-local.cjs "<pasta do Inventário>"` e defina `INVENTARIO_INTEGRACAO_URL_LOCAL=http://127.0.0.1:33318/api/integracoes/solicitacoes` no `.env.local` do Kyro. O modo de desenvolvimento lê o Inventário em transações somente leitura e guarda a contagem de avisos em memória. A foto fica disponível quando o Inventário local tem acesso ao Blob privado.
+
+O Inventário usa OIDC no Blob. Na pasta do Inventário, `vercel pull --environment=development` atualiza o cache em `.vercel`. A ponte local usa apenas `BLOB_STORE_ID` e `VERCEL_OIDC_TOKEN` desse cache e mantém o `.env.local` existente.
+
 Cada pessoa com perfil de dono ou gerência pode ativar **Solicitações de material** em **Configurações → Geral → Notificações de aplicativos**. A ativação começa no cursor atual do inventário. O Kyro consulta as solicitações seguintes enquanto está aberto e salva o progresso por conta.
 
 ### Armazenamento de fotos na Vercel
@@ -375,6 +379,18 @@ Cada pessoa com perfil de dono ou gerência pode ativar **Solicitações de mate
 O Kyro usa Vercel Blob para as fotos de perfil e do catálogo de materiais. No projeto da Vercel, crie um Blob Store público, por exemplo `kyro-fotos`, e conecte-o aos ambientes Production e Preview do projeto Kyro. A Vercel deve adicionar a variável `BLOB_READ_WRITE_TOKEN`; depois do primeiro deploy, confirme essa variável em Settings > Environment Variables e faça um redeploy.
 
 O arquivo da foto fica no Blob e o Kyro salva apenas a URL junto dos dados do usuário/material. Se o Blob ainda não estiver configurado, a interface continua funcionando e usa a cópia local até o armazenamento ser conectado.
+
+### Arquivos de propostas de aplicativos
+
+Em **Empresa → Sistemas → Gerenciar aplicativos**, o dono pode marcar um sistema como **Protótipo** e incluir um PDF de até 15 MB e um vídeo MP4 de até 100 MB, ou usar links HTTPS. A proposta fica disponível para dono e gerência na página do sistema.
+
+Para habilitar o envio de arquivos, conecte um Vercel Blob Store com acesso **Private** ao projeto do Kyro e configure `KYRO_PROPOSTAS_BLOB_READ_WRITE_TOKEN` no backend. Para testar o envio no Vite local, configure a mesma variável no `.env.local`. Links HTTPS funcionam sem o armazenamento de arquivos.
+
+### Catálogo e permissões do Power BI
+
+Em **Empresa → Power BI → Gerenciar relatórios**, o dono cadastra e edita links de incorporação segura do Power BI. Em **Configurações → Administração**, selecione os relatórios no convite ou em **Editar perfil** de uma conta de gerência. As contas antigas conservam o acesso ao **Controle de Custos SAP** até a primeira edição dos acessos. Convites novos começam sem relatórios marcados.
+
+O backend reconhece `KYRO_POWER_BI_REPORT_URL` para o Controle de Custos SAP e `KYRO_POWER_BI_REPORT_URL_2` para o segundo relatório inicial. As duas variáveis podem ser configuradas por ambiente. Salvar uma edição no gerenciador grava o relatório no catálogo do banco. Cada pessoa ainda precisa de permissão de leitura no Power BI. [Incorporação segura do Power BI](https://learn.microsoft.com/pt-br/power-bi/collaborate-share/service-embed-secure)
 
 ## Estrutura
 

@@ -41,6 +41,26 @@
   gap: 8px;
 }
 
+.power-bi-gerencia { display: grid; gap: 16px; max-width: 900px; }
+.power-bi-edicao, .power-bi-lista {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 16px;
+  border: 1px solid var(--borda);
+  border-radius: 12px;
+  background: var(--superficie);
+}
+.power-bi-lista { list-style: none; }
+.power-bi-lista > li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.power-bi-lista > li + li { padding-top: 12px; border-top: 1px solid var(--borda); }
+
 .power-bi-quadro {
   position: relative;
   display: flex;

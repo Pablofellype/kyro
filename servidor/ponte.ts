@@ -9,7 +9,7 @@ import { lerUltimaVersao } from "./atualizacoes.ts";
 import { lerTudo, gravar, backupManual, zerarBanco, reservarConfirmacao } from "./banco.ts";
 import { pedirMidia } from "./midia.ts";
 import { pedirJanelas } from "./janelas.ts";
-import { configPublica, estadoConexoes, lerConexao, salvarChaveConexao, removerChaveConexao, servicoValido, chaveDe, lerAbaDasPlanilhas, SERVICOS as SERVICOS_CONEXAO } from "./conexoes.ts";
+import { configPublica, estadoConexoes, lerConexao, salvarChaveConexao, removerChaveConexao, removerTodasAsChavesDeConexao, servicoValido, chaveDe } from "./conexoes.ts";
 import { buscarGmail, criarRascunhoGmail, enviarGmail } from "./gmail.ts";
 import { lerAgendaGoogle } from "./agendaGoogle.ts";
 import { lerCotacoes, lerCotacoesImportados } from "./cotacoes.ts";
@@ -31,6 +31,8 @@ import { configuracaoSalva, executarAderencias, enviarAderencia, navegadorDeAder
 import { aplicarRascunhoAderencias, type RascunhoAderencias } from "../src/modulos/escritorio/edicaoAderencias.ts";
 import { comUsuarioLocal } from "./escopoUsuario.ts";
 import { tratarAplicativosEmpresa } from "../src/servicos/aplicativosEmpresa.ts";
+import { responderArquivoProposta } from "../src/servicos/propostasAplicativos.ts";
+import { criarInventarioLocal } from "./inventarioLocal.ts";
 
 const LIMITE_CORPO = 24 * 1024 * 1024;
 
@@ -357,7 +359,8 @@ async function encaminharWhatsappRemoto(req: IncomingMessage, res: ServerRespons
   }
 }
 
-export const rotas: Connect.NextHandleFunction = async (req, res, proximo) => {
+export async function rotas(req: Parameters<Connect.NextHandleFunction>[0], res: ServerResponse,
+  proximo: Parameters<Connect.NextHandleFunction>[2], inventarioLocal?: ReturnType<typeof criarInventarioLocal>) {
   const url = new URL(req.url ?? "/", "http://localhost");
 
   if (url.pathname === "/api/health") {
@@ -424,6 +427,7 @@ export const rotas: Connect.NextHandleFunction = async (req, res, proximo) => {
               cargo: typeof corpo.cargo === "string" ? corpo.cargo : "",
               setor: typeof corpo.setor === "string" ? corpo.setor : "",
               telefone: typeof corpo.telefone === "string" ? corpo.telefone : "",
+              powerBiRelatorios: corpo.powerBiRelatorios,
             });
           }
           return responder(res, 200, { sucesso: true, mensagem: "Convite enviado." });
@@ -453,6 +457,7 @@ export const rotas: Connect.NextHandleFunction = async (req, res, proximo) => {
               cargo: typeof corpo.cargo === "string" ? corpo.cargo : "",
               setor: typeof corpo.setor === "string" ? corpo.setor : "",
               telefone: typeof corpo.telefone === "string" ? corpo.telefone : "",
+              powerBiRelatorios: typeof corpo.perfil === "string" ? undefined : corpo.powerBiRelatorios,
             });
             if (typeof corpo.perfil === "string") atualizado = await alterarPerfilUsuario(usuarioAtual, Number(corpo.id), corpo.perfil);
             return responder(res, 200, { sucesso: true, usuario: atualizado });
@@ -485,7 +490,9 @@ export const rotas: Connect.NextHandleFunction = async (req, res, proximo) => {
 
   if (url.pathname === "/api/aplicativos-empresa") {
     if (!hostLocal(req) || !origemConfiavel(req)) return responder(res, 403, { erro: "origem_nao_permitida" });
-    const resultado = await tratarAplicativosEmpresa(req.method, url.searchParams.get("acao"), tokenDaRequisicao(req), () => lerCorpo(req));
+    const resultado = await tratarAplicativosEmpresa(req.method, url.searchParams.get("acao"), tokenDaRequisicao(req),
+      () => lerCorpo(req), url.searchParams, inventarioLocal);
+    if (resultado.arquivo) return responderArquivoProposta(res, resultado.arquivo);
     return responder(res, resultado.status, resultado.dados);
   }
 
@@ -755,11 +762,6 @@ export const rotas: Connect.NextHandleFunction = async (req, res, proximo) => {
       return responder(res, 200, await lerCotacoes());
     }
     if (caminho === "/google/login-direto" && req.method === "GET") return responder(res, 200, { disponivel: false, emTestes: true });
-    if (caminho === "/conexoes/planilhas/aba" && req.method === "GET") {
-      const gid = url.searchParams.get("gid");
-      if (!gid || !/^\d+$/.test(gid)) return responder(res, 400, { erro: "planilhas_aba_invalida" });
-      return responder(res, 200, await lerAbaDasPlanilhas(url.searchParams.get("id") ?? "", Number(gid)));
-    }
     if (caminho === "/gmail/buscar" && req.method === "GET") return responder(res, 200, await buscarGmail(await chaveDe("google"), url.searchParams.get("q") ?? ""));
     if (caminho === "/agenda/eventos" && req.method === "GET") return responder(res, 200, await lerAgendaGoogle(await chaveDe("google"), url.searchParams.get("de") ?? "", url.searchParams.get("ate") ?? ""));
     if (caminho === "/gmail/rascunho" && req.method === "POST") return responder(res, 200, await criarRascunhoGmail(await chaveDe("google"), await lerCorpo(req)));
@@ -789,7 +791,7 @@ export const rotas: Connect.NextHandleFunction = async (req, res, proximo) => {
       const pasta = zerarBanco(bancoDaRequisicao(req));
       if (corpo.chaves === true) {
         for (const p of listarProvedores()) await removerProvedor(p.id);
-        for (const s of SERVICOS_CONEXAO) await removerChaveConexao(s);
+        await removerTodasAsChavesDeConexao();
       }
       return responder(res, 200, { pasta });
     }
@@ -863,9 +865,9 @@ export const rotas: Connect.NextHandleFunction = async (req, res, proximo) => {
       res.end();
     }
   });
-};
+}
 
-export function ponteLocal(): Plugin {
+export function ponteLocal(urlInventario?: string): Plugin {
   return {
     name: "niko-ponte-local",
     configureServer(servidor) {
@@ -878,7 +880,8 @@ export function ponteLocal(): Plugin {
         }
         proximo();
       });
-      servidor.middlewares.use(rotas);
+      const inventarioLocal = criarInventarioLocal(urlInventario);
+      servidor.middlewares.use((req, res, proximo) => rotas(req, res, proximo, inventarioLocal));
       if (servidor.httpServer) instalarSincroniaTempoReal(servidor.httpServer);
     },
     transformIndexHtml: {

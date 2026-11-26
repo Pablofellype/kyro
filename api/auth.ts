@@ -66,7 +66,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const resultado = await loginUsuario(email, senha, origemDaRequisicao(req));
-    if (!resultado.sucesso) {
+    if (!("token" in resultado)) {
       return res.status(401).json(resultado);
     }
 
@@ -127,7 +127,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const telefone = typeof req.body?.telefone === "string" ? req.body.telefone : "";
     const perfil = "gerencia";
     try {
-      await criarConviteUsuario(usuarioAtual, email, nome, urlPublicaDaRequisicao(req), { perfil, cargo, setor, telefone });
+      await criarConviteUsuario(usuarioAtual, email, nome, urlPublicaDaRequisicao(req), { perfil, cargo, setor, telefone, powerBiRelatorios: req.body?.powerBiRelatorios });
       return res.status(200).json({ sucesso: true, mensagem: "Convite enviado." });
     } catch (erro) {
       return res.status(400).json({ sucesso: false, erro: (erro as Error).message });
@@ -165,6 +165,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           cargo: typeof req.body?.cargo === "string" ? req.body.cargo : "",
           setor: typeof req.body?.setor === "string" ? req.body.setor : "",
           telefone: typeof req.body?.telefone === "string" ? req.body.telefone : "",
+          powerBiRelatorios: typeof req.body?.perfil === "string" ? undefined : req.body?.powerBiRelatorios,
         });
         if (typeof req.body?.perfil === "string") usuarioAtualizado = await alterarPerfilUsuario(usuarioAtual, id, req.body.perfil);
         return res.status(200).json({ sucesso: true, usuario: usuarioAtualizado });

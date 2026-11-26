@@ -52,6 +52,7 @@ export const BARRA_PADRAO: ItemBarra[] = [
   { rota: "escritorio", visivel: true },
   { rota: "appsEmpresa", visivel: true },
   { rota: "powerBi", visivel: true },
+  { rota: "planilhasEmpresa", visivel: true },
   { rota: "sults", visivel: true },
   { rota: "conexoes", visivel: true },
   { rota: "journal", visivel: true },
@@ -68,6 +69,7 @@ export const GRUPO_DA_ROTA: Record<Rota, "principal" | "organizacao" | "ferramen
   escritorio: "principal",
   appsEmpresa: "principal",
   powerBi: "principal",
+  planilhasEmpresa: "principal",
   sults: "principal",
   conexoes: "principal",
   journal: "organizacao",
@@ -188,7 +190,7 @@ export interface Configuracoes {
   silenciarComTerminalNaFrente: boolean;
   claudeInstalado: boolean;
   funcoesDesligadas: ("journal" | "estudos" | "financas" | "metas" | "calendario")[];
-  ultimaSaudacao: { dia: string; versao: string } | null;
+  ultimaSaudacao: { dia: string; versao: string; usuarioId?: number } | null;
 }
 
 export const CONFIG_PADRAO: Configuracoes = {
@@ -361,9 +363,10 @@ export const useConfig = create<Configuracoes & AcoesConfig>()(
         const barraLateral = [...barraSalva];
         BARRA_PADRAO.forEach((item, i) => {
           if (barraLateral.some((x) => x.rota === item.rota)) return;
-          if (item.rota === "sults") {
-            const powerBi = barraLateral.findIndex((x) => x.rota === "powerBi");
-            barraLateral.splice(powerBi + 1, 0, item);
+          if (item.rota === "planilhasEmpresa" || item.rota === "sults") {
+            const anterior = item.rota === "planilhasEmpresa" ? "powerBi" : "planilhasEmpresa";
+            const posicao = barraLateral.findIndex((x) => x.rota === anterior);
+            barraLateral.splice(posicao + 1, 0, item);
             return;
           }
           const seguinte = BARRA_PADRAO.slice(i + 1).find((p) => barraLateral.some((x) => x.rota === p.rota));

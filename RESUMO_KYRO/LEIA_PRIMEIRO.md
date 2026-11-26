@@ -4,7 +4,7 @@ Esta pasta é o resumo permanente do projeto e deve ser usada para continuar o t
 
 O ponto de retomada mais recente está em [RETOMADA.md](RETOMADA.md), com o estado confirmado, as correções publicadas e os testes ainda pendentes. Consulte esse arquivo junto com o final do histórico para não tratar pendências antigas já concluídas como abertas.
 
-**Estado atualizado em 22/11/2026, horário de Brasília.** A versão atual é **0.2.46**, commit **2c054de** na `main` e na tag `v0.2.46`. A Release Windows está publicada e a DigitalOcean respondeu com a API e o banco saudáveis. **Pessoal → Finanças** foi recuperado no Neon e no localhost. A pendência mais recente é a cotação de Importados no site publicado, cuja rota respondeu `503` durante a conferência.
+**Estado atualizado em 25/11/2026, horário de Brasília.** A versão atual é **0.2.49**, commit **aabe2e4** na `main` e na tag `v0.2.49`. O usuário confirmou que o relatório **Controle de Custos SAP** abriu dentro do Kyro para Windows após o login da Microsoft. O checkout do DigitalOcean chegou ao mesmo commit. A v0.2.48 incluiu o painel editável do Escritório, as melhorias de Aderências e WhatsApp e as abas Power BI e SULTS. A aba SULTS exibe **Em breve no Kyro**.
 
 ## Regra obrigatória para qualquer continuação
 
@@ -22,7 +22,7 @@ O ponto de retomada mais recente está em [RETOMADA.md](RETOMADA.md), com o esta
 - Pasta: `C:\Users\pfmmelo\Downloads\kyro`
 - Produto: Kyro, sistema pessoal + sistema de empresa.
 - Área pessoal: rotina, estudos, finanças, objetivos, calendário pessoal e preferências do usuário.
-- Área de empresa: deve ser separada da vida pessoal e se chamar **Escritório**.
+- Área **Empresa**: o **Dashboard** abre o espaço de trabalho, com o **Calendário** logo abaixo na navegação.
 - O usuário pediu para preservar o visual Kyro, a experiência responsiva e as animações, mas remover excessos técnicos visíveis para pessoas que não são desenvolvedoras.
 
 ## Regra de trabalho

@@ -57,6 +57,7 @@ import { VisaoWhatsapp, usarAvisosDoWhatsapp } from "./VisaoWhatsapp";
 import { useWhatsapp } from "../../estado/whatsapp";
 import { VisaoSolicitacoesMaterial } from "./VisaoSolicitacoesMaterial";
 import { usarResumoDoInventario } from "../../modulos/escritorio/notificacoesAppsEmpresa";
+import { consultarAppsEmpresa } from "../../modulos/escritorio/catalogoAppsEmpresa";
 import "./ilha.css";
 
 const ICONE_ABA: Record<AbaIlha, LucideIcon> = {
@@ -117,15 +118,27 @@ function useAgora(intervalo: number, ativo: boolean) {
   return agora;
 }
 
-function IconeAvisoMaterial({ reduzir }: { reduzir: boolean }) {
+function IconeAvisoMaterial({ reduzir, evento }: { reduzir: boolean; evento?: string }) {
+  const token = useAuth((s) => s.token);
+  const [foto, setFoto] = useState<{ token: string; evento: string; imagem: string } | null>(null);
+  useEffect(() => {
+    if (!token || !evento) return;
+    const controle = new AbortController();
+    void consultarAppsEmpresa<{ foto: string }>("foto-inventario", token, { evento }, controle.signal).then(({ foto: imagem }) => {
+      if (!controle.signal.aborted && /^data:image\/(jpeg|png|webp);base64,/.test(imagem)) setFoto({ token, evento, imagem });
+    }).catch(() => undefined);
+    return () => controle.abort();
+  }, [token, evento]);
+  const imagem = foto && foto.token === token && foto.evento === evento ? foto.imagem : undefined;
   return <motion.span
     className="ilha-materiais-icone-aviso"
+    data-foto={imagem ? "sim" : undefined}
     aria-hidden="true"
     initial={reduzir ? false : { scale: 0.7, rotate: -14 }}
     animate={reduzir ? { scale: 1 } : { scale: [0.7, 1.24, 0.95, 1], rotate: [-14, 7, -3, 0] }}
     transition={{ duration: reduzir ? 0 : 0.48, ease: "easeOut" }}
   >
-    <PackageOpen size={16} />
+    {imagem ? <img src={imagem} alt="" draggable={false} onError={() => setFoto(null)} /> : <PackageOpen size={16} />}
   </motion.span>;
 }
 
@@ -148,7 +161,8 @@ export function Ilha({ mobileSobDemanda = false }: { mobileSobDemanda?: boolean 
   const secaoHoje = useIlha((s) => s.secaoHoje);
   const [conexaoSelecionada, setConexaoSelecionada] = useState<ServicoId | null>(null);
   const [personalizacaoAberta, setPersonalizacaoAberta] = useState(false);
-  const revelacao = useIlha((s) => s.revelacao);
+  const avisoPendente = useIlha((s) => s.revelacao);
+  const revelacao = avisoPendente?.destinatarioId === undefined || avisoPendente.destinatarioId === usuario?.id ? avisoPendente : null;
   const saudacao = useIlha((s) => mobileSobDemanda ? null : s.saudacao);
   const encerrarSaudacao = useIlha((s) => s.encerrarSaudacao);
   const saudando = saudacao !== null;
@@ -475,7 +489,7 @@ export function Ilha({ mobileSobDemanda = false }: { mobileSobDemanda?: boolean 
     : estadoEfetivo === "escondida"
       ? { w: 120, h: 6, r: 6 }
       : estadoEfetivo === "compacta"
-        ? { w: larguraCompacta, h: compacta.tipo === "revelacao" ? (revelacao?.detalhe ? 72 : 56) : compacta.tipo === "midia" ? ALTURA_COMPACTA_MIDIA : ALTURA_COMPACTA, r: compacta.tipo === "midia" || compacta.tipo === "revelacao" ? 14 : 12 }
+        ? { w: larguraCompacta, h: compacta.tipo === "revelacao" ? (revelacao?.detalhe ? (revelacao.aba === "materiais" ? 84 : 72) : 56) : compacta.tipo === "midia" ? ALTURA_COMPACTA_MIDIA : ALTURA_COMPACTA, r: compacta.tipo === "midia" || compacta.tipo === "revelacao" ? 14 : 12 }
         : DIMENSOES_ILHA_EXPANDIDA;
   const margemTela = ehMobile ? 8 : MARGEM_DA_TELA;
   const alvo = ehMobile && estadoEfetivo !== "escondida"
@@ -538,7 +552,7 @@ export function Ilha({ mobileSobDemanda = false }: { mobileSobDemanda?: boolean 
         return (
           <>
             <div className="ilha-compacta-lado">
-              {revelacao?.aba === "materiais" ? <IconeAvisoMaterial key={revelacao.texto} reduzir={Boolean(reduzirAnimacoes)} /> : revelacao?.marca ? <Marca marca={revelacao.marca} tamanho={16} /> : revelacao?.agente ? <EspacoDoPersonagem agente={revelacao.agente} tamanho={20} posicao="compacta" /> : null}
+              {revelacao?.aba === "materiais" ? <IconeAvisoMaterial key={revelacao.texto} reduzir={Boolean(reduzirAnimacoes)} evento={privacidade ? undefined : revelacao.fotoEvento} /> : revelacao?.marca ? <Marca marca={revelacao.marca} tamanho={16} /> : revelacao?.agente ? <EspacoDoPersonagem agente={revelacao.agente} tamanho={20} posicao="compacta" /> : null}
             </div>
             {revelacao?.detalhe ? <span className="ilha-materiais-aviso-detalhado privado" role="status" title={revelacao.detalhe}>
               <strong>{revelacao.texto}</strong><span>{revelacao.detalhe}</span>
@@ -714,7 +728,7 @@ export function Ilha({ mobileSobDemanda = false }: { mobileSobDemanda?: boolean 
           </AnimatePresence>
           <AnimatePresence>
             {revelacao && estadoEfetivo === "expandida" && !saudando && <motion.button key={revelacao.texto} type="button" className="ilha-aviso-aberta" initial={{ opacity: 0, y: reduzirAnimacoes ? 0 : -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} onClick={() => { abrir(revelacao.aba); useIlha.getState().dispensarRevelacao(); }}>
-              {revelacao.aba === "materiais" ? <IconeAvisoMaterial reduzir={Boolean(reduzirAnimacoes)} /> : <Bell size={16} />}
+              {revelacao.aba === "materiais" ? <IconeAvisoMaterial reduzir={Boolean(reduzirAnimacoes)} evento={privacidade ? undefined : revelacao.fotoEvento} /> : <Bell size={16} />}
               {revelacao.detalhe ? <span className="ilha-materiais-aviso-detalhado privado" role="status" title={revelacao.detalhe}>
                 <strong>{revelacao.texto}</strong><span>{revelacao.detalhe}</span>
               </span> : <span className="privado" role="status">{revelacao.texto}</span>}

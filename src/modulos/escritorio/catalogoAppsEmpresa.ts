@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { create } from "zustand";
 import { cabecalhosNiko, urlApi, useAuth } from "../../estado/autenticacao";
-import { APLICATIVOS_EMPRESA, type AplicativoEmpresa } from "./aplicativosEmpresaConfig";
+import { APLICATIVOS_EMPRESA, TIPOS_PROPOSTA, type AnexoProposta, type AplicativoEmpresa, type TipoProposta } from "./aplicativosEmpresaConfig";
 
 export class ErroAppsEmpresa extends Error {}
 
@@ -51,11 +51,39 @@ export async function carregarCatalogoAppsEmpresa(token: string, signal?: AbortS
   }
 }
 
-export async function salvarAppEmpresa(token: string, app: Omit<AplicativoEmpresa, "id"> & { id: string | null; criacaoId?: string }) {
-  const { aplicativos } = await consultarAppsEmpresa<{ aplicativos: AplicativoEmpresa[] }>("catalogo", token, app);
+export async function salvarAppEmpresa(token: string, app: Omit<AplicativoEmpresa, "id"> & { id: string | null; criacaoId?: string }, signal?: AbortSignal) {
+  const { aplicativos } = await consultarAppsEmpresa<{ aplicativos: AplicativoEmpresa[] }>("catalogo", token, app, signal);
   if (useAuth.getState().token !== token) return;
   versaoConsulta++;
   useCatalogoRemoto.setState({ token, aplicativos, erro: false });
+}
+
+export function erroDoArquivoProposta(tipo: TipoProposta, arquivo: Pick<File, "name" | "size" | "type">): string | undefined {
+  const { mime, extensao, limiteMb } = TIPOS_PROPOSTA[tipo];
+  const tipoDoArquivo = arquivo.type.toLowerCase();
+  if (!arquivo.name.toLowerCase().endsWith(`.${extensao}`) || (tipoDoArquivo && tipoDoArquivo !== mime && tipoDoArquivo !== "application/octet-stream")) {
+    return `Escolha um arquivo ${extensao.toUpperCase()}.`;
+  }
+  if (arquivo.size < 1) return "O arquivo está vazio.";
+  if (arquivo.size > limiteMb * 1024 * 1024) return `O arquivo ultrapassa o limite de ${limiteMb} MB.`;
+}
+
+export async function enviarAnexoProposta(token: string, id: string, tipo: TipoProposta, arquivo: File, signal: AbortSignal): Promise<AnexoProposta> {
+  if (erroDoArquivoProposta(tipo, arquivo)) throw new ErroAppsEmpresa("arquivo_proposta_invalido");
+  const { mime } = TIPOS_PROPOSTA[tipo];
+  const { caminho, token: tokenUpload } = await consultarAppsEmpresa<{ caminho: string; token: string }>("proposta-upload", token, { id, tipo }, signal);
+  const { put } = await import("@vercel/blob/client");
+  await put(caminho, arquivo, { token: tokenUpload, access: "private", contentType: mime, multipart: arquivo.size > 5 * 1024 * 1024, abortSignal: signal });
+  return { origem: "arquivo", caminho, nome: arquivo.name.trim().slice(0, 160) };
+}
+
+export async function baixarAnexoProposta(token: string, id: string, tipo: TipoProposta, signal: AbortSignal): Promise<Blob> {
+  const parametros = new URLSearchParams({ acao: "proposta-arquivo", app: id, tipo });
+  const resposta = await fetch(urlApi(`/api/aplicativos-empresa?${parametros}`), {
+    headers: { ...cabecalhosNiko(), Authorization: `Bearer ${token}` }, signal,
+  });
+  if (!resposta.ok) throw new ErroAppsEmpresa("arquivo_proposta_indisponivel");
+  return resposta.blob();
 }
 
 export function useSincronizarCatalogoAppsEmpresa() {

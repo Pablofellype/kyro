@@ -22,7 +22,7 @@ await build({
     emptyOutDir: false,
     target: "node22",
     minify: false,
-    rollupOptions: { output: { format: "es", entryFileNames: "ponte.mjs" } },
+    rollupOptions: { output: { format: "es", entryFileNames: "ponte.mjs", codeSplitting: false } },
   },
   ssr: { noExternal: true },
 });
